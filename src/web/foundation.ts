@@ -367,7 +367,7 @@ export function foundationRouter(): Router {
   /* ---------------- judge mode (B.10) ---------------- */
   r.get("/judge", page(async (req, res) => {
     const db = await getDb();
-    const m = (await db.query<Merchant>("SELECT * FROM merchants ORDER BY created_at LIMIT 1")).rows[0] ?? null;
+    const m = (await db.query<Merchant>("SELECT * FROM merchants WHERE slug = $1", [process.env.KEPT_DEMO_SHOP || "ember-oak-coffee-club"])).rows[0] ?? (await db.query<Merchant>("SELECT * FROM merchants ORDER BY created_at LIMIT 1")).rows[0] ?? null;
     let sid = typeof req.cookies?.kept_judge === "string" ? req.cookies.kept_judge : "";
     const existing = sid ? (await db.query("SELECT * FROM judge_sessions WHERE id = $1", [sid])).rows[0] : null;
     if (!existing) {

@@ -27,6 +27,8 @@ export interface EligibilityInput {
   skipsAt: Date[];
   /** When this subscriber last accepted any retention offer. */
   lastOfferAcceptedAt: Date | null;
+  /** The owner's autonomy limit for pauses the offer step may give without asking (guard settings). */
+  maxPauseCycles?: number;
   now?: Date;
 }
 
@@ -60,8 +62,11 @@ export function eligibleOffers(input: EligibilityInput): EligibleOffer[] {
   const out: EligibleOffer[] = [];
   const price = current.price;
 
-  if (rules.pause.enabled && subscriber.status === "ACTIVE") {
-    const cycles = rules.pause.maxCycles;
+  // Offer the longest pause the rules allow that the owner also lets Kept give on its own; a longer one would
+  // only be held for approval while the subscriber waits, and the cancel would go ahead with no offer at all.
+  const pauseCycles = Math.min(rules.pause.maxCycles, input.maxPauseCycles ?? rules.pause.maxCycles);
+  if (rules.pause.enabled && subscriber.status === "ACTIVE" && pauseCycles >= 1) {
+    const cycles = pauseCycles;
     out.push({
       key: `pause_${cycles}`,
       type: "pause",

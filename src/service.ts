@@ -13,7 +13,7 @@ import {
   currentPolicy, intervalMs, intervalWords, KeptError, logEvent, Merchant, merchantById, offerById, openOfferFor, Plan, planById, plansFor,
   Subscriber, subscriberById, subscriberByRef, subscribersFor, toOffer, updateSubscriber,
 } from "./store.js";
-import { gate, GateDenied, HeldForApproval, type MoneyMove } from "./guard/dryrun.js";
+import { gate, GateDenied, guardSettings, HeldForApproval, type MoneyMove } from "./guard/dryrun.js";
 import { register as registerProvenance } from "./guard/provenance.js";
 import { appendAudit } from "./guard/audit.js";
 import { quarantine } from "./ai/grounding.js";
@@ -543,6 +543,7 @@ export async function requestCancel(ref: string, opts: { reason?: string; hearOf
             plans,
             skipsAt: await skipsFor(s.id),
             lastOfferAcceptedAt: lastAccepted ? new Date(lastAccepted) : null,
+            maxPauseCycles: (await guardSettings(m.id)).auto_pause_max_cycles,
           });
           const choice = brain.pickOffer(eligible, category);
           const chosen = eligible.find((o) => o.key === choice.key);
@@ -876,7 +877,7 @@ export async function subscriptionView(ref: string) {
   };
 }
 
-export async function computeStats(m: Merchant): Promise<ShopStats & { collected30: number; offersExpired: number; reasonsTotal: number; sampleRows: number }> {
+export async function computeStats(m: Merchant): Promise<ShopStats & { collected30: number; offersExpired: number; reasonsTotal: number; sampleRows: number; live: { active: number; suspended: number; mrr: number } }> {
   const db = await getDb();
   const subs = await subscribersFor(db, m.id);
   const plans = await plansFor(db, m.id, true);
@@ -924,6 +925,12 @@ export async function computeStats(m: Merchant): Promise<ShopStats & { collected
     upcomingRenewals7d: active.filter((s) => s.next_billing_time && s.next_billing_time.getTime() < in7).length,
     collected30: Number(collected?.t ?? 0),
     sampleRows: subs.filter((s) => s.is_sample).length,
+    // The same headline numbers without labelled sample rows: what PayPal actually bills.
+    live: {
+      active: active.filter((s) => !s.is_sample).length,
+      suspended: subs.filter((s) => s.status === "SUSPENDED" && !s.is_sample).length,
+      mrr: Math.round(active.filter((s) => !s.is_sample).reduce((a, s) => a + monthly(s), 0) * 100) / 100,
+    },
   };
 }
 
