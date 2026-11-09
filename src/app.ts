@@ -14,6 +14,8 @@ import { guardRouter } from "./web/guard.js";
 import { safetyRouter } from "./web/safety.js";
 import { foundationRouter, runsApi } from "./web/foundation.js";
 import { installChannelHandlers } from "./channels/handlers.js";
+import { uiApi } from "./web/ui-api.js";
+import { spaRouter } from "./web/spa.js";
 import { KeptError } from "./store.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -60,6 +62,8 @@ export function createApp() {
 
   app.post("/webhooks/paypal", (req, res, next) => receiveWebhook(req, res).catch(next));
   installChannelHandlers();
+  app.use(uiApi());
+  app.use(spaRouter());
   app.use("/api/v1", runsApi());
   app.use("/api/v1", apiRouter());
   app.use(guardRouter());

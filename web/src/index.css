@@ -1,0 +1,261 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/schibsted-grotesk/wght.css";
+@import "@fontsource/ibm-plex-sans/400.css";
+@import "@fontsource/ibm-plex-sans/500.css";
+@import "@fontsource/ibm-plex-sans/600.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* Kept tokens: paper, ink and a cobalt stamp pad. See docs/DESIGN_BRIEF.md. */
+:root {
+  --paper: #f6f3ec;
+  --card-stock: #fffdf9;
+  --ink: #16181b;
+  --ink-2: #4b5058;
+  --rule: #dcd4c4;
+  --stamp: #2443c4;
+  --stamp-wash: #e7ebfa;
+  --paid: #1d7348;
+  --paid-wash: #e2f1e8;
+  --pause: #8f5a00;
+  --pause-wash: #f6ead2;
+  --fail: #b42318;
+  --fail-wash: #f9e2df;
+
+  --background: var(--paper);
+  --foreground: var(--ink);
+  --card: var(--card-stock);
+  --card-foreground: var(--ink);
+  --popover: var(--card-stock);
+  --popover-foreground: var(--ink);
+  --primary: var(--ink);
+  --primary-foreground: var(--paper);
+  --secondary: #ece6da;
+  --secondary-foreground: var(--ink);
+  --muted: #ece6da;
+  --muted-foreground: var(--ink-2);
+  --accent: var(--stamp-wash);
+  --accent-foreground: var(--ink);
+  --destructive: var(--fail);
+  --border: var(--rule);
+  --input: #c9c0ae;
+  --ring: var(--stamp);
+  --radius: 0.75rem;
+  --radius-btn: 0.5rem;
+  --sidebar: #efeadf;
+  --sidebar-foreground: var(--ink);
+  --sidebar-primary: var(--ink);
+  --sidebar-primary-foreground: var(--paper);
+  --sidebar-accent: var(--stamp-wash);
+  --sidebar-accent-foreground: var(--ink);
+  --sidebar-border: var(--rule);
+  --sidebar-ring: var(--stamp);
+  --shadow-float: 0 12px 32px rgb(22 24 27 / 0.18);
+  --dur-fast: 120ms;
+  --dur-stamp: 200ms;
+  --dur-sheet: 320ms;
+}
+
+.dark {
+  --paper: #121417;
+  --card-stock: #1a1d21;
+  --ink: #ede8de;
+  --ink-2: #a9adb5;
+  --rule: #2d3137;
+  --stamp: #93a6ff;
+  --stamp-wash: #20264a;
+  --paid: #63c795;
+  --paid-wash: #15301f;
+  --pause: #e6ae52;
+  --pause-wash: #352710;
+  --fail: #ff8f85;
+  --fail-wash: #3a1714;
+  --secondary: #24282d;
+  --muted: #24282d;
+  --input: #3a3f46;
+  --sidebar: #16191c;
+  --shadow-float: 0 12px 32px rgb(0 0 0 / 0.5);
+}
+
+@theme inline {
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-heading: "Schibsted Grotesk Variable", "IBM Plex Sans", ui-sans-serif, sans-serif;
+  --font-display: "Schibsted Grotesk Variable", "IBM Plex Sans", ui-sans-serif, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --color-paper: var(--paper);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-rule: var(--rule);
+  --color-stamp: var(--stamp);
+  --color-stamp-wash: var(--stamp-wash);
+  --color-paid: var(--paid);
+  --color-paid-wash: var(--paid-wash);
+  --color-pause: var(--pause);
+  --color-pause-wash: var(--pause-wash);
+  --color-fail: var(--fail);
+  --color-fail-wash: var(--fail-wash);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: var(--radius);
+  --radius-xl: 1rem;
+  --animate-marquee: marquee var(--duration) infinite linear;
+  --animate-marquee-vertical: marquee-vertical var(--duration) linear infinite;
+  @keyframes marquee {
+    from { transform: translateX(0); }
+    to { transform: translateX(calc(-100% - var(--gap))); }
+  }
+  @keyframes marquee-vertical {
+    from { transform: translateY(0); }
+    to { transform: translateY(calc(-100% - var(--gap))); }
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/60;
+  }
+  /* grid children never force the page wider than the screen */
+  .grid > * {
+    min-width: 0;
+  }
+  html {
+    @apply font-sans;
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-size: 1rem;
+    line-height: 1.55;
+    text-rendering: optimizeLegibility;
+  }
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+    letter-spacing: -0.015em;
+    line-height: 1.15;
+    text-wrap: balance;
+  }
+  :focus-visible {
+    outline: 3px solid var(--stamp);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: var(--stamp-wash);
+  }
+}
+
+/* Money, dates and statuses always line up. */
+.num, time, [data-money] {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+/* Big standalone figures read better proportional; the display face's tabular full stop is too wide. */
+.font-display.num, .font-display .num, .font-display[data-money] {
+  font-variant-numeric: lining-nums proportional-nums;
+}
+
+/* Stamp press: used by the cycle card. */
+@keyframes stamp-in {
+  0% { transform: scale(1.18) rotate(-6deg); opacity: 0; }
+  70% { transform: scale(0.96) rotate(0deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+.stamp-in { animation: stamp-in var(--dur-stamp) ease-out both; }
+
+/* Reduced motion from the OS. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; scroll-behavior: auto !important; }
+}
+
+/* Display and help (public/a11y.js sets these data attributes on <html> from a profile kept on this device). */
+html[data-a11y-text="1.25"] { font-size: 125%; }
+html[data-a11y-text="1.5"] { font-size: 150%; }
+html[data-a11y-text="2"] { font-size: 200%; }
+html[data-a11y-contrast="high"] { --ink-2: var(--ink); --rule: var(--ink); --input: var(--ink); --stamp: #0b2399; --paper: #ffffff; --card-stock: #ffffff; }
+html.dark[data-a11y-contrast="high"] { --stamp: #c5d0ff; --paper: #000000; --card-stock: #000000; }
+html[data-a11y-font="hyperlegible"] body { font-family: "Atkinson Hyperlegible", var(--font-sans); letter-spacing: 0.01em; }
+html[data-a11y-motion="off"] *, html[data-a11y-motion="off"] *::before, html[data-a11y-motion="off"] *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+html[data-a11y-targets="big"] button, html[data-a11y-targets="big"] a[role="button"], html[data-a11y-targets="big"] input, html[data-a11y-targets="big"] select { min-height: 52px; }
+html[data-a11y-simple="on"] [data-simple] { font-size: 0; }
+html[data-a11y-simple="on"] [data-simple]::after { content: attr(data-simple); font-size: 1rem; }
+.a11y-panel { position: fixed; inset: 4.25rem 16px auto auto; z-index: 70; width: min(420px, calc(100vw - 32px)); max-height: min(80vh, 720px); overflow: auto; background: var(--card-stock); color: var(--ink); border: 1px solid var(--rule); border-radius: 12px; box-shadow: var(--shadow-float); padding: 16px; font-family: var(--font-sans); }
+.a11y-panel h2 { margin: 0 0 4px; font-size: 1.125rem; }
+.a11y-panel .spread { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.a11y-panel .row { display: flex; gap: 8px; flex-wrap: wrap; }
+.a11y-panel .sub, .a11y-panel .muted { color: var(--ink-2); }
+.a11y-panel .small { font-size: 0.875rem; }
+.a11y-panel fieldset { border: 1px solid var(--rule); border-radius: 8px; margin: 0 0 10px; padding: 8px 12px; }
+.a11y-panel legend { font-weight: 600; padding: 0 4px; }
+.a11y-panel label.tog { display: flex; align-items: center; gap: 10px; min-height: 44px; cursor: pointer; }
+.a11y-panel label.tog input { width: 22px; height: 22px; accent-color: var(--stamp); }
+.a11y-panel .seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.a11y-panel .btn, .a11y-first .btn { min-height: 44px; min-width: 56px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--ink); background: var(--card-stock); color: var(--ink); font: 500 0.9375rem var(--font-sans); cursor: pointer; }
+.a11y-panel .btn[aria-pressed="true"], .a11y-first .btn[aria-pressed="true"], .a11y-first .btn.primary { background: var(--ink); color: var(--paper); }
+.a11y-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.a11y-mic { margin-left: 6px; min-height: 44px; min-width: 44px; border-radius: 8px; border: 1px solid var(--rule); background: var(--card-stock); cursor: pointer; }
+.a11y-fab { display: none !important; } /* every header here has its own Display and help button */
+.a11y-fab-unused { position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 50; min-height: 44px; border-radius: 999px; padding: 0 16px; background: var(--card-stock); color: var(--ink); border: 1px solid var(--ink); font: 500 0.9375rem var(--font-sans); box-shadow: var(--shadow-float); }
+[data-a11y-open].a11y-custom { position: relative; }
+[data-a11y-open].a11y-custom::after { content: ""; position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; border-radius: 50%; background: var(--stamp); }
+
+/* AG Grid takes our tokens. */
+.ag-theme-kept {
+  --ag-font-family: var(--font-sans);
+  --ag-font-size: 14px;
+  --ag-foreground-color: var(--ink);
+  --ag-background-color: var(--card-stock);
+  --ag-header-background-color: var(--paper);
+  --ag-header-foreground-color: var(--ink-2);
+  --ag-border-color: var(--rule);
+  --ag-row-hover-color: var(--stamp-wash);
+  --ag-selected-row-background-color: var(--stamp-wash);
+  --ag-accent-color: var(--stamp);
+}
+
+/* Driver.js tour, re-tokened. */
+.driver-popover.kept-tour {
+  background: var(--card-stock);
+  color: var(--ink);
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  box-shadow: var(--shadow-float);
+  font-family: var(--font-sans);
+  max-width: min(360px, calc(100vw - 32px));
+}
+.driver-popover.kept-tour .driver-popover-title { font-family: var(--font-display); font-size: 1.125rem; }
+.driver-popover.kept-tour .driver-popover-description { color: var(--ink-2); font-size: 0.9375rem; line-height: 1.5; }
+.driver-popover.kept-tour .driver-popover-progress-text { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.driver-popover.kept-tour .driver-popover-footer button {
+  min-height: 40px; padding: 0 14px; border-radius: 8px; font: 500 14px var(--font-sans); text-shadow: none;
+  background: var(--card-stock); color: var(--ink); border: 1px solid var(--ink);
+}
+.driver-popover.kept-tour .driver-popover-footer .driver-popover-next-btn { background: var(--ink); color: var(--paper); }
+.driver-popover.kept-tour .driver-popover-close-btn { color: var(--ink-2); width: 40px; height: 40px; }
+.driver-popover.kept-tour .driver-popover-arrow { border-color: var(--card-stock); }
