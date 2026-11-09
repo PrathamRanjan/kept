@@ -43,3 +43,14 @@ h1 { font-size: 2.35rem; } h2 { font-size: 1.45rem; }
 .reason-bar .bar { height: 8px; }
 .reason-bar .bar > span { background: var(--crema); }
 h3, .lp-steps h3, .lp-feature h3, .persona-card b { font-family: var(--font-sans); font-weight: 600; letter-spacing: -0.005em; }
+
+/* >>> layout identity */
+/* Kept: a coffee club ledger book. A centred top bar with pill tabs, a narrow reading column, serif headlines. */
+:root { --radius: 0.6rem; --content-max: 980px; --top-bg: rgba(250,246,240,.92); --sb-mark-bg: #3e2417; --sb-mark-fg: #fbf3e8; }
+@media (min-width: 961px) { .L-topbar .topnav { margin: 0 auto; } }
+.L-topbar .topnav > a { border-radius: 999px; }
+.L-topbar .topnav > a.active { background: var(--ui-primary); color: var(--ui-primary-fg); }
+.L-topbar .content h1, .L-topbar .page-head h1 { font-family: var(--font-display); font-weight: 400; font-size: clamp(2rem, 1.5rem + 1.8vw, 2.9rem); letter-spacing: -0.01em; }
+.card, .kpi, .tile { border-radius: 0.9rem; background: var(--ui-card); }
+.kpi .value { font-family: var(--font-display); font-weight: 400; font-size: 2.1rem; }
+/* <<< layout identity */

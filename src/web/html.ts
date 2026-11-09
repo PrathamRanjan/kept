@@ -40,11 +40,12 @@ export const BRAND: Brand = {
   description: "Kept: PayPal subscriptions that customers and their AI agents can skip, pause or cancel in one step, with one fair offer within the shop's rules.",
   themeColor: "#3e2417",
   fonts: "family=Instrument+Serif:ital@0;1&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500",
-  appFoot: "PayPal sandbox: no real money moves. Cancelling always works in one step; rows marked sample are labelled demo data.",
-  siteLinks: [["/#how", "How it works"], ["/#fair", "Fair by design"], ["/#try", "Try it"], ["/agents", "For AI agents"]],
-  cta: ["/#try", "Try the demo"],
-  siteFoot: "Kept · built for the PayPal AI Hackathon · PayPal sandbox only, no real money moves.",
-  siteFootLinks: [["/judge", "Judge tour"], ["/onboard", "Set up a shop"], ["/login", "Owner sign-in"]],
+  layout: "topbar",
+  testMode: "Test mode: subscriptions run on the PayPal sandbox, so no real money moves. Rows marked sample are example data.",
+  siteLinks: [["/#how", "How it works"], ["/#fair", "Fair by design"], ["/agents", "For AI agents"], ["/#try", "Sign in"]],
+  cta: ["/#try", "Sign in"],
+  siteFoot: "© 2026 Kept. Test mode: subscriptions run on the PayPal sandbox.",
+  siteFootLinks: [["/judge", "Guided tour"], ["/onboard", "Set up a shop"], ["/login", "Owner sign-in"]],
   staticBase: "/static",
   legacyCss: ["legacy.css"],
 };
@@ -52,7 +53,7 @@ export const BRAND: Brand = {
 const navFor = (slug: string): NavGroup[] => [
   { label: "Your shop", items: [["/dashboard", "Today", "home"], ["/dashboard/guard", "Approvals and limits", "shieldCheck"], ["/dashboard/money", "Money", "wallet"], [`/s/${slug}`, "Shop page", "store"]] },
   { label: "Settings", items: [["/onboard/rules", "Retention rules", "settings"], ["/dashboard/safety", "Scam protection", "shield"], ["/dashboard/channels", "Messages", "message"]] },
-  { label: "How it works", items: [["/dashboard/traces", "Runs", "layers"], ["/dashboard/eval", "Test results", "flask"], ["/dashboard/compliance", "Compliance", "receipt"], ["/dashboard/evidence", "Evidence", "gauge"], ["/agents", "For AI agents", "sparkles"]] },
+  { label: "Admin", admin: true, items: [["/dashboard/traces", "Runs", "layers"], ["/dashboard/eval", "Test results", "flask"], ["/dashboard/compliance", "Compliance", "receipt"], ["/dashboard/evidence", "Evidence", "gauge"], ["/agents", "For AI agents", "sparkles"]] },
 ];
 
 export function layout(o: LayoutOpts, body: Raw): string {
