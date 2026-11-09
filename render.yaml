@@ -1,0 +1,70 @@
+# Render Blueprint for Kept: web service (app + MCP endpoints), background worker, daily cron, Postgres.
+# Deploy: Render Dashboard → New → Blueprint → pick this repo. Fill the variables marked sync: false
+# (PayPal sandbox client id/secret; APP_URL = the web service URL; PAYPAL_WEBHOOK_ID after `npm run webhook:register`).
+# Cheaper single-service option: deploy only kept-web with KEPT_INLINE_WORKER=true (the worker runs in-process).
+
+envVarGroups:
+  - name: kept-shared
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: PAYPAL_ENV
+        value: sandbox
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      - key: PAYPAL_WEBHOOK_ID
+        sync: false
+      - key: APP_URL
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: KEPT_BRAIN
+        value: local
+      - key: KEPT_DEMO_MODE
+        value: "true"
+
+databases:
+  - name: kept-db
+    databaseName: kept
+    user: kept
+    plan: basic-256mb
+
+services:
+  - type: web
+    name: kept-web
+    runtime: node
+    plan: starter
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: node dist/main.js
+    healthCheckPath: /healthz
+    envVars:
+      - fromGroup: kept-shared
+      - key: DATABASE_URL
+        fromDatabase: { name: kept-db, property: connectionString }
+      - key: KEPT_INLINE_WORKER
+        value: "false"
+
+  - type: worker
+    name: kept-worker
+    runtime: node
+    plan: starter
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: node dist/worker-main.js
+    envVars:
+      - fromGroup: kept-shared
+      - key: DATABASE_URL
+        fromDatabase: { name: kept-db, property: connectionString }
+
+  - type: cron
+    name: kept-reconcile
+    runtime: node
+    plan: starter
+    schedule: "0 3 * * *"
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: node dist/cron-main.js
+    envVars:
+      - fromGroup: kept-shared
+      - key: DATABASE_URL
+        fromDatabase: { name: kept-db, property: connectionString }

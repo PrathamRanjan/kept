@@ -1,0 +1,302 @@
+openapi: 3.0.3
+info:
+  title: Kept API
+  version: 0.1.0
+  description: |
+    PayPal subscriptions that AI agents can manage, with fair retention for small subscription businesses.
+    The same operations are available over MCP at /mcp (directory) and /s/{slug}/mcp (one shop).
+    Writes accept an `Idempotency-Key` header; a repeated key returns the first result.
+    Send `X-Agent-Id` to identify an AI agent in the shop's audit log.
+  license: { name: MIT }
+servers:
+  - url: http://localhost:3000/api/v1
+    description: Local
+tags:
+  - name: Shops
+  - name: Subscriptions
+  - name: Offers
+  - name: Owner
+paths:
+  /shops:
+    get:
+      tags: [Shops]
+      operationId: listShops
+      summary: List shops and their plans
+      responses:
+        "200": { description: Shops, content: { application/json: { schema: { type: object, properties: { shops: { type: array, items: { $ref: "#/components/schemas/Shop" } } } } } } }
+  /shops/{slug}:
+    get:
+      tags: [Shops]
+      operationId: getShop
+      summary: Shop details, plans and policies
+      parameters: [{ $ref: "#/components/parameters/Slug" }]
+      responses:
+        "200": { description: Shop, content: { application/json: { schema: { $ref: "#/components/schemas/Shop" } } } }
+        "404": { $ref: "#/components/responses/Error" }
+  /shops/{slug}/plans:
+    get:
+      tags: [Shops]
+      operationId: listPlans
+      summary: Current plans
+      parameters: [{ $ref: "#/components/parameters/Slug" }]
+      responses:
+        "200": { description: Plans, content: { application/json: { schema: { type: object, properties: { plans: { type: array, items: { $ref: "#/components/schemas/Plan" } } } } } } }
+  /shops/{slug}/subscriptions:
+    post:
+      tags: [Subscriptions]
+      operationId: startSubscription
+      summary: Start a subscription
+      description: Creates the PayPal subscription and returns an approval_url. Nothing is charged until the subscriber approves on PayPal.
+      parameters: [{ $ref: "#/components/parameters/Slug" }, { $ref: "#/components/parameters/IdempotencyKey" }, { $ref: "#/components/parameters/AgentId" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [plan_id]
+              properties:
+                plan_id: { type: string }
+                subscriber_name: { type: string }
+                subscriber_email: { type: string, format: email }
+      responses:
+        "201":
+          description: Created; waiting for approval on PayPal
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  subscription_ref: { type: string }
+                  paypal_subscription_id: { type: string }
+                  status: { type: string, example: APPROVAL_PENDING }
+                  approval_url: { type: string, format: uri }
+        "404": { $ref: "#/components/responses/Error" }
+        "422": { $ref: "#/components/responses/Error" }
+  /subscriptions/{ref}:
+    get:
+      tags: [Subscriptions]
+      operationId: getSubscription
+      summary: Subscription status (re-reads PayPal)
+      parameters: [{ $ref: "#/components/parameters/Ref" }, { name: refresh, in: query, schema: { type: boolean, default: true } }]
+      responses:
+        "200": { description: Subscription, content: { application/json: { schema: { $ref: "#/components/schemas/Subscription" } } } }
+        "404": { $ref: "#/components/responses/Error" }
+  /subscriptions/{ref}/skip:
+    post:
+      tags: [Subscriptions]
+      operationId: skipNext
+      summary: Skip the next renewal
+      parameters: [{ $ref: "#/components/parameters/Ref" }, { $ref: "#/components/parameters/IdempotencyKey" }, { $ref: "#/components/parameters/AgentId" }]
+      responses:
+        "200": { $ref: "#/components/responses/Paused" }
+        "403": { $ref: "#/components/responses/Error" }
+  /subscriptions/{ref}/pause:
+    post:
+      tags: [Subscriptions]
+      operationId: pause
+      summary: Pause for a number of billing cycles
+      parameters: [{ $ref: "#/components/parameters/Ref" }, { $ref: "#/components/parameters/IdempotencyKey" }, { $ref: "#/components/parameters/AgentId" }]
+      requestBody: { content: { application/json: { schema: { type: object, properties: { cycles: { type: integer, minimum: 1, maximum: 6 } } } } } }
+      responses:
+        "200": { $ref: "#/components/responses/Paused" }
+        "403": { $ref: "#/components/responses/Error" }
+        "422": { $ref: "#/components/responses/Error" }
+  /subscriptions/{ref}/resume:
+    post:
+      tags: [Subscriptions]
+      operationId: resume
+      summary: Resume now
+      parameters: [{ $ref: "#/components/parameters/Ref" }, { $ref: "#/components/parameters/IdempotencyKey" }, { $ref: "#/components/parameters/AgentId" }]
+      responses:
+        "200": { description: Resumed, content: { application/json: { schema: { type: object, properties: { status: { type: string } } } } } }
+        "409": { $ref: "#/components/responses/Error" }
+  /subscriptions/{ref}/switch:
+    post:
+      tags: [Subscriptions]
+      operationId: switchPlan
+      summary: Switch plan (PayPal revise)
+      parameters: [{ $ref: "#/components/parameters/Ref" }, { $ref: "#/components/parameters/IdempotencyKey" }, { $ref: "#/components/parameters/AgentId" }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [plan_id], properties: { plan_id: { type: string } } } } } }
+      responses:
+        "200":
+          description: Switched, scheduled, or waiting for subscriber consent
+          content: { application/json: { schema: { type: object, properties: { status: { type: string }, plan: { type: string }, applied: { type: boolean }, approval_url: { type: string, nullable: true } } } } }
+  /subscriptions/{ref}/cancel:
+    post:
+      tags: [Subscriptions]
+      operationId: cancelSubscription
+      summary: Cancel (one call), optionally hearing one offer first
+      parameters: [{ $ref: "#/components/parameters/Ref" }, { $ref: "#/components/parameters/IdempotencyKey" }, { $ref: "#/components/parameters/AgentId" }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: { type: string, maxLength: 500 }
+                hear_offer: { type: boolean, default: false }
+      responses:
+        "200":
+          description: Cancelled, or one open offer (declining it cancels)
+          content: { application/json: { schema: { type: object, properties: { status: { type: string, enum: [cancelled, offer_open] }, subscription_status: { type: string }, offer: { $ref: "#/components/schemas/Offer" }, note: { type: string } } } } }
+  /subscriptions/{ref}/payment-fixed:
+    post:
+      tags: [Subscriptions]
+      operationId: paymentFixed
+      summary: Subscriber fixed their payment method; collect the outstanding balance
+      parameters: [{ $ref: "#/components/parameters/Ref" }, { $ref: "#/components/parameters/IdempotencyKey" }, { $ref: "#/components/parameters/AgentId" }]
+      responses:
+        "200": { description: Result, content: { application/json: { schema: { type: object, properties: { collected: { type: string, nullable: true }, note: { type: string } } } } } }
+  /subscriptions/{ref}/invoice:
+    post:
+      tags: [Subscriptions]
+      operationId: invoiceOutstanding
+      summary: Send a PayPal invoice for the outstanding balance after a failed renewal (gated; may be held for the owner)
+      parameters: [{ $ref: "#/components/parameters/Ref" }, { $ref: "#/components/parameters/IdempotencyKey" }, { $ref: "#/components/parameters/AgentId" }]
+      responses:
+        "200": { description: Invoice sent, content: { application/json: { schema: { type: object, properties: { invoice_id: { type: string }, status: { type: string }, note: { type: string }, run_id: { type: string } } } } } }
+        "409": { $ref: "#/components/responses/Error" }
+  /subscriptions/{ref}/runs:
+    get:
+      tags: [Subscriptions]
+      operationId: subscriptionRuns
+      summary: Recent agent runs on this subscription (ids and summaries; full trace via /runs/{id} or MCP get_trace)
+      parameters: [{ $ref: "#/components/parameters/Ref" }]
+      responses:
+        "200": { description: Runs, content: { application/json: { schema: { type: object, properties: { runs: { type: array, items: { type: object } } } } } } }
+  /runs:
+    get:
+      tags: [Owner]
+      operationId: ownerRuns
+      summary: Recent agent runs on the shop (owner key)
+      security: [{ ownerKey: [] }]
+      parameters: [{ name: limit, in: query, schema: { type: integer, default: 50 } }]
+      responses:
+        "200": { description: Runs, content: { application/json: { schema: { type: object, properties: { runs: { type: array, items: { type: object } } } } } } }
+        "401": { $ref: "#/components/responses/Error" }
+  /runs/{id}:
+    get:
+      tags: [Owner]
+      operationId: ownerRun
+      summary: One run with its trace steps (owner key)
+      security: [{ ownerKey: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        "200": { description: Run and steps, content: { application/json: { schema: { type: object, properties: { run: { type: object }, steps: { type: array, items: { type: object } } } } } } }
+        "401": { $ref: "#/components/responses/Error" }
+  /offers/{id}/respond:
+    post:
+      tags: [Offers]
+      operationId: respondToOffer
+      summary: Accept or decline an offer (declining cancels)
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }, { $ref: "#/components/parameters/IdempotencyKey" }, { $ref: "#/components/parameters/AgentId" }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [accept], properties: { accept: { type: boolean } } } } } }
+      responses:
+        "200": { description: Result, content: { application/json: { schema: { type: object, properties: { status: { type: string, enum: [kept, cancelled] }, subscription: { $ref: "#/components/schemas/Subscription" } } } } } }
+        "409": { $ref: "#/components/responses/Error" }
+        "410": { $ref: "#/components/responses/Error" }
+  /owner/stats:
+    get:
+      tags: [Owner]
+      operationId: ownerStats
+      summary: Shop metrics
+      security: [{ ownerKey: [] }]
+      responses: { "200": { description: Stats }, "401": { $ref: "#/components/responses/Error" } }
+  /owner/subscribers:
+    get:
+      tags: [Owner]
+      operationId: ownerSubscribers
+      summary: Subscribers
+      security: [{ ownerKey: [] }]
+      responses: { "200": { description: Subscribers }, "401": { $ref: "#/components/responses/Error" } }
+  /owner/events:
+    get:
+      tags: [Owner]
+      operationId: ownerEvents
+      summary: Audit log
+      security: [{ ownerKey: [] }]
+      responses: { "200": { description: Events }, "401": { $ref: "#/components/responses/Error" } }
+  /owner/calendar:
+    get:
+      tags: [Owner]
+      operationId: ownerCalendar
+      summary: Calendar events (renewals, pauses, resumes, discounts, follow-ups)
+      security: [{ ownerKey: [] }]
+      responses: { "200": { description: Events }, "401": { $ref: "#/components/responses/Error" } }
+  /owner/ask:
+    post:
+      tags: [Owner]
+      operationId: ownerAsk
+      summary: Ask a question about the shop
+      security: [{ ownerKey: [] }]
+      requestBody: { content: { application/json: { schema: { type: object, properties: { question: { type: string } } } } } }
+      responses: { "200": { description: Answer, content: { application/json: { schema: { type: object, properties: { answer: { type: string } } } } } } }
+  /owner/reconcile:
+    post:
+      tags: [Owner]
+      operationId: ownerReconcile
+      summary: Re-read every live subscription from PayPal now
+      security: [{ ownerKey: [] }]
+      responses: { "200": { description: Result } }
+components:
+  securitySchemes:
+    ownerKey: { type: http, scheme: bearer, description: "The shop's owner key (own_...)" }
+  parameters:
+    Slug: { name: slug, in: path, required: true, schema: { type: string } }
+    Ref: { name: ref, in: path, required: true, schema: { type: string }, description: subscription_ref }
+    IdempotencyKey: { name: Idempotency-Key, in: header, required: false, schema: { type: string, maxLength: 80 } }
+    AgentId: { name: X-Agent-Id, in: header, required: false, schema: { type: string, maxLength: 80 } }
+  responses:
+    Error:
+      description: Error
+      content: { application/json: { schema: { type: object, properties: { error: { type: string }, message: { type: string } } } } }
+    Paused:
+      description: Suspended until resumes_at
+      content: { application/json: { schema: { type: object, properties: { status: { type: string }, resumes_at: { type: string, format: date-time } } } } }
+  schemas:
+    Plan:
+      type: object
+      properties:
+        plan_id: { type: string }
+        name: { type: string }
+        description: { type: string }
+        price: { type: string, example: "24.00" }
+        currency: { type: string, example: USD }
+        billing: { type: string, example: per month }
+        lighter_plan: { type: boolean }
+    Shop:
+      type: object
+      properties:
+        shop: { type: string }
+        name: { type: string }
+        tagline: { type: string }
+        currency: { type: string }
+        plans: { type: array, items: { $ref: "#/components/schemas/Plan" } }
+        policies: { type: array, items: { type: string } }
+        mcp_url: { type: string }
+    Offer:
+      type: object
+      nullable: true
+      properties:
+        offer_id: { type: string }
+        type: { type: string, enum: [pause, skip, switch_plan, discount] }
+        label: { type: string }
+        message: { type: string }
+        expires_at: { type: string, format: date-time }
+        if_declined: { type: string }
+    Subscription:
+      type: object
+      properties:
+        subscription_ref: { type: string }
+        shop: { type: string }
+        status: { type: string, enum: [CREATED, APPROVAL_PENDING, APPROVED, ACTIVE, SUSPENDED, CANCELLED, EXPIRED] }
+        plan: { type: object, nullable: true }
+        next_billing_time: { type: string, nullable: true }
+        resumes_at: { type: string, nullable: true }
+        outstanding_balance: { type: string }
+        approval_url: { type: string, nullable: true }
+        open_offer: { $ref: "#/components/schemas/Offer" }
+        notice: { type: string, nullable: true }
+        manage_url: { type: string }
+        available_actions: { type: array, items: { type: string } }

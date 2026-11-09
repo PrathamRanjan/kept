@@ -1,0 +1,391 @@
+{
+  "info": {
+    "name": "Kept API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Walk the Kept subscription lifecycle against a running Kept (local or Render). Set baseUrl, run '1. List shops', copy a plan_id into planId, then start a subscription and approve it on PayPal."
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api/v1"
+    },
+    {
+      "key": "shop",
+      "value": "ember-oak-coffee-club"
+    },
+    {
+      "key": "planId",
+      "value": ""
+    },
+    {
+      "key": "ref",
+      "value": ""
+    },
+    {
+      "key": "offerId",
+      "value": ""
+    },
+    {
+      "key": "ownerKey",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "1. List shops",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Agent-Id",
+            "value": "postman"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/shops",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "shops"
+          ]
+        }
+      }
+    },
+    {
+      "name": "2. Shop details and policies",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Agent-Id",
+            "value": "postman"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/shops/{{shop}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "shops",
+            "{{shop}}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "3. Start subscription",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Agent-Id",
+            "value": "postman"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "{{$guid}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/shops/{{shop}}/subscriptions",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "shops",
+            "{{shop}}",
+            "subscriptions"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"plan_id\": \"{{planId}}\",\n  \"subscriber_name\": \"Postman Buyer\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const j = pm.response.json();",
+              "pm.collectionVariables.set('ref', j.subscription_ref);",
+              "console.log('Approve on PayPal:', j.approval_url);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Get subscription",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Agent-Id",
+            "value": "postman"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/subscriptions/{{ref}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "subscriptions",
+            "{{ref}}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "5. Skip next renewal",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Agent-Id",
+            "value": "postman"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/subscriptions/{{ref}}/skip",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "subscriptions",
+            "{{ref}}",
+            "skip"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        }
+      }
+    },
+    {
+      "name": "6. Resume",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Agent-Id",
+            "value": "postman"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/subscriptions/{{ref}}/resume",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "subscriptions",
+            "{{ref}}",
+            "resume"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        }
+      }
+    },
+    {
+      "name": "7. Pause 1 cycle",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Agent-Id",
+            "value": "postman"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/subscriptions/{{ref}}/pause",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "subscriptions",
+            "{{ref}}",
+            "pause"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"cycles\": 1\n}"
+        }
+      }
+    },
+    {
+      "name": "8. Cancel, hearing one offer",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Agent-Id",
+            "value": "postman"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/subscriptions/{{ref}}/cancel",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "subscriptions",
+            "{{ref}}",
+            "cancel"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"reason\": \"travelling for a while\",\n  \"hear_offer\": true\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const j = pm.response.json();",
+              "if (j.offer) pm.collectionVariables.set('offerId', j.offer.offer_id);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. Decline the offer (cancels)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Agent-Id",
+            "value": "postman"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/offers/{{offerId}}/respond",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "offers",
+            "{{offerId}}",
+            "respond"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"accept\": false\n}"
+        }
+      }
+    },
+    {
+      "name": "10. Owner stats",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Agent-Id",
+            "value": "postman"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{ownerKey}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/owner/stats",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "owner",
+            "stats"
+          ]
+        }
+      }
+    },
+    {
+      "name": "11. Owner: ask",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Agent-Id",
+            "value": "postman"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{ownerKey}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/owner/ask",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "owner",
+            "ask"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"question\": \"Why are people cancelling?\"\n}"
+        }
+      }
+    }
+  ]
+}
