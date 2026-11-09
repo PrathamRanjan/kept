@@ -1,0 +1,45 @@
+/* Kept: a neighbourhood coffee club. Crema paper, espresso ink, a roasted-copper accent; Instrument Serif headings. */
+:root {
+  --ui-bg: #faf6f0; --ui-fg: #22160f; --ui-card: #fffdf9; --ui-card-fg: #22160f;
+  --ui-primary: #3e2417; --ui-primary-fg: #fbf3e8;
+  --ui-secondary: #f2e9dd; --ui-secondary-fg: #3e2417;
+  --ui-muted-bg: #f4ece2; --ui-muted-fg: #7b6758;
+  --ui-accent-bg: #f6e3cf; --ui-accent-fg: #8a4a1c;
+  --ui-border: #ebdfd1; --ui-input: #dfcfbd; --ui-ring: #b36a33;
+  --ui-sidebar: #f5eee5;
+  --ui-success: #2f6a45; --ui-success-bg: #eaf4ec;
+  --ui-warning: #8f5a0b; --ui-warning-bg: #fbf1de;
+  --ui-destructive: #a52a1f; --ui-destructive-bg: #fbecea;
+  --ui-info: #35597d; --ui-info-bg: #ecf2f8;
+  --radius: 0.85rem;
+  --font-sans: "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Instrument Serif", Georgia, serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  --crema: #b36a33;
+}
+h1, h2, .lp-title, .lp-h2, .kpi .value, .tile .big, .price-big { font-family: var(--font-display); font-weight: 400; letter-spacing: -0.01em; }
+h1 { font-size: 2.35rem; } h2 { font-size: 1.45rem; }
+.lp-title { font-size: clamp(2.6rem, 6vw, 4.4rem); line-height: 1.02; }
+.lp-title em { font-style: italic; color: var(--crema); }
+.lp-hero { background: radial-gradient(48rem 26rem at 95% -5%, #f3dcc2 0%, transparent 60%), radial-gradient(28rem 18rem at -5% 105%, #efe2d2 0%, transparent 70%); }
+.kpi .value { font-size: 2rem; }
+.btn.primary { box-shadow: 0 1px 0 rgba(255,255,255,.18) inset, 0 8px 18px -10px rgba(62,36,23,.7); }
+.sidebar .sb-brand .mark, .site-nav .sb-brand .mark { background: var(--ui-primary); color: #f6e3cf; }
+.cup { display: inline-grid; place-items: center; width: 2.4rem; height: 2.4rem; border-radius: 999px; background: var(--ui-accent-bg); color: var(--ui-accent-fg); font-weight: 700; }
+.plan-card { display: flex; flex-direction: column; gap: 0.6rem; }
+.plan-card .price-big { font-size: 2.6rem; line-height: 1; }
+.plan-card .price-big small { font-family: var(--font-sans); font-size: 0.9rem; color: var(--ui-muted-fg); }
+.plan-card.current { border-color: color-mix(in oklab, var(--crema) 55%, var(--ui-border)); box-shadow: 0 0 0 3px color-mix(in oklab, var(--crema) 18%, transparent); }
+.sub-hero { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); align-items: start; }
+@media (max-width: 760px) { .sub-hero { grid-template-columns: 1fr; } }
+.choice-grid { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); }
+.choice { display: flex; flex-direction: column; gap: 0.45rem; padding: 1rem; border: 1px solid var(--ui-border); border-radius: var(--radius); background: var(--ui-card); }
+.choice h3 { margin: 0; font-size: 1rem; }
+.choice p { margin: 0; color: var(--ui-muted-fg); font-size: 0.875rem; }
+.choice form { margin-top: auto; }
+.offer-card { border: 1px solid color-mix(in oklab, var(--crema) 50%, var(--ui-border)); background: linear-gradient(180deg, #fbefe2, var(--ui-card)); }
+.offer-card h2 { font-style: italic; }
+.reason-bar { display: grid; grid-template-columns: 9rem 1fr 2rem; gap: 0.6rem; align-items: center; font-size: 0.875rem; margin-bottom: 0.5rem; }
+.reason-bar .bar { height: 8px; }
+.reason-bar .bar > span { background: var(--crema); }
+h3, .lp-steps h3, .lp-feature h3, .persona-card b { font-family: var(--font-sans); font-weight: 600; letter-spacing: -0.005em; }

@@ -3,6 +3,7 @@
  * held approvals with passkey countersign, kill switches with a visible banner, the hash-chained audit log, and
  * the compliance scorecard by jurisdiction.
  */
+import { nextOf } from "./safetyui.js";
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { config } from "../config.js";
 import { getDb } from "../db.js";
@@ -91,7 +92,7 @@ export function guardRouter(): Router {
     const fair = await fairness(m.id);
     const hist = await history(m.id, db);
     res.send(layout({ title: `${m.name} · Guard`, nav: "dashboard", owner: nav(m), head: raw(`<script>${PASSKEY_JS}</script>`), scripts: raw(`<script src="/static/guard.js"></script>`) }, html`
-      <h1>Guard</h1><p class="muted">What the agents and the offer step may do on their own, tested against the last 90 days before you adopt it. Cancelling is never part of this: it always works in one step.</p>
+      <h1>Approvals and limits</h1><p class="muted">What the agents and the offer step may do on their own, tested against the last 90 days before you adopt it. Cancelling is never part of this: it always works in one step.</p>
       ${flash(req)}${await killBanner(m.id)}
 
       <div class="card"><h2>Fairness scorecard</h2><p class="sub">From this shop's own event log, next to a modelled dark-pattern flow (labelled modelled, not measured).</p>
@@ -186,9 +187,9 @@ export function guardRouter(): Router {
     if (!m) return;
     try {
       const out = await decideApproval(req.params.id, m.id, req.params.choice === "approve", "click", "owner");
-      back(res, "/dashboard/guard", out.replayed ? `Already ${out.status}.` : `${out.status}.`);
+      back(res, nextOf(req.body?.next, "/dashboard/guard"), out.replayed ? `Already ${out.status}.` : out.status === "approved" ? "Approved. Kept will go ahead." : out.status === "declined" ? "Declined. Nothing moves." : `${out.status}.`);
     } catch (e) {
-      back(res, "/dashboard/guard", errMsg(e), true);
+      back(res, nextOf(req.body?.next, "/dashboard/guard"), errMsg(e), true);
     }
   }));
   r.post("/dashboard/guard/kill", page(async (req, res) => {

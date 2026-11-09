@@ -15,6 +15,10 @@ import { WEBHOOK_EVENTS } from "../paypal/client.js";
 import * as svc from "../service.js";
 import { currentPolicy, intervalWords, KeptError, listMerchants, Merchant, merchantById, merchantBySlug, merchantByToken, openOfferFor, plansFor, subscriberByRef, subscribersFor, toOffer } from "../store.js";
 import { esc, fmtDate, fmtMoney, html, layout, raw, Raw } from "./html.js";
+import { landing } from "./landing.js";
+import { icon } from "./icons.js";
+import { guardCard } from "./safetyui.js";
+import { pendingApprovals } from "../guard/dryrun.js";
 import type { DraftPlan } from "../brain/types.js";
 
 const COOKIE = "kept_owner";
@@ -60,54 +64,20 @@ export function webRouter(): Router {
   const r = Router();
 
   /* ------------------------------------------------------------------ landing */
-  r.get("/", page(async (req, res) => {
-    const m = await ownerOf(req);
-    const shops = await listMerchants(await getDb());
-    res.send(layout({ title: "Kept: subscriptions for the agent era", nav: "home", owner: ownerNav(m) }, html`
-      <section class="hero">
-        <p class="pill agent">PayPal Subscriptions + AI agents</p>
-        <h1>Let your customers' AI agents manage their subscriptions, and keep them fairly.</h1>
-        <p class="lead">Kept gives a small subscription business an agent endpoint for its PayPal subscriptions. Agents can subscribe, skip, pause, switch or cancel in one call. Before a cancel, your own agent can make one fair offer within rules you write. Cancelling is never blocked.</p>
-        <div class="row" style="margin-top:18px">
-          ${config.demoMode ? html`<form method="post" action="/login/demo" class="inline"><button class="btn primary" type="submit">Open the demo shop dashboard</button></form>` : ""}
-          <a class="btn" href="/onboard">Set up your shop</a>
-          <a class="btn" href="/agents">Connect an AI agent</a>
-        </div>
-      </section>
-      <section class="card" style="margin-top:24px">
-        <h2>The whole subscription life, end to end</h2>
-        <p class="sub">Every step ends in a real PayPal state change that Kept reads back before it tells anyone.</p>
-        <div class="flow">
-          <div><b>1. Set up</b>Describe plans and retention rules in plain words. Kept creates the PayPal plans.</div>
-          <div><b>2. Subscribe</b>A buyer's agent finds the shop over MCP. The human approves on PayPal's own page.</div>
-          <div><b>3. Change</b>Skip, pause, resume or switch plan in one call, within your rules.</div>
-          <div><b>4. Cancel fairly</b>One call cancels. Optionally one offer first; declining cancels at once.</div>
-          <div><b>5. Recover &amp; reconcile</b>Failed renewals are chased and collected. Webhooks are verified and every change is reconciled with PayPal.</div>
-        </div>
-      </section>
-      <section class="grid g2" style="margin-top:16px">
-        <div class="card"><h2>For shop owners</h2><ul class="steps">
-          <li>Connect your PayPal app (sandbox works out of the box).</li>
-          <li>Type your plans: "Signature bag $24 monthly; Half bag $12 monthly".</li>
-          <li>Type your rules: "one skip per quarter; pause up to 2 months; at most 15% off for 3 months".</li>
-          <li>Share your shop page and agent endpoint.</li></ul></div>
-        <div class="card"><h2>For AI agents</h2><p>One MCP endpoint lists every shop: <code>${config.appUrl}/mcp</code>. Each shop also has its own endpoint. Tools: <code>find_shops</code>, <code>list_plans</code>, <code>start_subscription</code>, <code>get_subscription</code>, <code>skip_next</code>, <code>pause</code>, <code>resume</code>, <code>switch_plan</code>, <code>cancel_subscription</code>, <code>respond_to_offer</code>, <code>payment_fixed</code>.</p><a href="/agents">Agent setup guide →</a></div>
-      </section>
-      ${shops.length ? html`<section class="card" style="margin-top:16px"><h2>Shops on this Kept</h2><div class="table-wrap"><table><tr><th>Shop</th><th>Page</th><th>Agent endpoint</th></tr>${shops.map((s) => html`<tr><td>${s.name}<br><small>${s.tagline}</small></td><td><a href="/s/${s.slug}">/s/${s.slug}</a></td><td><code>/s/${s.slug}/mcp</code></td></tr>`)}</table></div></section>` : ""}
-    `));
-  }));
+  r.get("/", page(landing));
 
   /* ------------------------------------------------------------------ auth */
   r.get("/login", page(async (req, res) => {
     const lipp = config.paypal.clientId && process.env.KEPT_LIPP_ENABLED === "true";
     res.send(layout({ title: "Owner sign-in · Kept", nav: "login" }, html`
-      <div class="grid g2">
-        <div class="card"><h2>Sign in</h2><p class="sub">Shop owners sign in to see their dashboard.</p>
+      <div class="page-head"><div><h1>Sign in to your shop</h1><p>Shop owners see renewals, cancel reasons and anything waiting for approval.</p></div></div>${flash(req)}
+      <div class="lp-personas">
+        ${config.demoMode ? html`<div class="persona-card"><div class="who"><span class="avatar">${raw(icon("coffee"))}</span><span><b>Demo shop owner</b><span>Ember &amp; Oak Coffee Club</span></span></div><p>Real PayPal sandbox plans; sample members are labelled.</p><form method="post" action="/login/demo"><button class="btn primary" type="submit">Continue as the owner ${raw(icon("arrowRight"))}</button></form></div>` : ""}
+        <div class="persona-card"><div class="who"><span class="avatar">${raw(icon("lock"))}</span><span><b>Your own shop</b><span>Sign in with your owner key</span></span></div>
           ${lipp ? html`<p><a class="btn primary" href="/auth/paypal">Log in with PayPal</a></p>` : ""}
-          <form method="post" action="/login/token"><input type="hidden" name="next" value="${String(req.query.next ?? "/dashboard")}"><div class="field"><label for="token">Owner key</label><input id="token" name="token" type="password" autocomplete="off" placeholder="own_..."><div class="help">Shown once when you created your shop, and in your dashboard settings.</div></div><button class="btn" type="submit">Sign in with owner key</button></form>
+          <form method="post" action="/login/token" class="stack"><input type="hidden" name="next" value="${String(req.query.next ?? "/dashboard")}"><label for="token">Owner key</label><input id="token" name="token" type="password" autocomplete="off" placeholder="own_..."><p class="small muted" style="margin:0">Shown once when you created your shop.</p><button class="btn" type="submit">Sign in with owner key</button></form>
         </div>
-        ${config.demoMode ? html`<div class="card"><h2>Demo shop</h2><p class="sub">Open the demo coffee club's dashboard. Its PayPal plans are real sandbox plans; sample subscribers are labelled.</p><form method="post" action="/login/demo"><button class="btn primary" type="submit">Open demo dashboard</button></form></div>` : ""}
-      </div>${flash(req)}`));
+      </div>`));
   }));
 
   r.post("/login/token", page(async (req, res) => {
@@ -334,27 +304,38 @@ export function webRouter(): Router {
     const reasonTotal = stats.reasons.reduce((a, r) => a + r.count, 0);
     const label: Record<string, string> = { price: "Cost", too_much: "Too much product", away: "Away / travelling", quality: "Quality", competitor: "Switching elsewhere", no_need: "No longer needed", payment: "Payment problems", other: "Other / none given" };
     const webhookOk = Boolean(m.paypal_webhook_id || (!m.paypal_credentials && config.paypal.webhookId));
+    const pending = (await pendingApprovals(m.id)).filter((a: any) => a.status === "pending").slice(0, 6);
+    const failed = subs.filter((x) => x.kept_state === "payment_failed" && x.status !== "CANCELLED").slice(0, 6);
+    const openOffers = offers.filter((o: any) => o.status === "open");
+    const needs = pending.length + failed.length + openOffers.length;
     res.send(layout({
       title: `${m.name} · Kept dashboard`, nav: "dashboard", owner: ownerNav(m),
       head: raw(`<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@bryntum/calendar-trial@7.3.8/calendar.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@bryntum/calendar-trial@7.3.8/svalbard-light.css" id="bryntum-theme">`),
       scripts: raw(`<script type="module" src="/static/calendar.js"></script>`),
     }, html`
-      ${await killBanner(m.id)}<div class="spread"><div><h1>${m.name}</h1><p class="muted">${m.tagline}</p></div>
-        <div class="row"><form method="post" action="/dashboard/reconcile" class="inline"><button class="btn" type="submit">Reconcile with PayPal now</button></form><a class="btn" href="/s/${m.slug}">Open shop page</a></div></div>
+      ${await killBanner(m.id)}
+      <div class="page-head"><div><h1>Today at ${m.name}</h1><p>${stats.active} active members, ${fmtMoney(stats.mrr, m.currency)} a month. ${needs ? `${needs} thing${needs === 1 ? "" : "s"} need${needs === 1 ? "s" : ""} you.` : "Nothing needs you right now."}</p></div>
+        <div class="row"><form method="post" action="/dashboard/reconcile" class="inline"><button class="btn" type="submit">${raw(icon("repeat"))}Check against PayPal</button></form><a class="btn primary" href="/s/${m.slug}">${raw(icon("store"))}Open shop page</a></div></div>
       ${flash(req)}
-      ${stats.sampleRows ? html`<div class="banner info">${stats.sampleRows} subscribers are labelled sample rows so the dashboard isn't empty. Everything else is live on the PayPal sandbox.</div>` : ""}
+      ${stats.sampleRows ? html`<div class="banner info">${stats.sampleRows} members are labelled <span class="pill sample">sample</span> rows so the dashboard isn't empty. Everything else is live on the PayPal sandbox.</div>` : ""}
       <div class="kpis">
-        <div class="kpi"><div class="label">Active</div><div class="value">${stats.active}</div><div class="hint">${stats.suspended} paused</div></div>
-        <div class="kpi"><div class="label">MRR</div><div class="value">${fmtMoney(stats.mrr, m.currency)}</div><div class="hint">monthly equivalent</div></div>
-        <div class="kpi"><div class="label">Revenue kept</div><div class="value">${fmtMoney(stats.revenueKept3, m.currency)}</div><div class="hint">next 3 cycles, from accepted offers</div></div>
-        <div class="kpi"><div class="label">Offers accepted</div><div class="value">${stats.offersAccepted}/${stats.offersMade}</div><div class="hint">${stats.offersExpired} expired → cancelled</div></div>
-        <div class="kpi"><div class="label">Cancels honoured</div><div class="value">${stats.cancelsHonoured}</div><div class="hint">all in one step</div></div>
-        <div class="kpi"><div class="label">From AI agents</div><div class="value">${stats.agentShare}%</div><div class="hint">of subscriber actions</div></div>
-        <div class="kpi"><div class="label">Collected, 30 days</div><div class="value">${fmtMoney(stats.collected30, m.currency)}</div><div class="hint">${stats.sampleRows ? "PayPal transactions + sample rows" : "from PayPal transactions"}</div></div>
+        <div class="kpi"><div class="label">Active members</div><div class="value">${stats.active}</div><div class="hint">${stats.suspended} paused</div></div>
+        <div class="kpi"><div class="label">Monthly revenue</div><div class="value">${fmtMoney(stats.mrr, m.currency)}</div><div class="hint">monthly equivalent</div></div>
+        <div class="kpi"><div class="label">Kept by fair offers</div><div class="value">${fmtMoney(stats.revenueKept3, m.currency)}</div><div class="hint">${stats.offersAccepted} of ${stats.offersMade} offers taken, next 3 cycles</div></div>
+        <div class="kpi"><div class="label">Cancels in one step</div><div class="value">${stats.cancelsHonoured}</div><div class="hint">${stats.agentShare}% of changes came from AI assistants</div></div>
       </div>
 
-      <div class="card" style="margin-top:16px"><h2>Ask about your shop</h2>
-        <form method="get" action="/dashboard" class="row"><input type="text" name="q" value="${q}" placeholder="Why are people cancelling? Who has a failed payment? How much did offers keep?" style="flex:1;min-width:240px"><button class="btn primary" type="submit">Ask</button></form>
+      <div class="section-title"><h2>Needs you</h2><p>Held offers and collections, failed renewals, and offers waiting on a member.</p></div>
+      ${needs ? html`<div class="stack" style="margin-bottom:1.5rem">
+        ${pending.map((a: any) => { const big = Number(a.payload.cents ?? 0) >= config.guard.countersignAboveCents; const who = a.payload.entityId ? subs.find((x) => x.id === a.payload.entityId) : undefined; const what = a.payload.offer ? `Offer: ${a.payload.offer.label ?? `${a.payload.offer.type}${a.payload.offer.percent ? ` ${a.payload.offer.percent}% off` : ""}${a.payload.offer.cycles ? ` for ${a.payload.offer.cycles} cycles` : ""}`}` : `${String(a.action).replace(/_/g, " ")} of ${fmtMoney(Number(a.payload.cents ?? 0) / 100, m.currency)}`; return guardCard({ level: a.payload.safety_reasons?.length ? "hold" : "caution", reasons: [a.payload.reason, ...(a.payload.safety_reasons ?? [])].filter(Boolean) }, { approve: big ? null : `/dashboard/guard/approvals/${a.id}`, next: "/dashboard", title: `${what}${who ? ` for ${who.subscriber_name ?? who.subscriber_email ?? "a member"}` : ""}`, doText: big ? "This is above your passkey limit: approve it on Approvals and limits, where your passkey signs the exact amount." : a.payload.safety_reasons?.length ? "This looks like a scam pattern. Only approve if you've confirmed it with the member directly." : "This is above what you let Kept do on its own. Approve it, or decline and nothing moves." }); })}
+        ${failed.length || openOffers.length ? html`<div class="rows">
+          ${failed.map((x) => html`<a class="r" href="/manage/${x.ref}"><span class="av" style="background:var(--ui-destructive-bg);color:var(--ui-destructive)">${raw(icon("alert"))}</span><span><div class="t">${x.subscriber_name ?? x.subscriber_email ?? "A member"} ${x.is_sample ? html`<span class="pill sample">sample</span>` : ""}</div><div class="s">Renewal failed. They see how to fix it on their member page; Kept retries once they do.</div></span><span class="m"><span class="amt">${fmtMoney(Number(x.outstanding ?? 0), m.currency)}</span>outstanding</span><span class="act">${raw(icon("arrowRight"))}</span></a>`)}
+          ${openOffers.map((o: any) => html`<div class="r"><span class="av">${raw(icon("clock"))}</span><span><div class="t">${o.subscriber_name ?? o.subscriber_email ?? "A member"} ${o.is_sample ? html`<span class="pill sample">sample</span>` : ""}</div><div class="s">Thinking about your offer: ${toOffer(o).terms.label}. If they don't answer, they're cancelled as they asked.</div></span><span class="m">expires<span class="amt">${fmtDate(o.expires_at, true)}</span></span><span></span></div>`)}
+        </div>` : ""}
+      </div>` : html`<div class="empty" style="margin-bottom:1.5rem">Nothing needs you. Kept is handling renewals, skips and cancels within your rules.</div>`}
+
+      <div class="card"><h2>Ask about your shop</h2>
+        <form method="get" action="/dashboard" class="row"><label for="ask" class="sr">Question</label><input id="ask" type="text" name="q" value="${q}" placeholder="Why are people cancelling? Who has a failed payment? How much did offers keep?" style="flex:1;min-width:240px"><button class="btn primary" type="submit">${raw(icon("sparkles"))}Ask</button></form>
         ${answer ? html`<div class="answer">${answer}</div>` : ""}
       </div>
 
@@ -364,32 +345,21 @@ export function webRouter(): Router {
         <noscript><p class="muted">The calendar needs JavaScript.</p></noscript>
       </div>
 
-      <div class="card"><h2>Subscribers</h2><p class="sub">${subs.length} total. Click a reference to open the subscriber's own manage page.</p>
-        <div class="table-wrap"><table><tr><th>Subscriber</th><th>Plan</th><th>Status</th><th>Channel</th><th>Next billing</th><th></th></tr>
-        ${subs.slice(0, 60).map((s) => html`<tr>
-          <td>${s.subscriber_name ?? s.subscriber_email ?? "—"}<br><small><a href="/manage/${s.ref}">${s.ref.slice(0, 14)}…</a></small> ${s.is_sample ? html`<span class="pill sample">sample</span>` : ""}</td>
-          <td>${planName(s.plan_id)}${s.promo_until ? html`<br><small>discount until ${fmtDate(s.promo_until)}</small>` : ""}</td>
-          <td><span class="pill ${s.status}">${s.status}</span>${s.kept_state === "payment_failed" ? html` <span class="pill bad">payment failed</span>` : ""}${s.kept_state === "unconfirmed" ? html` <span class="pill warn">re-checking</span>` : ""}${s.resume_at ? html`<br><small>resumes ${fmtDate(s.resume_at, true)}</small>` : ""}</td>
-          <td><span class="pill ${s.channel === "agent" ? "agent" : ""}">${s.channel}</span></td>
-          <td>${fmtDate(s.next_billing_time)}</td>
-          <td class="row">${!s.is_sample && s.paypal_subscription_id ? html`<form method="post" action="/dashboard/sub/${s.ref}/sync" class="inline"><button class="btn small" type="submit">Re-read PayPal</button></form>` : ""}
-            ${config.demoMode && s.status === "ACTIVE" && s.kept_state !== "payment_failed" ? html`<form method="post" action="/dashboard/sub/${s.ref}/simulate-failure" class="inline"><button class="btn small" type="submit" title="Demo only: records a failed renewal without touching PayPal">Simulate failed renewal</button></form>` : ""}</td>
-        </tr>`)}
-        </table></div>${subs.length ? "" : html`<div class="empty">No subscribers yet. Share your shop page or agent endpoint.</div>`}
-      </div>
+      <div class="section-title"><h2>Members</h2><p>${subs.length} in all. Open one to see exactly what they see.</p></div>
+      ${subs.length ? html`<div class="rows" style="margin-bottom:1.5rem">${subs.slice(0, 40).map((s) => html`<div class="r"><span class="av ${s.status === "CANCELLED" ? "muted" : ""}">${(s.subscriber_name ?? s.subscriber_email ?? "?")[0].toUpperCase()}</span><span><div class="t"><a href="/manage/${s.ref}">${s.subscriber_name ?? s.subscriber_email ?? s.ref.slice(0, 12)}</a> ${s.is_sample ? html`<span class="pill sample">sample</span>` : ""} ${s.channel === "agent" ? html`<span class="pill agent">via AI assistant</span>` : ""}</div><div class="s">${planName(s.plan_id)}${s.promo_until ? ` · discount until ${fmtDate(s.promo_until)}` : ""}${s.resume_at ? ` · resumes ${fmtDate(s.resume_at)}` : ""}${s.next_billing_time && s.status === "ACTIVE" ? ` · renews ${fmtDate(s.next_billing_time)}` : ""}</div></span><span class="m"><span class="pill ${s.status}">${s.status.toLowerCase()}</span>${s.kept_state === "payment_failed" ? html` <span class="pill bad">payment failed</span>` : ""}${s.kept_state === "unconfirmed" ? html` <span class="pill warn">re-checking</span>` : ""}</span><span class="act row">${!s.is_sample && s.paypal_subscription_id ? html`<form method="post" action="/dashboard/sub/${s.ref}/sync" class="inline"><button class="btn small ghost" type="submit" title="Read this subscription back from PayPal">Re-read</button></form>` : ""}${config.demoMode && s.status === "ACTIVE" && s.kept_state !== "payment_failed" ? html`<form method="post" action="/dashboard/sub/${s.ref}/simulate-failure" class="inline"><button class="btn small ghost" type="submit" title="Demo only: records a failed renewal without touching PayPal">Simulate failed renewal</button></form>` : ""}</span></div>`)}</div>` : html`<div class="empty" style="margin-bottom:1.5rem">No members yet. Share your shop page or agent endpoint.</div>`}
 
       <div class="grid g2">
         <div class="card"><h2>Why people cancel</h2><p class="sub">${reasonTotal} reasons given.</p>
-          ${stats.reasons.length ? [...stats.reasons].sort((a, b) => b.count - a.count).map((r) => html`<div style="margin-bottom:10px"><div class="spread"><span>${label[r.category] ?? r.category}</span><small>${r.count}</small></div><div class="bar"><span style="width:${Math.round((100 * r.count) / Math.max(1, reasonTotal))}%"></span></div>${r.examples[0] ? html`<small>"${r.examples[0]}"</small>` : ""}</div>`) : html`<div class="empty">No reasons recorded yet.</div>`}
+          ${stats.reasons.length ? [...stats.reasons].sort((a, b) => b.count - a.count).map((r) => html`<div class="reason-bar" title="${r.examples[0] ? `“${r.examples[0]}”` : ""}"><span>${label[r.category] ?? r.category}</span><div class="bar"><span style="width:${Math.round((100 * r.count) / Math.max(1, reasonTotal))}%"></span></div><small class="num">${r.count}</small></div>`) : html`<div class="empty">No reasons recorded yet.</div>`}
         </div>
         <div class="card"><h2>Recent offers</h2>
           ${offers.length ? html`<table><tr><th>Subscriber</th><th>Offer</th><th>Outcome</th></tr>${offers.map((o: any) => { const x = toOffer(o); return html`<tr><td>${o.subscriber_name ?? o.subscriber_email ?? "—"} ${o.is_sample ? html`<span class="pill sample">sample</span>` : ""}</td><td>${x.terms.label}<br><small>reason: ${x.reason_category}</small></td><td><span class="pill ${x.status}">${x.status}</span></td></tr>`; })}</table>` : html`<div class="empty">No offers yet.</div>`}
         </div>
       </div>
 
-      <div class="card"><h2>Activity</h2><p class="sub">Every agent request, offer, PayPal call and webhook, newest first.</p>
+      <details class="card"><summary><b>Activity</b> <span class="muted small">every agent request, offer, PayPal call and webhook, newest first</span></summary>
         ${events.map((e: any) => html`<div class="event-row"><span class="muted">${fmtDate(e.created_at, true)}</span><span><span class="pill ${e.source === "agent" ? "agent" : e.source === "executor" ? "info" : e.source === "webhook" ? "good" : ""}">${e.source}</span></span><span>${e.summary} ${e.is_sample ? html`<span class="pill sample">sample</span>` : ""}</span></div>`)}
-      </div>
+      </details>
 
       <div class="grid g2">
         <div class="card"><h2>Rules (v${policy?.version ?? 0})</h2>${policy ? html`<ul>${describeRules(policy.rules).map((d) => html`<li>${d}</li>`)}</ul>` : html`<p class="muted">No rules approved yet: cancels go through with no offer.</p>`}<a class="btn" href="/onboard/rules">Edit rules</a></div>
@@ -511,24 +481,25 @@ export function webRouter(): Router {
       potentialAction: { "@type": "Action", name: "Subscribe via MCP", target: `${config.appUrl}/s/${m.slug}/mcp` },
     };
     res.send(layout({
-      title: `${m.name} · subscribe`, nav: "shop", owner: ownerNav(await ownerOf(req)), description: m.tagline,
+      title: `${m.name} · subscribe`, nav: "shop", business: m.name, description: m.tagline,
       head: raw(`<script type="application/ld+json">${JSON.stringify(ld).replace(/</g, "\\u003c")}</script><link rel="alternate" type="text/plain" href="/s/${esc(m.slug)}/llms.txt" title="llms.txt">`),
       scripts: clientId ? raw(`<script src="https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(clientId)}&vault=true&intent=subscription&currency=${encodeURIComponent(m.currency)}" data-sdk-integration-source="button-factory"></script><script src="/static/shop.js"></script>`) : undefined,
     }, html`
-      <section class="hero"><h1>${m.name}</h1><p class="lead">${m.tagline}</p></section>
+      <div class="page-head"><div><h1>${m.name}</h1><p>${m.tagline}</p></div></div>
       ${flash(req)}
-      <div class="grid ${plans.length >= 3 ? "g3" : "g2"}">
-        ${plans.map((p) => html`<div class="card plan"><h2>${p.name}</h2><div class="price">${fmtMoney(p.price, m.currency)} <small class="muted">${intervalWords(p)}</small></div><p class="muted">${p.description}</p>
-          <form method="post" action="/s/${m.slug}/subscribe" class="stack subscribe-form" data-plan="${p.id}" data-slug="${m.slug}">
+      <div class="choice-grid" style="grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));margin-bottom:1.5rem">
+        ${plans.map((p) => html`<div class="card plan-card"><h2 style="margin:0">${p.name}</h2><div class="price-big">${fmtMoney(p.price, m.currency)} <small>${intervalWords(p)}</small></div><p class="muted" style="margin:0">${p.description}</p>
+          <form method="post" action="/s/${m.slug}/subscribe" class="stack subscribe-form" data-plan="${p.id}" data-slug="${m.slug}" style="margin-top:auto">
             <input type="hidden" name="plan_id" value="${p.id}">
-            <div class="grid g2"><div><label for="n-${p.id}">Name</label><input id="n-${p.id}" name="name" type="text" maxlength="80"></div><div><label for="e-${p.id}">Email</label><input id="e-${p.id}" name="email" type="email"></div></div>
+            <label for="n-${p.id}">Your name</label><input id="n-${p.id}" name="name" type="text" maxlength="80" autocomplete="name">
+            <label for="e-${p.id}">Email</label><input id="e-${p.id}" name="email" type="email" autocomplete="email">
             ${clientId ? html`<div class="pp-button" id="pp-${p.id}"></div><button class="btn" type="submit">Or continue to PayPal</button>` : html`<button class="btn primary" type="submit">Subscribe with PayPal</button>`}
           </form></div>`)}
       </div>
       ${plans.length ? "" : html`<div class="empty">This shop hasn't published plans yet.</div>`}
-      <div class="grid g2" style="margin-top:16px">
+      <div class="grid g2">
         <div class="card"><h2>Our promise</h2><ul>${(policy ? describeRules(policy.rules) : ["Cancelling always works in one step."]).map((d) => html`<li>${d}</li>`)}</ul></div>
-        <div class="card"><h2>For AI agents</h2><p>Your assistant can subscribe and manage this subscription for you through our agent endpoint (MCP):</p><div class="codebox">${config.appUrl}/s/${m.slug}/mcp</div><p style="margin-top:8px"><a href="/s/${m.slug}/llms.txt">llms.txt</a> · <a href="/agents">setup guide</a></p></div>
+        <div class="card"><h2>Use an AI assistant?</h2><p class="small">It can subscribe and manage this subscription for you through our agent endpoint (MCP):</p><div class="codebox">${config.appUrl}/s/${m.slug}/mcp</div><p class="small" style="margin-top:8px"><a href="/s/${m.slug}/llms.txt">llms.txt</a> · <a href="/agents">setup guide</a></p></div>
       </div>`));
   }));
 
@@ -589,36 +560,41 @@ export function webRouter(): Router {
     const policy = await currentPolicy(db, m.id);
     const offer = await openOfferFor(db, s.id);
     const can = (a: string) => v.available_actions.includes(a);
-    res.send(layout({ title: `Your ${m.name} subscription`, nav: "manage" }, html`
-      <h1>Your ${m.name} subscription</h1>${flash(req)}
-      ${s.is_sample ? html`<div class="banner info">This is a labelled sample subscriber for the demo; it has no PayPal subscription behind it.</div>` : ""}
-      <p class="small muted">If a payment ever fails, you will see it here on this page, and only here. ${m.name} never sends a "pay here" link by text or email. Got a message like that? <a href="/manage/${s.ref}/check">Check it</a>.</p>
+    const tg = Number((await db.query<any>("SELECT count(*)::int AS n FROM party_links WHERE channel = 'telegram' AND party = 'subscriber' AND party_id = $1", [s.id])).rows[0]?.n ?? 0) > 0;
+    const first = (s.subscriber_name ?? "").split(" ")[0];
+    res.send(layout({ title: `Your ${m.name} subscription`, nav: "manage", business: m.name }, html`
+      <div class="page-head"><div><h1>${first ? `Hi ${first}, here's your subscription` : "Your subscription"}</h1><p>Skip, pause, switch or cancel here, any time. Every change is made in PayPal and checked before we confirm it.</p></div></div>
+      ${flash(req)}
+      ${s.is_sample ? html`<div class="banner info">This is a labelled sample member for the demo; it has no PayPal subscription behind it, so the buttons are view-only.</div>` : ""}
       ${s.kept_state === "cancel_pending" || (s as any).cancel_requested_at ? html`<div class="banner warn" role="status"><b>Cancellation pending.</b> You asked to cancel${(s as any).cancel_requested_at ? ` on ${fmtDate((s as any).cancel_requested_at, true)}` : ""}. PayPal hasn't confirmed it yet; Kept keeps retrying and will tell you when it's done. You won't be charged for a renewal you asked to stop.</div>` : ""}
-      ${v.notice ? html`<div class="banner warn">${v.notice}<form method="post" action="/manage/${s.ref}/payment-fixed" style="margin-top:8px"><button class="btn primary" type="submit">I've updated my payment method, retry now</button></form><form method="post" action="/manage/${s.ref}/promise" class="row" style="margin-top:8px"><label for="pd">Can't fix it today? I'll sort it by</label><input id="pd" type="date" name="date" required><button class="btn" type="submit">Pause reminders until then</button></form></div>` : ""}
-      <div class="grid g2">
-        <div class="card"><div class="spread"><h2>${v.plan?.name ?? "Plan"}</h2><span class="pill ${v.status}">${v.status}</span></div>
-          ${v.plan ? html`<p class="price" style="font-size:1.5rem;font-weight:700">${fmtMoney(Number(v.plan.price), m.currency)} <small class="muted">${v.plan.billing}</small></p>` : ""}
-          ${v.returns_to_plan ? html`<p>Discount until ${fmtDate(v.discount_until)}, then back to ${v.returns_to_plan}.</p>` : ""}
-          <p class="muted">Next billing: ${fmtDate(v.next_billing_time)}${v.resumes_at ? html` · Resumes ${fmtDate(v.resumes_at, true)}` : ""}</p>
+      ${v.notice ? html`<div class="guard-card caution" role="alert"><div class="gc-head">${raw(icon("alert"))}<span>Your last payment didn't go through<small class="gc-level">Shown only here, never by text or email</small></span></div><p class="gc-do" style="color:inherit">${v.notice}</p><div class="row" style="margin-top:0.6rem"><form method="post" action="/manage/${s.ref}/payment-fixed" class="inline"><button class="btn primary" type="submit">I've updated my payment method, retry now</button></form></div><form method="post" action="/manage/${s.ref}/promise" class="row" style="margin-top:0.6rem"><label for="pd" style="margin:0">Can't fix it today? I'll sort it by</label><input id="pd" type="date" name="date" required style="width:auto"><button class="btn" type="submit">Pause reminders until then</button></form></div>` : ""}
+      <div class="sub-hero">
+        <div class="card plan-card current"><div class="spread"><span class="small muted">Your plan at ${m.name}</span><span class="pill ${v.status}">${String(v.status).toLowerCase()}</span></div>
+          <h2 style="margin:0;font-size:2rem">${v.plan?.name ?? "Plan"}</h2>
+          ${v.plan ? html`<div class="price-big">${fmtMoney(Number(v.plan.price), m.currency)} <small>${v.plan.billing}</small></div>` : ""}
+          ${v.returns_to_plan ? html`<p style="margin:0">Discount until ${fmtDate(v.discount_until)}, then back to ${v.returns_to_plan}.</p>` : ""}
+          <p class="muted" style="margin:0">${v.status === "CANCELLED" ? "Cancelled. You won't be charged again." : html`Next payment ${fmtDate(v.next_billing_time)}${v.resumes_at ? html` · resumes ${fmtDate(v.resumes_at, true)}` : ""}`}</p>
           ${v.approval_url ? html`<p><a class="btn primary" href="${v.approval_url}">Approve on PayPal</a></p>` : ""}
-          <div class="row" style="margin-top:8px">
-            ${can("skip_next") ? html`<form method="post" action="/manage/${s.ref}/skip" class="inline"><button class="btn" type="submit">Skip next renewal</button></form>` : ""}
-            ${can("resume") ? html`<form method="post" action="/manage/${s.ref}/resume" class="inline"><button class="btn primary" type="submit">Resume now</button></form>` : ""}
-          </div>
-          ${can("pause") && policy?.rules.pause.enabled ? html`<form method="post" action="/manage/${s.ref}/pause" class="row" style="margin-top:10px"><select name="cycles" style="width:auto">${Array.from({ length: policy.rules.pause.maxCycles }, (_, i) => html`<option value="${i + 1}">${i + 1} cycle${i ? "s" : ""}</option>`)}</select><button class="btn" type="submit">Pause</button></form>` : ""}
-          ${can("switch_plan") && plans.length ? html`<form method="post" action="/manage/${s.ref}/switch" class="row" style="margin-top:10px"><select name="plan_id" style="width:auto">${plans.map((p) => html`<option value="${p.id}">${p.name}: ${fmtMoney(p.price, m.currency)} ${intervalWords(p)}</option>`)}</select><button class="btn" type="submit">Switch plan</button></form>` : ""}
         </div>
-        <div class="card">
-          ${offer ? html`<div class="card offer"><h2>One offer before you go</h2><p>${offer.message}</p><p class="muted">Expires ${fmtDate(offer.expires_at, true)}. If it expires, your subscription is cancelled as you asked.</p>
-              <div class="row"><form method="post" action="/offer/${offer.id}/accept" class="inline"><button class="btn primary" type="submit">Accept</button></form><form method="post" action="/offer/${offer.id}/decline" class="inline"><button class="btn danger" type="submit">No thanks, cancel now</button></form></div></div>`
-            : can("cancel_subscription") ? html`<h2>Cancel</h2><p class="muted">Cancelling works in one step. You don't have to give a reason or hear an offer.</p>
-              <form method="post" action="/manage/${s.ref}/cancel"><div class="field"><label for="reason">Reason (optional)</label><textarea id="reason" name="reason" style="min-height:70px" placeholder="e.g. too much coffee piling up"></textarea></div>
-              <label class="check"><input type="checkbox" name="hear_offer" value="1"> Show me one offer before cancelling (optional)</label>
-              <button class="btn danger" type="submit" style="margin-top:10px">Cancel subscription</button></form>`
-            : html`<h2>Status</h2><p class="muted">${v.status === "CANCELLED" ? "This subscription is cancelled. You won't be charged again." : "No actions available right now."}</p><a href="/s/${m.slug}">Visit ${m.name}</a>`}
-        </div>
+        <div class="card"><h2 style="font-size:1.2rem">Reminders on your phone</h2><p class="small muted">A note before each renewal, with Skip and Keep buttons, in Telegram. ${tg ? "Connected." : ""}</p>
+          ${s.is_sample ? "" : html`<form method="post" action="/manage/${s.ref}/connect/telegram" target="_blank" class="inline"><button class="btn ${tg ? "" : "primary"}" type="submit">${raw(icon("message"))}${tg ? "Connect another chat" : "Get reminders on Telegram"}</button></form>`}
+          <p class="small muted" style="margin-top:0.8rem">Got a text about this subscription? <a href="/manage/${s.ref}/check">Check it for scam signs</a>.</p></div>
       </div>
-      <div class="card"><h2>Let your AI agent manage this</h2><p>Give your assistant this reference and the shop's endpoint:</p><div class="codebox">subscription_ref: ${s.ref}\nendpoint: ${config.appUrl}/s/${m.slug}/mcp</div></div>`));
+      ${can("skip_next") || can("pause") || can("resume") || can("switch_plan") ? html`<div class="section-title"><h2>Change it</h2><p>Within ${m.name}'s rules. Nothing here charges you extra.</p></div>
+      <div class="choice-grid" style="margin-bottom:1.5rem">
+        ${can("skip_next") ? html`<div class="choice"><h3>Skip the next one</h3><p>Away, or still have plenty? Skip one renewal; it carries on after.</p><form method="post" action="/manage/${s.ref}/skip"><button class="btn" type="submit">Skip next renewal</button></form></div>` : ""}
+        ${can("pause") && policy?.rules.pause.enabled ? html`<div class="choice"><h3>Pause for a while</h3><p>Nothing ships or bills until it resumes on its own.</p><form method="post" action="/manage/${s.ref}/pause" class="row"><label for="cyc" class="sr">How long</label><select id="cyc" name="cycles" style="width:auto">${Array.from({ length: policy.rules.pause.maxCycles }, (_, i) => html`<option value="${i + 1}">${i + 1} cycle${i ? "s" : ""}</option>`)}</select><button class="btn" type="submit">Pause</button></form></div>` : ""}
+        ${can("resume") ? html`<div class="choice"><h3>Start again</h3><p>Resume now instead of waiting for the date.</p><form method="post" action="/manage/${s.ref}/resume"><button class="btn primary" type="submit">Resume now</button></form></div>` : ""}
+        ${can("switch_plan") && plans.length ? html`<div class="choice"><h3>Switch plan</h3><p>More or less, from your next cycle.</p><form method="post" action="/manage/${s.ref}/switch" class="stack"><label for="sw" class="sr">New plan</label><select id="sw" name="plan_id">${plans.map((p) => html`<option value="${p.id}">${p.name}: ${fmtMoney(p.price, m.currency)} ${intervalWords(p)}</option>`)}</select><button class="btn" type="submit">Switch plan</button></form></div>` : ""}
+      </div>` : ""}
+      ${offer ? html`<div class="card offer-card"><h2>One offer before you go</h2><p>${offer.message}</p><p class="muted small">Expires ${fmtDate(offer.expires_at, true)}. If you don't answer, your subscription is cancelled as you asked.</p>
+          <div class="row"><form method="post" action="/offer/${offer.id}/accept" class="inline"><button class="btn primary" type="submit">Take the offer</button></form><form method="post" action="/offer/${offer.id}/decline" class="inline"><button class="btn" type="submit">No thanks, cancel now</button></form></div></div>`
+        : can("cancel_subscription") ? html`<details class="card"><summary><b>Cancel your subscription</b> <span class="muted small">one step, no reason needed</span></summary>
+          <form method="post" action="/manage/${s.ref}/cancel" style="margin-top:0.8rem"><div class="field"><label for="reason">Anything you'd like ${m.name} to know? (optional)</label><textarea id="reason" name="reason" style="min-height:70px" placeholder="e.g. too much coffee piling up"></textarea></div>
+          <label class="check"><input type="checkbox" name="hear_offer" value="1"> Show me one offer before cancelling (optional)</label>
+          <button class="btn danger" type="submit" style="margin-top:10px">Cancel subscription</button></form></details>`
+        : v.status === "CANCELLED" ? html`<div class="card"><h2>Changed your mind?</h2><p class="muted">You can subscribe again on <a href="/s/${m.slug}">${m.name}'s page</a> whenever you like.</p></div>` : ""}
+      <details class="card"><summary><b>Let your AI assistant manage this</b> <span class="muted small">for Claude or any MCP client</span></summary><p class="small">Give your assistant this reference and the shop's endpoint:</p><div class="codebox">subscription_ref: ${s.ref}\nendpoint: ${config.appUrl}/s/${m.slug}/mcp</div></details>`));
   }));
 
   const manageAction = (path: string, fn: (ref: string, body: any) => Promise<string>) =>

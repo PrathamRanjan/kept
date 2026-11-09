@@ -31,7 +31,7 @@ export function createApp() {
     res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
     next();
   });
-  app.use("/static", express.static(join(root, "public"), { maxAge: "1h" }));
+  app.use("/static", express.static(join(root, "public"), { maxAge: 0, setHeaders: (res, file) => { if (/[\\/]safety[\\/]/.test(file)) res.setHeader("Cache-Control", "public, max-age=86400"); } }));
 
   app.get("/healthz", async (_req, res) => {
     try {

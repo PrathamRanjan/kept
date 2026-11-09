@@ -1,3 +1,4 @@
+import { renderShell, type Brand, type NavGroup } from "./shell.js";
 /** Minimal safe HTML templating: every interpolated value is escaped unless wrapped in raw(). */
 export class Raw {
   constructor(readonly value: string) {}
@@ -28,32 +29,41 @@ export interface LayoutOpts {
   head?: Raw;
   scripts?: Raw;
   description?: string;
+  /** Customer pages: the shop's name in the header. */
+  business?: string;
+  wide?: boolean;
 }
 
+export const BRAND: Brand = {
+  name: "Kept",
+  mark: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><path d="M7 2v2"/><path d="M11 2v2"/></svg>`,
+  description: "Kept: PayPal subscriptions that customers and their AI agents can skip, pause or cancel in one step, with one fair offer within the shop's rules.",
+  themeColor: "#3e2417",
+  fonts: "family=Instrument+Serif:ital@0;1&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500",
+  appFoot: "PayPal sandbox: no real money moves. Cancelling always works in one step; rows marked sample are labelled demo data.",
+  siteLinks: [["/#how", "How it works"], ["/#fair", "Fair by design"], ["/#try", "Try it"], ["/agents", "For AI agents"]],
+  cta: ["/#try", "Try the demo"],
+  siteFoot: "Kept · built for the PayPal AI Hackathon · PayPal sandbox only, no real money moves.",
+  siteFootLinks: [["/judge", "Judge tour"], ["/onboard", "Set up a shop"], ["/login", "Owner sign-in"]],
+  staticBase: "/static",
+  legacyCss: ["legacy.css"],
+};
+
+const navFor = (slug: string): NavGroup[] => [
+  { label: "Your shop", items: [["/dashboard", "Today", "home"], ["/dashboard/guard", "Approvals and limits", "shieldCheck"], ["/dashboard/money", "Money", "wallet"], [`/s/${slug}`, "Shop page", "store"]] },
+  { label: "Settings", items: [["/onboard/rules", "Retention rules", "settings"], ["/dashboard/safety", "Scam protection", "shield"], ["/dashboard/channels", "Messages", "message"]] },
+  { label: "How it works", items: [["/dashboard/traces", "Runs", "layers"], ["/dashboard/eval", "Test results", "flask"], ["/dashboard/compliance", "Compliance", "receipt"], ["/dashboard/evidence", "Evidence", "gauge"], ["/agents", "For AI agents", "sparkles"]] },
+];
+
 export function layout(o: LayoutOpts, body: Raw): string {
-  const nav = o.owner
-    ? html`<a href="/dashboard" class="${o.nav === "dashboard" ? "active" : ""}">Dashboard</a><a href="/s/${o.owner.slug}">Shop page</a><a href="/onboard/rules">Rules</a><a href="/dashboard/guard">Guard</a><a href="/dashboard/safety">Safety</a><a href="/dashboard/money">Money</a><a href="/dashboard/eval">Evals</a><a href="/dashboard/traces">Runs</a><a href="/dashboard/channels">Channels</a><a href="/dashboard/evidence">Evidence</a><a href="/agents" class="${o.nav === "agents" ? "active" : ""}">For agents</a><form method="post" action="/logout" class="inline"><button class="btn small" type="submit">Sign out</button></form>`
-    : html`<a href="/agents" class="${o.nav === "agents" ? "active" : ""}">For agents</a><a href="/onboard" class="${o.nav === "onboard" ? "active" : ""}">Set up a shop</a><a href="/login" class="${o.nav === "login" ? "active" : ""}">Owner sign-in</a>`;
-  return `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(o.title)}</title>
-<meta name="description" content="${esc(o.description ?? "Kept: PayPal subscriptions that AI agents can manage, with fair retention for small shops.")}">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231f5c47'/%3E%3Ctext x='16' y='22' font-size='17' text-anchor='middle' fill='white' font-family='Arial' font-weight='700'%3EK%3C/text%3E%3C/svg%3E">
-<link rel="stylesheet" href="/static/app.css">
-${o.head ? o.head.value : ""}
-</head>
-<body>
-<link rel="manifest" href="/manifest.webmanifest"><meta name="theme-color" content="#1f5c47">
-<header class="topbar"><div class="wrap"><a class="brand" href="/"><span class="dot">K</span>Kept</a>${o.owner ? html`<span class="muted">· ${o.owner.name}</span>`.value : ""}<nav class="nav">${nav.value}</nav></div></header>
-<main><div class="wrap">${body.value}</div></main>
-<footer><div class="wrap">Kept runs on the PayPal sandbox. No real money moves. Rows marked <span class="pill sample">sample</span> are labelled demo data.</div></footer>
-<link rel="stylesheet" href="/static/a11y.css"><script src="/static/a11y.js" defer></script>
-${o.scripts ? o.scripts.value : ""}
-</body>
-</html>`;
+  const common = { title: o.title.replace(/ · Kept( dashboard)?$/, ""), body: body.value, head: `<link rel="manifest" href="/manifest.webmanifest">${o.head?.value ?? ""}`, scripts: o.scripts?.value, wide: o.wide };
+  if (o.nav === "manage" || (o.nav === "shop" && o.business)) {
+    return renderShell(BRAND, { ...common, mode: "customer", business: o.business ?? "Your subscription", trust: `${o.business ?? "This shop"} bills only through PayPal. A failed payment is only ever shown on this page; we never send a "pay here" link by text or email, or ask for a card number or a code.` });
+  }
+  if (o.owner && o.nav !== "home") {
+    return renderShell(BRAND, { ...common, mode: "app", nav: navFor(o.owner.slug), homeHref: "/dashboard", workspace: o.owner.name, user: { name: "Shop owner", sub: o.owner.name, logout: "/logout", settings: "/dashboard/channels#phone" } });
+  }
+  return renderShell(BRAND, { ...common, mode: o.nav === "home" ? "site" : "plain" });
 }
 
 export function fmtMoney(n: number, currency: string): string {

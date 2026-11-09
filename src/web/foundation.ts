@@ -8,7 +8,10 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { aiUsageSummary, hasOpenAI, providerLabel } from "../ai/provider.js";
-import { conversation, link, receive, recentMessages, telegramReady, telegramUpdate, whatsappReady, whatsappUpdate } from "../channels/index.js";
+import { conversation, link, receive, recentMessages, telegramReady, telegramUpdate, whatsappUpdate } from "../channels/index.js";
+import { randomBytes } from "node:crypto";
+import { icon } from "./icons.js";
+import { messageFlag } from "./safetyui.js";
 import { pushReady, subscribe } from "../channels/push.js";
 import { config } from "../config.js";
 import { getDb } from "../db.js";
@@ -250,23 +253,38 @@ export function foundationRouter(): Router {
     const msgs = await recentMessages(80);
     const addr = typeof req.query.address === "string" ? req.query.address : `owner:${m.id}`;
     const conv = await conversation(addr, 40);
-    res.send(layout({ title: `${m.name} · Channels`, nav: "dashboard", owner: nav(m) }, html`
-      <h1>Channels</h1><p class="muted">Telegram ${telegramReady() ? html`<span class="pill good">connected</span>` : html`<span class="pill warn">simulated</span>`} · WhatsApp ${whatsappReady() ? html`<span class="pill good">connected</span>` : html`<span class="pill warn">simulated</span>`} · Web push ${pushReady() ? html`<span class="pill good">ready</span>` : html`<span class="pill warn">no VAPID keys</span>`}. Without tokens every message is recorded here as simulated, with its buttons, so the demo works without a phone.</p>${flash(req)}
+    const tg = Number((await (await getDb()).query<any>("SELECT count(*)::int AS n FROM party_links WHERE channel = 'telegram' AND party = 'owner' AND party_id = $1", [m.id])).rows[0]?.n ?? 0) > 0;
+    res.send(layout({ title: "Messages", nav: "dashboard", owner: nav(m) }, html`
+      <div class="page-head"><div><h1>Messages and alerts</h1><p>What reaches you and your members on their phones: renewal reminders with Skip and Keep buttons, and approvals for you.</p></div></div>${flash(req)}
+      <section class="card" id="phone"><h2>Approvals on your phone</h2><p class="sub">Held offers and large collections arrive on Telegram with Approve and Decline buttons.</p>
+        <div class="row">${tg ? html`<span class="pill good">Telegram connected</span>` : html`<span class="pill">Telegram not connected</span>`}<form method="post" action="/connect/telegram" class="inline" target="_blank"><button class="btn primary" type="submit">${raw(icon("message"))}${tg ? "Connect another chat" : "Connect Telegram"}</button></form><button class="btn" type="button" id="push-sub">${raw(icon("zap"))}Turn on notifications in this browser</button></div>
+        <p class="small muted">Telegram opens with a one-time code that lasts 15 minutes: press Start and you're done. Members connect from their own member page.${telegramReady() ? "" : " The bot token isn't set on this server, so messages are recorded below as simulated."}${pushReady() ? "" : " Browser notifications need VAPID keys on the server."}</p></section>
       <div class="grid g2">
-        <div class="card"><h2>Simulator: ${addr}</h2>
-          <div class="chips"><a class="${addr === `owner:${m.id}` ? "on" : ""}" href="/dashboard/channels?address=owner:${m.id}">owner</a>${(await subscribersFor(await getDb(), m.id)).filter((s) => !s.is_sample).slice(0, 6).map((s) => html`<a class="${addr === `subscriber:${s.id}` ? "on" : ""}" href="/dashboard/channels?address=subscriber:${s.id}">${s.subscriber_name ?? s.ref.slice(0, 10)}</a>`)}</div>
-          ${conv.map((x: any) => html`<div class="event-row"><span class="muted small">${fmtDate(x.created_at, true)}</span><span><span class="pill ${x.direction === "in" ? "agent" : ""}">${x.direction}</span></span><span>${x.body}${x.buttons ? html`<div class="row">${(x.buttons as any[]).map((b) => html`<form method="post" action="/dashboard/channels/reply" class="inline"><input type="hidden" name="address" value="${addr}"><input type="hidden" name="reply_to" value="${x.id}"><input type="hidden" name="button" value="${b.id}"><button class="btn small" type="submit">${b.label}</button></form>`)}</div>` : ""} <small class="muted">${x.status}</small></span></div>`)}
-          <form method="post" action="/dashboard/channels/reply" class="row" style="margin-top:8px"><input type="hidden" name="address" value="${addr}"><input type="text" name="text" placeholder="pending · status · skip · approve:<id>" style="flex:1"><button class="btn" type="submit">Send</button></form>
+        <div class="card"><h2>Message simulator</h2><p class="sub">What the phone channels would send, and your replies.</p>
+          <div class="chips"><a class="${addr === `owner:${m.id}` ? "on" : ""}" href="/dashboard/channels?address=owner:${m.id}">You (owner)</a>${(await subscribersFor(await getDb(), m.id)).filter((s) => !s.is_sample).slice(0, 6).map((s) => html`<a class="${addr === `subscriber:${s.id}` ? "on" : ""}" href="/dashboard/channels?address=subscriber:${s.id}">${s.subscriber_name ?? s.ref.slice(0, 10)}</a>`)}</div>
+          ${conv.map((x: any) => html`<div class="event-row"><span class="muted small">${fmtDate(x.created_at, true)}</span><span><span class="pill ${x.direction === "in" ? "agent" : ""}">${x.direction === "in" ? "received" : "sent"}</span></span><span>${x.direction === "in" ? messageFlag(String(x.body), "Kept only acts on its own buttons and commands; a message can't change where money goes.") : ""}${x.body}${x.buttons ? html`<div class="row">${(x.buttons as any[]).map((b) => html`<form method="post" action="/dashboard/channels/reply" class="inline"><input type="hidden" name="address" value="${addr}"><input type="hidden" name="reply_to" value="${x.id}"><input type="hidden" name="button" value="${b.id}"><button class="btn small" type="submit">${b.label}</button></form>`)}</div>` : ""} <small class="muted">${x.status}</small></span></div>`)}
+          <form method="post" action="/dashboard/channels/reply" class="row" style="margin-top:8px"><input type="hidden" name="address" value="${addr}"><label for="sim" class="sr">Reply</label><input id="sim" type="text" name="text" placeholder="pending · status · skip · approve:<id>" style="flex:1"><button class="btn" type="submit">Send</button></form>
         </div>
-        <div class="card"><h2>Connect a phone</h2>
-          <p class="small">Telegram: set <code>TELEGRAM_BOT_TOKEN</code>, register <code>${config.appUrl}/webhooks/telegram</code> with secret <code>TELEGRAM_WEBHOOK_SECRET</code>, then message the bot <code>link owner:&lt;your owner key&gt;</code>. Subscribers send <code>link subscriber:&lt;ref&gt;</code>.</p>
-          <p class="small">WhatsApp Cloud API: set <code>WHATSAPP_TOKEN</code>, <code>WHATSAPP_PHONE_ID</code>; verify <code>${config.appUrl}/webhooks/whatsapp</code> with <code>WHATSAPP_VERIFY_TOKEN</code>.</p>
-          <p class="small">Phone-first PWA: open <code>${config.appUrl}/manage/&lt;ref&gt;</code> on a phone, add to home screen; <button class="btn small" type="button" id="push-sub">enable push</button> needs VAPID keys.</p>
-          <h3>All recent messages</h3>${msgs.slice(0, 30).map((x: any) => html`<div class="small"><span class="muted">${fmtDate(x.created_at, true)}</span> ${x.channel} ${x.direction} ${x.address}: ${String(x.body).slice(0, 90)} <span class="pill">${x.status}</span></div>`)}
-        </div>
+        <div class="card"><h2>All recent messages</h2>${msgs.slice(0, 30).map((x: any) => html`<div class="small" style="padding:0.3rem 0;border-bottom:1px solid var(--ui-border)"><span class="muted">${fmtDate(x.created_at, true)}</span> ${x.channel} · ${x.direction === "in" ? "received" : "sent"} · ${String(x.body).slice(0, 90)} <span class="pill">${x.status}</span></div>`)}</div>
       </div>
       <script src="/static/pwa.js"></script>
     `));
+  }));
+  /** One tap: a 15-minute one-time code, then straight into Telegram; the shared bot routes "kept-<code>" here. */
+  const tgCode = async (party: "owner" | "subscriber", partyId: string) => {
+    const code = randomBytes(12).toString("base64url").replace(/[-_]/g, "x");
+    await (await getDb()).query("INSERT INTO settings (key, value) VALUES ($1,$2) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value", [`tglink:${code}`, JSON.stringify({ party, party_id: partyId, exp: Date.now() + 15 * 60_000 })]);
+    return `https://t.me/${config.channels.telegramBot}?start=kept-${code}`;
+  };
+  r.post("/connect/telegram", page(async (req, res) => {
+    const m = await requireOwner(req, res);
+    if (!m) return;
+    res.redirect(303, await tgCode("owner", m.id));
+  }));
+  r.post("/manage/:ref/connect/telegram", page(async (req, res) => {
+    const s = await subscriberByRef(await getDb(), req.params.ref);
+    if (!s || s.is_sample) return res.status(404).send("Subscription not found");
+    res.redirect(303, await tgCode("subscriber", s.id));
   }));
   r.post("/dashboard/channels/reply", page(async (req, res) => {
     const m = await requireOwner(req, res);
@@ -333,7 +351,7 @@ export function foundationRouter(): Router {
       ["PayPal-Mock-Response negative tests", "real where PayPal honours the header", "the page says when an endpoint ignored it"],
       ["Log in with PayPal", config.paypal.loginEnabled ? "on" : "off (PAYPAL_LOGIN_ENABLED)", "needs a sandbox app with Log in with PayPal enabled"],
       ["Model brain", hasOpenAI() ? "live (OpenAI)" : "rules only", providerLabel()],
-      ["Telegram / WhatsApp / push", telegramReady() || whatsappReady() || pushReady() ? "partly connected" : "simulated", "messages recorded with buttons; simulator on /dashboard/channels"],
+      ["Telegram / push", telegramReady() || pushReady() ? "partly connected" : "simulated", "messages recorded with buttons; simulator on /dashboard/channels"],
       ["Passkey countersign", "real WebAuthn, attestation not verified", "ES256/RS256 with Node crypto"],
       ["90-day history for the backtest", "seeded sample", "labelled sample rows, replaced by the shop's own history as it accrues"],
       ["Dark-pattern baseline on the fairness scorecard", "modelled", fair.baseline.note],

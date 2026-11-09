@@ -2,10 +2,6 @@
 const BRYNTUM = "https://cdn.jsdelivr.net/npm/@bryntum/calendar-trial@7.3.8";
 const el = document.getElementById("calendar");
 if (el) {
-  if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
-    const link = document.getElementById("bryntum-theme");
-    if (link) link.href = `${BRYNTUM}/svalbard-dark.css`;
-  }
   try {
     const [{ Calendar }, data] = await Promise.all([
       import(`${BRYNTUM}/calendar.module.js`),

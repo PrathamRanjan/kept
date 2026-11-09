@@ -40,6 +40,7 @@ export const config = {
   channels: {
     telegramToken: process.env.TELEGRAM_BOT_TOKEN || "",
     telegramSecret: process.env.TELEGRAM_WEBHOOK_SECRET || "",
+    telegramBot: process.env.TELEGRAM_BOT_USERNAME || "paypalhackathonbot",
     whatsappToken: process.env.WHATSAPP_TOKEN || "",
     whatsappPhoneId: process.env.WHATSAPP_PHONE_ID || "",
     whatsappVerifyToken: process.env.WHATSAPP_VERIFY_TOKEN || "kept-verify",

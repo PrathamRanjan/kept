@@ -364,7 +364,7 @@ describe("REST API and pages", () => {
     const cookie = login.headers.get("set-cookie")!.split(";")[0];
     const page = await fetch(`${base}/dashboard`, { headers: { cookie } });
     expect(page.status).toBe(200);
-    expect(await page.text()).toMatch(/Revenue kept/);
+    expect(await page.text()).toMatch(/Kept by fair offers/);
     const cal = await (await fetch(`${base}/dashboard/calendar.json`, { headers: { cookie } })).json();
     expect(cal.resources.length).toBe(5);
     const stats = await (await fetch(`${base}/api/v1/owner/stats`, { headers: { authorization: `Bearer ${m.owner_token}` } })).json();

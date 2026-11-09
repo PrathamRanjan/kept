@@ -18,6 +18,21 @@ export function installChannelHandlers() {
   onInbound(async (msg) => {
     const text = (msg.text ?? "").trim();
     const db = await getDb();
+    // One tap from the app: "/start <one-time code>" (the shared bot strips its "kept-" prefix). Codes last 15 minutes and work once.
+    const st = text.match(/^\/start(?:\s+(\S+))?$/i);
+    if (st) {
+      const code = st[1] ?? "";
+      const row = code ? (await db.query<{ value: string }>("SELECT value FROM settings WHERE key = $1", [`tglink:${code}`])).rows[0] : undefined;
+      if (code) await db.query("DELETE FROM settings WHERE key = $1", [`tglink:${code}`]);
+      const v = row ? (JSON.parse(row.value) as { party: "owner" | "subscriber"; party_id: string; exp: number }) : null;
+      if (!v || v.exp < Date.now()) return code ? "That connect link has expired. Open Kept and tap “Connect Telegram” again." : "Hi, this is Kept. Open your member page (or your shop's Messages page) and tap the Telegram button to connect this chat.";
+      await link(msg.channel, msg.address, v.party, v.party_id);
+      if (v.party === "subscriber") {
+        const s = await subscriberById(db, v.party_id);
+        return `Connected. You'll get renewal reminders, with Skip and Keep buttons, for ${s?.subscriber_name ? `${s.subscriber_name}'s subscription` : "your subscription"} here. A payment problem is only ever shown on your member page, never as a link in this chat.`;
+      }
+      return "Connected as the shop owner. Held offers and large collections will ask you here with Approve and Decline buttons. Send “pending” any time.";
+    }
     const m = text.match(/^link\s+(subscriber|owner):(\S+)$/i);
     if (m) {
       if (m[1].toLowerCase() === "subscriber") {
@@ -31,7 +46,7 @@ export function installChannelHandlers() {
       await link(msg.channel, msg.address, "owner", o.id);
       return `Linked as the owner of ${o.name}. Held offers and collections above your threshold will ask you here.`;
     }
-    if (!msg.party) return "Hi. Link this chat first: send \"link subscriber:<your subscription ref>\" or \"link owner:<your owner key>\".";
+    if (!msg.party) return "Hi, this is Kept. This chat isn't connected yet: open your member page (or your shop's Messages page) and tap the Telegram button.";
     // A button id ("skip:<ref>"), the same typed out, or a bare word ("skip", "cancel", "fixed") for the linked subscription.
     const button = msg.buttonId ?? (text.match(/^(approve|decline|skip|keep|cancel|fixed)(?::(\S+))?$/i)?.[0] ?? null);
     const [verbRaw, id] = (button ?? "").split(":");

@@ -117,7 +117,7 @@ describe("Kept acceptance journey", () => {
     ok(await manage("switch", { plan_id: lite }));
 
     // A renewal fails (simulated from the dashboard): Ada promises a date, then says it's fixed.
-    expect((await owner.get("/dashboard")).text).toMatch(/Revenue kept/);
+    expect((await owner.get("/dashboard")).text).toMatch(/Kept by fair offers/);
     ok(await owner.post(`/dashboard/sub/${ada.ref}/simulate-failure`));
     ok(await manage("promise", { date: new Date(Date.now() + 3 * 864e5).toISOString().slice(0, 10) }));
     expect((await manage("payment-fixed")).status).toBe(302);
@@ -143,6 +143,15 @@ describe("Kept acceptance journey", () => {
     expect((await start()).json.subscription_ref).toBe(s1.subscription_ref);
     fake.approve(s1.paypal_subscription_id);
     const ref = s1.subscription_ref;
+    // One-tap Telegram: the member's one-time code links their chat once; the owner's button opens the bot with a code too.
+    const tgm = await anon.post(`/manage/${ref}/connect/telegram`, {});
+    expect(tgm.status).toBe(303);
+    const mcode = String(tgm.location).split("start=kept-")[1];
+    await anon.postJson("/webhooks/telegram", { message: { chat: { id: 4242 }, text: "/start " + mcode } });
+    expect((await one("SELECT party FROM party_links WHERE channel = 'telegram' AND address = '4242'"))?.party).toBe("subscriber");
+    await anon.postJson("/webhooks/telegram", { message: { chat: { id: 4243 }, text: "/start " + mcode } });
+    expect(await one("SELECT party FROM party_links WHERE channel = 'telegram' AND address = '4243'")).toBeUndefined();
+    expect(String((await owner.post("/connect/telegram", {})).location)).toMatch(/t\.me\/.+start=kept-/);
     expect((await anon.get(`/api/v1/subscriptions/${ref}`)).json.status).toBe("ACTIVE");
     expect((await anon.postJson(`/api/v1/subscriptions/${ref}/skip`, {})).json.resumes_at).toBeTruthy();
     await anon.postJson(`/api/v1/subscriptions/${ref}/resume`, {});

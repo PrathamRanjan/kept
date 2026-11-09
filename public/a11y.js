@@ -28,21 +28,33 @@
   // Read aloud: one button per page reads the main content; payment status banners are announced as they appear.
   let speaking = false;
   function readAloudButtons() {
-    const existing = document.getElementById("a11y-read");
-    if (!p.readAloud || !("speechSynthesis" in window)) { existing?.remove(); return; }
-    if (existing) return;
-    const b = document.createElement("button"); b.id = "a11y-read"; b.type = "button"; b.className = "btn small"; b.textContent = "Read this page";
-    b.style.cssText = "position:fixed;left:16px;bottom:16px;z-index:50;min-height:44px";
-    b.addEventListener("click", () => {
-      if (speaking) { speechSynthesis.cancel(); speaking = false; b.textContent = "Read this page"; return; }
+    const slot = document.querySelector("[data-a11y-read]");
+    const speak = (b) => {
+      if (!("speechSynthesis" in window)) return;
+      if (speaking) { speechSynthesis.cancel(); speaking = false; b.setAttribute("aria-pressed", "false"); return; }
       const main = document.getElementById("main") || document.body;
       const text = main.innerText.replace(/\s+/g, " ").slice(0, 6000);
-      const u = new SpeechSynthesisUtterance(text); u.rate = 0.95; u.onend = () => { speaking = false; b.textContent = "Read this page"; };
-      speechSynthesis.cancel(); speechSynthesis.speak(u); speaking = true; b.textContent = "Stop reading";
-    });
-    document.body.appendChild(b);
-    const banner = document.querySelector(".banner[role=status], .banner[role=alert]");
-    if (banner) { const u = new SpeechSynthesisUtterance(banner.innerText); speechSynthesis.speak(u); }
+      const u = new SpeechSynthesisUtterance(text); u.rate = 0.95; u.onend = () => { speaking = false; b.setAttribute("aria-pressed", "false"); };
+      speechSynthesis.cancel(); speechSynthesis.speak(u); speaking = true; b.setAttribute("aria-pressed", "true");
+    };
+    if (slot) {
+      if (!slot.dataset.bound) { slot.dataset.bound = "1"; slot.addEventListener("click", () => speak(slot)); }
+      if (!("speechSynthesis" in window)) slot.hidden = true;
+    } else {
+      const existing = document.getElementById("a11y-read");
+      if (!p.readAloud || !("speechSynthesis" in window)) { existing?.remove(); return; }
+      if (!existing) {
+        const b = document.createElement("button"); b.id = "a11y-read"; b.type = "button"; b.className = "btn small"; b.textContent = "Read this page aloud";
+        b.style.marginBottom = "12px";
+        b.addEventListener("click", () => speak(b));
+        (document.getElementById("main") || document.body).prepend(b);
+      }
+    }
+    if (p.readAloud && "speechSynthesis" in window && !window.__a11yAnnounced) {
+      window.__a11yAnnounced = true;
+      const banner = document.querySelector(".banner[role=status], .banner[role=alert]");
+      if (banner) { const u = new SpeechSynthesisUtterance(banner.innerText); speechSynthesis.speak(u); }
+    }
   }
 
   // Voice input: a microphone button beside every text field; Web Speech, on-device when the browser supports it.
@@ -84,14 +96,21 @@
       announce(`${b.dataset.set} set to ${b.textContent}`);
     });
     d.addEventListener("change", (e) => { const c = e.target.closest("[data-tog]"); if (!c) return; p[c.dataset.tog] = c.checked; save(); apply(); announce(`${c.parentElement.textContent.trim().split("\n")[0]} ${c.checked ? "on" : "off"}`); });
-    d.querySelector("#a11y-close").addEventListener("click", () => { d.remove(); fab.focus(); });
+    d.querySelector("#a11y-close").addEventListener("click", () => { d.remove(); opener().focus(); });
     document.body.appendChild(d); d.querySelector("button").focus();
-    d.addEventListener("keydown", (e) => { if (e.key === "Escape") { d.remove(); fab.focus(); } });
+    d.addEventListener("keydown", (e) => { if (e.key === "Escape") { d.remove(); opener().focus(); } });
   }
 
   const fab = document.createElement("button"); fab.type = "button"; fab.className = "a11y-fab"; fab.textContent = "Display and help"; fab.setAttribute("aria-haspopup", "dialog");
   fab.addEventListener("click", panel);
-  document.addEventListener("click", (e) => { if (e.target.closest("[data-a11y-open]")) panel(); });
+  document.addEventListener("click", (e) => { if (e.target.closest("[data-a11y-open]")) { if (document.querySelector(".a11y-panel")) document.querySelector(".a11y-panel").remove(); else panel(); } });
+  const opener = () => document.querySelector("[data-a11y-open]") || fab;
+  // Quick choices on any page (the landing page offers them before anyone starts): <button data-q="textScale:1.5">.
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-q]"); if (!b || b.closest(".a11y-first")) return;
+    const [k, v] = b.dataset.q.split(":"); const val = v === "true" ? true : isNaN(Number(v)) ? v : Number(v);
+    const on = b.getAttribute("aria-pressed") !== "true"; b.setAttribute("aria-pressed", String(on)); p[k] = on ? val : DEF[k]; p.seen = true; save(); apply();
+  });
 
   // First visit: one screen, big toggles, skippable.
   function firstVisit() {
@@ -105,12 +124,27 @@
       const [k, v] = b.dataset.q.split(":"); const val = v === "true" ? true : isNaN(Number(v)) ? v : Number(v);
       const on = b.getAttribute("aria-pressed") !== "true"; b.setAttribute("aria-pressed", String(on)); p[k] = on ? val : DEF[k]; save(); apply();
     });
-    const done = () => { p.seen = true; save(); w.remove(); fab.focus(); };
+    const done = () => { p.seen = true; save(); w.remove(); opener().focus(); };
     w.querySelector("#a11y-first-done").addEventListener("click", done); w.querySelector("#a11y-first-skip").addEventListener("click", done);
     document.body.appendChild(w); w.querySelector("button").focus();
   }
 
   apply();
-  const boot = () => { document.body.appendChild(fab); apply(); if (!/\/(login|c\/|judge)/.test(location.pathname)) firstVisit(); };
+  const boot = () => {
+    if (!document.querySelector("[data-a11y-open]")) document.body.appendChild(fab);
+    for (const b of document.querySelectorAll("[data-q]")) { const [k, v] = b.dataset.q.split(":"); const val = v === "true" ? true : isNaN(Number(v)) ? v : Number(v); b.setAttribute("aria-pressed", String(p[k] === val)); }
+    apply();
+    if (document.querySelector("[data-a11y-first]")) firstVisit();
+    // Mark the current page in the sidebar when the server did not (longest matching link wins).
+    if (!document.querySelector(".sb-nav a.active")) {
+      const here = location.pathname;
+      let best = null, len = -1;
+      for (const a of document.querySelectorAll(".sb-nav a")) {
+        const h = a.getAttribute("href") || "";
+        if ((here === h || (h !== "/" && here.startsWith(h + "/"))) && h.length > len) { best = h; len = h.length; }
+      }
+      if (best) for (const a of document.querySelectorAll(`.sb-nav a[href="${best}"]`)) { a.classList.add("active"); a.setAttribute("aria-current", "page"); }
+    }
+  };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot); else boot();
 })();
