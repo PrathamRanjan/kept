@@ -17,7 +17,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "seed": "tsx --env-file-if-exists=.env scripts/seed.ts",
-    "sandbox:check": "tsx --env-file-if-exists=.env scripts/sandbox-check.ts",
+    "sandbox:check": "tsx --env-file-if-exists=.env scripts/pp-check.mts",
     "agent:demo": "tsx --env-file-if-exists=.env scripts/buyer-agent.ts",
     "webhook:register": "tsx --env-file-if-exists=.env scripts/register-webhook.ts",
     "eval:reasons": "tsx --env-file-if-exists=.env scripts/eval-reasons.ts",
