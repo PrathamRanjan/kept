@@ -32,7 +32,7 @@ export interface LayoutOpts {
 
 export function layout(o: LayoutOpts, body: Raw): string {
   const nav = o.owner
-    ? html`<a href="/dashboard" class="${o.nav === "dashboard" ? "active" : ""}">Dashboard</a><a href="/s/${o.owner.slug}">Shop page</a><a href="/onboard/rules">Rules</a><a href="/dashboard/guard">Guard</a><a href="/dashboard/money">Money</a><a href="/dashboard/eval">Evals</a><a href="/dashboard/traces">Runs</a><a href="/dashboard/channels">Channels</a><a href="/dashboard/evidence">Evidence</a><a href="/agents" class="${o.nav === "agents" ? "active" : ""}">For agents</a><form method="post" action="/logout" class="inline"><button class="btn small" type="submit">Sign out</button></form>`
+    ? html`<a href="/dashboard" class="${o.nav === "dashboard" ? "active" : ""}">Dashboard</a><a href="/s/${o.owner.slug}">Shop page</a><a href="/onboard/rules">Rules</a><a href="/dashboard/guard">Guard</a><a href="/dashboard/safety">Safety</a><a href="/dashboard/money">Money</a><a href="/dashboard/eval">Evals</a><a href="/dashboard/traces">Runs</a><a href="/dashboard/channels">Channels</a><a href="/dashboard/evidence">Evidence</a><a href="/agents" class="${o.nav === "agents" ? "active" : ""}">For agents</a><form method="post" action="/logout" class="inline"><button class="btn small" type="submit">Sign out</button></form>`
     : html`<a href="/agents" class="${o.nav === "agents" ? "active" : ""}">For agents</a><a href="/onboard" class="${o.nav === "onboard" ? "active" : ""}">Set up a shop</a><a href="/login" class="${o.nav === "login" ? "active" : ""}">Owner sign-in</a>`;
   return `<!doctype html>
 <html lang="en">
@@ -50,6 +50,7 @@ ${o.head ? o.head.value : ""}
 <header class="topbar"><div class="wrap"><a class="brand" href="/"><span class="dot">K</span>Kept</a>${o.owner ? html`<span class="muted">· ${o.owner.name}</span>`.value : ""}<nav class="nav">${nav.value}</nav></div></header>
 <main><div class="wrap">${body.value}</div></main>
 <footer><div class="wrap">Kept runs on the PayPal sandbox. No real money moves. Rows marked <span class="pill sample">sample</span> are labelled demo data.</div></footer>
+<link rel="stylesheet" href="/static/a11y.css"><script src="/static/a11y.js" defer></script>
 ${o.scripts ? o.scripts.value : ""}
 </body>
 </html>`;

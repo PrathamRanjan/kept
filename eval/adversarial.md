@@ -20,7 +20,7 @@
 | Capture when PayPal shows nothing outstanding | dry_run_refused | Refused before PayPal: PayPal shows nothing outstanding on this subscription. |
 | Agent kill switch engaged: a skip is stopped | denied | Stopped by the kill switch on agent:evil (harness). |
 | Agent kill switch engaged: a cancel still goes through (never blocked) | allowed | cancel: always honoured |
-| Merchant kill switch engaged: an offer is stopped | denied | Stopped by the kill switch on merchant:mer_67qxp26cdrfn7ysj (harness). |
+| Merchant kill switch engaged: an offer is stopped | denied | Stopped by the kill switch on merchant:mer_mjiza2jkgpmaxdbk (harness). |
 | Global kill switch: even a capture by hand is stopped | denied | Stopped by the global kill switch (harness). |
 | Invoice above the threshold with a smuggled string amount | dry_run_refused | Refused before PayPal: amount 2400 is not a positive whole number of cents. |
 | Refund with NaN | dry_run_refused | Refused before PayPal: amount NaN is not a positive whole number of cents. |

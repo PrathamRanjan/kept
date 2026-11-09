@@ -592,6 +592,7 @@ export function webRouter(): Router {
     res.send(layout({ title: `Your ${m.name} subscription`, nav: "manage" }, html`
       <h1>Your ${m.name} subscription</h1>${flash(req)}
       ${s.is_sample ? html`<div class="banner info">This is a labelled sample subscriber for the demo; it has no PayPal subscription behind it.</div>` : ""}
+      <p class="small muted">If a payment ever fails, you will see it here on this page, and only here. ${m.name} never sends a "pay here" link by text or email. Got a message like that? <a href="/manage/${s.ref}/check">Check it</a>.</p>
       ${s.kept_state === "cancel_pending" || (s as any).cancel_requested_at ? html`<div class="banner warn" role="status"><b>Cancellation pending.</b> You asked to cancel${(s as any).cancel_requested_at ? ` on ${fmtDate((s as any).cancel_requested_at, true)}` : ""}. PayPal hasn't confirmed it yet; Kept keeps retrying and will tell you when it's done. You won't be charged for a renewal you asked to stop.</div>` : ""}
       ${v.notice ? html`<div class="banner warn">${v.notice}<form method="post" action="/manage/${s.ref}/payment-fixed" style="margin-top:8px"><button class="btn primary" type="submit">I've updated my payment method, retry now</button></form><form method="post" action="/manage/${s.ref}/promise" class="row" style="margin-top:8px"><label for="pd">Can't fix it today? I'll sort it by</label><input id="pd" type="date" name="date" required><button class="btn" type="submit">Pause reminders until then</button></form></div>` : ""}
       <div class="grid g2">

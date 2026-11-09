@@ -1,0 +1,35 @@
+/* Accessibility kit (SAFETY_ACCESSIBILITY_SPEC §5): every toggle is a data-* attribute on <html>, set by a11y.js from
+   a profile kept on this device. Layouts already use rem, so text scale is one font-size on :root. */
+html[data-a11y-text="1.25"] { font-size: 125%; }
+html[data-a11y-text="1.5"] { font-size: 150%; }
+html[data-a11y-text="2"] { font-size: 200%; }
+html[data-a11y-contrast="high"] { --bg: #ffffff; --surface: #ffffff; --surface-2: #f2f2f2; --ink: #000000; --muted: #333333; --line: #000000; --accent: #0000c8; --accent-ink: #ffffff; --accent-soft: #e6e6ff; --good: #005a1e; --good-soft: #dff5e6; --warn: #6b3d00; --warn-soft: #fff0cc; --bad: #9e0000; --bad-soft: #ffe0e0; --info: #003f8a; --info-soft: #e0ecff; --shadow: none; }
+html[data-a11y-contrast="high"] .btn, html[data-a11y-contrast="high"] .card, html[data-a11y-contrast="high"] input, html[data-a11y-contrast="high"] select, html[data-a11y-contrast="high"] textarea { border-color: #000 !important; }
+html[data-a11y-contrast="high"] .pill::before { content: "● "; }
+html[data-a11y-font="hyperlegible"] body { font-family: "Atkinson Hyperlegible", system-ui, sans-serif; line-height: 1.6; letter-spacing: 0.01em; text-align: left; }
+html[data-a11y-motion="off"] *, html[data-a11y-motion="off"] *::before, html[data-a11y-motion="off"] *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+html[data-a11y-targets="big"] .btn, html[data-a11y-targets="big"] button, html[data-a11y-targets="big"] input, html[data-a11y-targets="big"] select, html[data-a11y-targets="big"] summary, html[data-a11y-targets="big"] .nav a { min-height: 44px; min-width: 44px; padding: 10px 16px; }
+html[data-a11y-targets="big"] .row, html[data-a11y-targets="big"] .spread, html[data-a11y-targets="big"] .nav { gap: 8px; }
+html[data-a11y-targets="big"] td, html[data-a11y-targets="big"] th { padding: 12px 10px; }
+html[data-a11y-simple="on"] [data-simple] { font-size: 0; }
+html[data-a11y-simple="on"] [data-simple]::after { content: attr(data-simple); font-size: 1rem; }
+/* The floating Display and help button and its panel. */
+.a11y-fab { position: fixed; right: 16px; bottom: 16px; z-index: 50; min-height: 44px; min-width: 44px; border-radius: 999px; padding: 10px 16px; background: var(--accent); color: var(--accent-ink); border: 2px solid var(--accent-ink); font: inherit; font-weight: 600; box-shadow: var(--shadow); cursor: pointer; }
+.a11y-panel { position: fixed; inset: auto 16px 72px auto; z-index: 51; width: min(420px, calc(100vw - 32px)); max-height: min(80vh, 720px); overflow: auto; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 8px 32px rgba(0,0,0,.25); padding: 16px; }
+.a11y-panel h2 { margin: 0 0 4px; font-size: 1.15rem; }
+.a11y-panel .sub { margin: 0 0 12px; }
+.a11y-panel fieldset { border: 1px solid var(--line); border-radius: 8px; margin: 0 0 10px; padding: 8px 12px; }
+.a11y-panel legend { font-weight: 600; padding: 0 4px; }
+.a11y-panel label.tog { display: flex; align-items: center; gap: 10px; min-height: 44px; cursor: pointer; }
+.a11y-panel label.tog input { width: 22px; height: 22px; }
+.a11y-panel .seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.a11y-panel .seg button { min-height: 44px; min-width: 56px; }
+.a11y-panel .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.a11y-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.a11y-mic { margin-left: 6px; min-height: 36px; min-width: 36px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; }
+.a11y-mic[aria-pressed="true"] { background: var(--bad-soft); border-color: var(--bad); }
+.a11y-first { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.45); display: grid; place-items: center; padding: 16px; }
+.a11y-first .card { max-width: 560px; width: 100%; }
+.a11y-first .big-toggles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin: 12px 0; }
+.a11y-first .big-toggles button { min-height: 64px; font-size: 1.05rem; }
+@media (prefers-reduced-motion: reduce) { .a11y-panel, .a11y-first { transition: none; } }

@@ -11,6 +11,7 @@ import { merchantBySlug, merchantByToken } from "./store.js";
 import { receiveWebhook } from "./webhooks.js";
 import { webRouter } from "./web/routes.js";
 import { guardRouter } from "./web/guard.js";
+import { safetyRouter } from "./web/safety.js";
 import { foundationRouter, runsApi } from "./web/foundation.js";
 import { installChannelHandlers } from "./channels/handlers.js";
 import { KeptError } from "./store.js";
@@ -62,6 +63,7 @@ export function createApp() {
   app.use("/api/v1", runsApi());
   app.use("/api/v1", apiRouter());
   app.use(guardRouter());
+  app.use(safetyRouter());
   app.use(foundationRouter());
   app.use(webRouter());
 

@@ -174,3 +174,17 @@ Roadmap Parts B and C for Kept, all behind tests (`npm test`: 71 tests, includin
 - **Agent surface**: owner MCP adds `recent_runs`, `search_transactions`, `compliance_scorecard`, `fairness`, `pending_approvals` (all read-only); `/skill.md` and `/llms.txt` describe the guarantees; `npm run cli -- …` is a shell client over the API.
 
 Waiting on keys (add to `.env`, nothing else to wire): `TELEGRAM_BOT_TOKEN`/`TELEGRAM_WEBHOOK_SECRET`, `WHATSAPP_TOKEN`/`WHATSAPP_PHONE_ID`, `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`, `PAYPAL_LOGIN_ENABLED=true` once the sandbox app has Log in with PayPal. The APIMatic developer portal for `docs/openapi.yaml` is also parked until you have the account.
+
+## Scam and fraud protection (9 Nov 2026)
+
+The people at risk are subscribers, including older people who forget. Three layers, strictest wins, none can move money (`SAFETY_ACCESSIBILITY_SPEC.md` §4, Kept row of §6):
+
+- **No "pay here" links, ever.** Kept never sends one, so the rule is simple: a message that says a payment failed and sends the reader somewhere to pay is named `fake_failed_payment` and explained in plain words. Every subscriber's manage page says so and links to a check page (`/manage/<ref>/check`) that scores a pasted message in their browser.
+- **Rules in the gate** (`src/safety/index.ts`, called from `src/guard/dryrun.ts` step 3b for every agent or worker capture, invoice, refund and offer; never for a cancel or a person's own click): a subscriber asking for a refund to go to a different account holds the refund (`refund_to_other_account`) with the reason in the approval; protected mode (per merchant, `/dashboard/safety#protected`) holds every agent money move and offer and tells a trusted contact.
+- **Scam text model in the browser** (`public/safety/`, 23 MB int8 ONNX, fine-tuned MiniLM) on the owner's and the subscriber's pages. Advisory; its score never reaches the gate. **Payment-risk model** (`public/safety/risk_lgbm.json`): monotone LightGBM, **trained on synthetic data**, a ranking signal shown with the rule reasons.
+
+Tests: `test/safety.test.ts`; the model's measured results are on `/dashboard/safety/model-card`.
+
+## Accessibility (9 Nov 2026)
+
+`public/a11y.js` and `public/a11y.css` on every page, the subscriber's included: a **Display and help** button with text size, high contrast, Atkinson Hyperlegible, read-aloud, voice input (on-device where the browser supports it), plain words, bigger targets, more time and no motion. A first-visit card offers the same choices. The profile stays in this browser's `localStorage`; typing and buttons always work without it. Offers on the manage page carry no timers.

@@ -14,6 +14,7 @@ import { dryRun, pendingApprovals, saveGuardSettings } from "../src/guard/dryrun
 import { backtest, seedHistory } from "../src/guard/backtest.js";
 import { tick } from "../src/worker.js";
 import { Client } from "./client.js";
+import { DEMO_FAKE_FAILED } from "../src/web/safety.js";
 import { isFoundationRoute, serveTracked } from "./journey-coverage.js";
 
 // Foundation walk: every guard, compliance, trace, eval, money, channel, PWA and judge route is used by an
@@ -94,6 +95,18 @@ describe("Kept foundation", () => {
     expect((await anon.get(`/api/v1/subscriptions/${ada.ref}/runs`)).json.runs.length).toBeGreaterThan(0);
 
     /* ---- guard page, limits, backtest, kill switches, audit ---- */
+    /* ---- scam and fraud protection (SAFETY_ACCESSIBILITY_SPEC §4): owner page, model card, a scan, protected mode, the subscriber's check page ---- */
+    expect((await owner.get("/dashboard/safety")).text).toMatch(/pay here/);
+    expect((await owner.get("/dashboard/safety/model-card")).text).toMatch(/ScamShield/);
+    const scan = await owner.req("POST", "/dashboard/safety/scan", { json: { text: DEMO_FAKE_FAILED } });
+    expect(scan.status).toBe(200);
+    expect(JSON.parse(scan.text).rule).toBe("fake_failed_payment");
+    ok(await owner.post("/dashboard/safety/protected", { on: "1" }));
+    expect((await owner.get("/dashboard/safety")).text).toMatch(/Turn protected mode off/);
+    ok(await owner.post("/dashboard/safety/protected", { on: "0" }));
+    expect((await anon.get(`/manage/${ada.ref}/check`)).text).toMatch(/Check a message/);
+    expect(JSON.parse((await anon.req("POST", `/manage/${ada.ref}/check/scan`, { json: { text: DEMO_FAKE_FAILED } })).text).level).toBe("hold");
+
     const guardPage = (await owner.get("/dashboard/guard")).text;
     expect(guardPage).toMatch(/One-call cancel|Fairness|fairness/i);
     expect((await anon.get("/dashboard/guard")).location).toMatch(/login/);

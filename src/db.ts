@@ -276,6 +276,8 @@ CREATE TABLE IF NOT EXISTS eval_runs (
   latency_ms INTEGER NOT NULL DEFAULT 0, detail JSONB, at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS eval_runs_suite ON eval_runs(suite, arm);
+-- Key-value settings (safety layer: protected mode per merchant).
+CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 -- Owner guard settings: how much the agents and the offer step may do without the owner (earned autonomy).
 CREATE TABLE IF NOT EXISTS guard_settings (
   merchant_id TEXT PRIMARY KEY, auto_discount_max_pct INTEGER NOT NULL DEFAULT 15, auto_pause_max_cycles INTEGER NOT NULL DEFAULT 2,

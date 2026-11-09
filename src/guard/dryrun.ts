@@ -21,6 +21,7 @@ import { appendAudit } from "./audit.js";
 import { isKilled } from "./kill.js";
 import { moneyArgumentOk } from "./provenance.js";
 import { notifyParty } from "../channels/index.js";
+import { assessMove } from "../safety/index.js";
 
 export type MoneyAction = "subscribe" | "skip" | "pause" | "resume" | "switch" | "cancel" | "offer" | "capture" | "invoice" | "refund";
 
@@ -108,6 +109,8 @@ export function payloadHash(move: MoneyMove): string {
 export async function dryRun(move: MoneyMove, opts: { createApproval?: boolean; q?: Queryable } = {}): Promise<GateDecision> {
   const db = opts.q ?? (await getDb());
   const checks: GateDecision["checks"] = [];
+  // Set by the scam check below; read by hold() so the approval carries the reasons.
+  let safety: Awaited<ReturnType<typeof assessMove>> | null = null;
   const deny = (reason: string, policy: string | null = null, decision: GateDecision["decision"] = "denied"): GateDecision => ({ decision, reason, policy, checks });
   const isCancel = move.action === "cancel";
 
@@ -169,6 +172,14 @@ export async function dryRun(move: MoneyMove, opts: { createApproval?: boolean; 
     return await hold(`${(move.cents! / 100).toFixed(2)} needs the owner's approval (threshold ${(settings.approve_capture_above_cents / 100).toFixed(2)}).`, "autonomy.capture");
   }
 
+  // 3b. Scam check (SAFETY_ACCESSIBILITY_SPEC §4): a refund the subscriber asked to send elsewhere, protected mode.
+  // Never for a cancel and never for a person's own click.
+  if (!isCancel && !move.customerInitiated && (moneyActions.includes(move.action) || move.action === "offer")) {
+    safety = await assessMove({ action: move.action, merchantId: move.merchantId, entity: move.entity, entityId: move.entityId, cents: move.cents ?? 0 }, db);
+    checks.push({ name: "scam check", ok: safety.level !== "hold", note: safety.summary });
+    if (safety.level === "hold") return await hold(`Paused by the scam check: ${safety.reasons[0]}`, `safety.${safety.rule ?? "rule"}`);
+  }
+
   // 4. Compliance scorecard: a failing rule for the buyer's jurisdiction blocks the offer step in code.
   if (move.action === "offer" && rules) {
     const score = scoreCompliance(rules, move.jurisdiction ?? rules.jurisdiction ?? "US_FEDERAL");
@@ -220,7 +231,7 @@ export async function dryRun(move: MoneyMove, opts: { createApproval?: boolean; 
     if (!opts.createApproval) return { decision: "held", reason, policy, checks };
     const id = newId("apr");
     const hash = payloadHash(move);
-    await db.query("INSERT INTO approvals (id, merchant_id, action, payload_hash, payload, status) VALUES ($1,$2,$3,$4,$5,'pending')", [id, move.merchantId, move.action, hash, JSON.stringify({ ...move, reason })]);
+    await db.query("INSERT INTO approvals (id, merchant_id, action, payload_hash, payload, status) VALUES ($1,$2,$3,$4,$5,'pending')", [id, move.merchantId, move.action, hash, JSON.stringify({ ...move, reason, ...(safety && safety.level !== "clear" ? { safety_rule: safety.rule, safety_reasons: safety.reasons, safety_risk: safety.risk } : {}) })]);
     await appendAudit("approval.requested", "approval", id, { merchantId: move.merchantId, action: move.action, cents: move.cents ?? null, offer: move.offer ?? null, hash });
     const label = move.action === "offer" ? `${move.offer?.type} ${move.offer?.percent ? `${move.offer.percent}%` : move.offer?.cycles ? `${move.offer.cycles} cycles` : ""}`.trim() : `${move.action} ${((move.cents ?? 0) / 100).toFixed(2)}`;
     await notifyParty("owner", move.merchantId, `Kept held a ${label} (${reason}). Approve or decline.`, [{ id: `approve:${id}`, label: "Approve" }, { id: `decline:${id}`, label: "Decline" }], "approval", id, db);
