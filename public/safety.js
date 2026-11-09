@@ -37,7 +37,9 @@ form?.addEventListener("submit", async (e) => {
     const g = await guard(); const t0 = performance.now(); model = await g.score(t); ms = performance.now() - t0;
   } catch (err) { modelErr = err.message; }
   btn.disabled = false; status.textContent = "";
-  const level = [rules?.level, model?.level].includes("hold") ? "hold" : [rules?.level, model?.level].includes("caution") ? "caution" : "clear";
+  // The text model alone, below its hold line, with no tactic it is sure of and no rule fired, is a weak signal: show clear with a note.
+  const modelOnly = model?.level === "caution" && (!rules?.level || rules.level === "clear") && !Object.values(model?.tactics ?? {}).some((p) => p >= 0.5);
+  const level = [rules?.level, model?.level].includes("hold") ? "hold" : modelOnly ? "clear" : [rules?.level, model?.level].includes("caution") ? "caution" : "clear";
   const [cls, title] = LEVEL[level];
   const tactics = new Set([...(rules?.tactics ?? []), ...Object.entries(model?.tactics ?? {}).filter(([, p]) => p >= 0.5).map(([k]) => k)]);
   const top = Object.entries(model?.tactics ?? {}).sort((a, b) => b[1] - a[1]).slice(0, 2);
@@ -49,5 +51,5 @@ form?.addEventListener("submit", async (e) => {
   </div>
   ${tactics.size || top.length ? `<h3>What this message does</h3><ul>${[...tactics].map((k) => `<li>${esc(WORDS[k] || k)}</li>`).join("")}${top.filter(([k]) => !tactics.has(k) && k in WORDS).map(([k, p]) => `<li class="muted">${esc(WORDS[k])} (model ${Math.round(p * 100)}%)</li>`).join("")}</ul>` : ""}
   ${rules?.reasons?.length ? `<h3>Why</h3><ul>${rules.reasons.map((r) => `<li>${esc(r)}</li>`).join("")}</ul>` : ""}
-  <p class="small muted">What to do: pay only to details you confirmed by phone with a number you already had. Never share codes. If in doubt, put the payment on hold and ask a second person. ${level === "clear" ? "A clear result is not a guarantee: the model catches about three quarters of scams at this setting." : ""}</p>`;
+  <p class="small muted">What to do: pay only to details you confirmed by phone with a number you already had. Never share codes. If in doubt, put the payment on hold and ask a second person. ${modelOnly ? `The text model was a little unsure (${Math.round(model.p_scam * 100)}%) but found no scam tactic, and no rule fired, so this is not flagged. ` : ""}${level === "clear" ? "A clear result is not a guarantee: the model catches about three quarters of scams at this setting." : ""}</p>`;
 });
