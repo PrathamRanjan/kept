@@ -32,7 +32,7 @@ Live site: https://pph-kept.onrender.com · Source: https://github.com/PrathamRa
 
 **Wired but not run live:** outstanding-balance capture and Invoicing v2 (the sandbox can't make a renewal fail on demand).
 
-**Not wired:** Log in with PayPal (the feature is off on the sandbox app), WhatsApp (no token), Twilio, Channel3.
+**Not live:** Log in with PayPal (the feature is off on the sandbox app), WhatsApp (no token), Telegram (token set, no chat linked yet), web push (keys set, no browser subscribed yet). **Not part of Kept:** Twilio calls and SMS, Channel3.
 
 **APIMatic:** only `docs/openapi.yaml`; no portal or SDK was generated.
 
@@ -45,7 +45,7 @@ Live site: https://pph-kept.onrender.com · Source: https://github.com/PrathamRa
   - The switch message printed a raw PayPal URL.
   - A cancel with "show me an offer" and no eligible offer didn't say why.
   - `render.yaml` defaulted to the rules-only brain.
-- **Kept and labelled:** sample members, the "simulate failed renewal" button, the fault lab, the backtest history and the dark-pattern baseline.
+- **Removed after the redesign (e53e013):** sample members, the "simulate failed renewal" button, the fault lab, PayPal-Mock-Response negative tests, the webhook and message simulators, the seeded backtest history and the modelled dark-pattern baseline. Nothing in Kept is simulated now; see `docs/AUDIT.md` §5 for what is still not live.
 
 ## 4. Bugs found and fixed during the rebuild
 
@@ -63,7 +63,7 @@ Live site: https://pph-kept.onrender.com · Source: https://github.com/PrathamRa
 | Check | Result |
 |---|---|
 | Typecheck (server + web) | Clean |
-| Unit and integration (`npm test`) | **84 / 84**: 75 before the work, 2 audit tests, 7 for the UI API and page shell (`test/ui.test.ts` reaches every new route, with no 5xx) |
+| Unit and integration (`npm test`) | **84 / 84**: 75 before the work, 2 audit tests, 7 for the UI API and page shell (`test/ui.test.ts` reaches every new route, with no 5xx). Still 84 / 84 after the simulation removal: the tests now drive failures and channels through PayPal's (fake) client and the Telegram webhook, and the backtest test replays real requests |
 | Browser (`npm run e2e`, Playwright on the real app with FakePayPal) | **16 / 16** (8 tests × phone 360 px and desktop 1440 px). Landing, new subscriber hand-off to PayPal, member skip/pause/resume/cancel with trace, offer-then-decline, owner today/ask/approvals/members, not-found, Judge Mode across all 6 pages, "Start Judge Mode". axe WCAG 2.2 AA: no serious or critical issues |
 | Build | `npm ci && npm run build` from a clean clone builds `web/` then the server. The web lockfile carries the Linux binaries for rolldown, Tailwind oxide and lightningcss |
 | Lighthouse mobile, **live** | Landing: performance 92, accessibility 100, best practices 100, SEO 100. Owner dashboard: performance 95, accessibility 100, best practices 100 (SEO 63 because owner pages are `noindex` on purpose). Shop: performance 96, accessibility 100 (91 before the fix in b6195b6), best practices 96 (PayPal's own permissions-policy warning inside its button frame) |

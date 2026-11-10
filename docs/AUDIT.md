@@ -23,9 +23,9 @@
 | Vault, Payouts, Disputes, Orders v2 authorize/capture/void/reauthorize | Not used by Kept (subscriptions product) | — |
 | OpenAI (model brain) | Live on Render and locally | Fresh rules drafted by the model parsed correctly (skip 1/30 days, pause 3, 20% for 2 cycles, 30-day tenure, 180-day cooldown); cancel reason classified `price` via model (`run_7sfwebsvsvig7rui` step 1); live evidence page: 3/3 model calls ok |
 | MCP server (buyer, directory, owner) | Live-verified | `tools/list` on the live shop returns 13 tools; `find_shops` returns the demo shop |
-| Telegram | Token set on Render; not driven end to end this session | Owner channel shows "not connected" for the demo shop |
+| Telegram | Bot token set on Render; evidence page "bot connected · 0 chats linked" | Outbound works once a chat is linked. The shared bot's webhook points at another service, so a member's Start tap reaches Kept only if that service forwards `kept-<code>`; not yet confirmed |
 | Web push | VAPID keys set on Render; not driven this session | — |
-| WhatsApp | Code present, no token | Simulated |
+| WhatsApp | Code present, no token | Not live (messages to WhatsApp would be logged "not sent") |
 | Twilio, Channel3 | Not wired | — |
 | AG Grid | Not used before the redesign | Added in the redesign for the members table (see REDESIGN_REPORT) |
 | Bryntum Calendar | Live (trial build from jsDelivr) | Renewal calendar on the owner dashboard |
@@ -36,14 +36,15 @@
 
 | Finding | Where | Verdict | Action |
 |---|---|---|---|
-| ~30 seeded sample subscribers, offers, feedback | `scripts/seed.ts` | Legitimate scaffolding: `is_sample` column, labelled in every list, view-only, `--reset-samples` | Kept. But see the next row |
+| ~30 seeded sample subscribers, offers, feedback | `scripts/seed.ts` | Was labelled scaffolding; still not real | **Removed** (10 Nov, e53e013): the seed script creates no members, and a startup migration deletes sample rows from Kept's schema. Every member is a real sandbox subscription |
 | Headline KPIs (active members, monthly revenue) added sample rows to live rows | `svc.computeStats` | **Misleading** (P1): "$X a month" mixed labelled samples with PayPal-billed members | Fixed: stats now also return `live.{active,suspended,mrr}`; the new owner screen leads with the live figure and shows the sample count beside it |
-| "Simulate failed renewal" button | `routes.ts`, `svc.simulateFailedPayment` | Legitimate: demo mode only, labelled, no PayPal call, the real path is the verified webhook | Kept, labelled in the demo ribbon |
-| "Fail the next PayPal cancel" fault lab | `paypal/faults.ts` | Legitimate: demo mode only, one-shot, shows durable cancel retry | Kept |
+| "Simulate failed renewal" button | `routes.ts`, `svc.simulateFailedPayment` | Recorded a failure PayPal never reported | **Removed** (10 Nov, e53e013) with its routes. Failures come only from the verified webhook or read-back |
+| "Fail the next PayPal cancel" fault lab | `paypal/faults.ts` | Injected a fake PayPal error | **Removed** (10 Nov, e53e013); the durable-cancel retry is covered by tests using the fake client |
 | Fake PayPal client | `paypal/fake.ts` | Tests only: reachable only through `setPayPalFactory`, which production never calls | No action |
 | `KEPT_BRAIN=local` in `render.yaml` and `.env.example` defaults | config | The deployed service sets `KEPT_BRAIN=openai` with a key (evidence page says "live (OpenAI)"); `render.yaml` would deploy rules-only | Fixed `render.yaml` default to `openai` |
-| 90-day backtest history | `guard/backtest.ts` | Labelled "seeded sample" on the evidence page | Kept, labelled |
-| Dark-pattern baseline on the fairness scorecard | `guard/backtest.ts` | Labelled "modelled", not measured | Kept, labelled |
+| 90-day backtest history | `guard/backtest.ts` | Invented requests | **Removed** (10 Nov, e53e013): the backtest replays only the shop's real cancellation requests from the last 90 days |
+| Dark-pattern baseline on the fairness scorecard | `guard/backtest.ts` | Modelled, not measured | **Removed** (10 Nov, e53e013): the scorecard shows only measured figures |
+| PayPal-Mock-Response negative tests, webhook simulator, in-app message simulator | `foundation.ts`, `paypal/client.ts` | Not real traffic | **Removed** (10 Nov, e53e013). Notices go to linked channels plus an in-app record; a channel without credentials is logged "not sent" |
 | Fixed dates or frozen clock | none found outside tests | — | — |
 | Canned AI outputs | `brain/local.ts` is a deterministic fallback, used only when the model call fails, and the trace says `via: rules` | Legitimate | — |
 | `/judge` picks the oldest merchant, not the demo shop | `web/foundation.ts` | Bug (P2): if anyone onboards first on a fresh database the story points at the wrong shop | Fixed: uses `KEPT_DEMO_SHOP` / the demo slug first |
@@ -62,6 +63,13 @@ New shop "Rise Sourdough Club" → plans typed in plain words ("Starter kit $7.5
 - `eval:*`: not re-run in this session (the live evidence page shows the stored results); the adversarial and reasons suites are unchanged by this work.
 - `sandbox:check`: `scripts/pp-sub-check.mts` used for read-backs above.
 
-## 5. Still simulated, and why
+## 5. Not live, and why (nothing is simulated)
 
-Failed renewal on demand (sandbox cannot make a card fail on a subscription renewal; the verified webhook path is real); WhatsApp (no token); backtest history and dark-pattern baseline (labelled); Log in with PayPal (feature not enabled on the sandbox app).
+Since e53e013 (10 Nov) Kept has no sample members, no fault switches, no mock PayPal responses, no webhook or message simulator, no seeded backtest history and no modelled baseline. What is still not live:
+
+- **Failed renewal, balance capture, invoices:** the code is real, but it runs only when PayPal reports a failed renewal. The sandbox can't make one fail on demand.
+- **Telegram:** the bot token is set and outbound works. No chat is linked yet, and linking depends on the shared bot forwarding `kept-<code>` to Kept.
+- **Web push:** VAPID keys are set; it is live once a browser turns notifications on.
+- **WhatsApp:** no WhatsApp Cloud API token.
+- **Log in with PayPal:** the feature is off on the sandbox app.
+- **Phone calls, SMS (Twilio), Channel3:** not part of Kept.
