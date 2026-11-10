@@ -4,8 +4,11 @@
  *  - Judge Mode: one story across pages and personas, including the live PayPal sandbox step, ~3 minutes.
  * Tour state lives in localStorage so it survives page loads; `?tour=judge` starts Judge Mode from a link.
  */
-import { driver, type DriveStep, type Driver } from "driver.js";
-import "driver.js/dist/driver.css";
+import type { DriveStep, Driver } from "driver.js";
+
+/** Driver.js and its CSS load only when a tour actually starts, keeping them off every first page load. */
+let lib: Promise<typeof import("driver.js")> | null = null;
+const loadDriver = () => (lib ??= Promise.all([import("driver.js"), import("driver.js/dist/driver.css")]).then(([m]) => m));
 
 export type TourName = "owner" | "member" | "shop" | "judge";
 
@@ -146,7 +149,8 @@ const judgePages: PageSteps[] = [
 
 let active: Driver | null = null;
 
-function build(steps: DriveStep[], opts: { name: TourName; last?: { label: string; go: () => void }; onClose: () => void; showNever?: boolean }) {
+async function build(steps: DriveStep[], opts: { name: TourName; last?: { label: string; go: () => void }; onClose: () => void; showNever?: boolean }) {
+  const { driver } = await loadDriver();
   active?.destroy();
   const d = driver({
     steps,
@@ -183,6 +187,7 @@ function build(steps: DriveStep[], opts: { name: TourName; last?: { label: strin
         return;
       }
       if (d.isLastStep()) {
+        opts.onClose(); // finished: clear tour state now, not only when Driver reports it destroyed
         d.destroy();
         return;
       }
@@ -218,7 +223,7 @@ export function startTour(name: TourName, o: { force?: boolean } = {}) {
   } catch {}
   const steps = name === "owner" ? ownerSteps : name === "member" ? memberSteps : shopSteps;
   // Wait a frame so the page's targets exist.
-  requestAnimationFrame(() => build(steps.filter((s) => !s.element || document.querySelector(String(s.element))), { name, onClose: () => undefined, showNever: !o.force }).drive());
+  requestAnimationFrame(() => void build(steps.filter((s) => !s.element || document.querySelector(String(s.element))), { name, onClose: () => undefined, showNever: !o.force }).then((d) => d.drive()));
 }
 
 /** Continue Judge Mode on this page if it is running. Returns true if a tour is showing. */
@@ -231,7 +236,7 @@ export function resumeTour(path: string): boolean {
   store.set({ name: "judge", page: idx });
   const steps = pg.steps.filter((s) => !s.element || document.querySelector(String(s.element)));
   let advancing = false;
-  const d = build(steps.length ? steps : [{ popover: { title: "Judge Mode", description: "This step's panel isn't on screen; press Next to continue." } }], {
+  void build(steps.length ? steps : [{ popover: { title: "Judge Mode", description: "This step's panel isn't on screen; press Next to continue." } }], {
     name: "judge",
     last: pg.next
       ? {
@@ -246,8 +251,7 @@ export function resumeTour(path: string): boolean {
     onClose: () => {
       if (!advancing) store.set(null);
     },
-  });
-  d.drive();
+  }).then((d) => d.drive());
   return true;
 }
 

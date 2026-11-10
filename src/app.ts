@@ -1,3 +1,4 @@
+import compression from "compression";
 import express from "express";
 import cookieParser from "cookie-parser";
 import { readFileSync } from "node:fs";
@@ -23,6 +24,8 @@ const root = join(here, "..");
 
 export function createApp() {
   const app = express();
+  // gzip pages, assets and JSON; never streams (MCP and server-sent events must flush as they go).
+  app.use(compression({ filter: (req, res) => !/\/mcp$|\/events?$|\/stream/.test(req.path) && !/event-stream/.test(String(res.getHeader("Content-Type") ?? "")) && compression.filter(req, res) }));
   app.disable("x-powered-by");
   app.set("trust proxy", 1);
   app.use(express.json({ limit: "200kb" }));
