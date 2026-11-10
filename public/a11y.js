@@ -10,7 +10,9 @@
   let live;
   const announce = (t) => { if (!live) { live = document.createElement("div"); live.className = "a11y-live"; live.setAttribute("aria-live", "polite"); document.body.appendChild(live); } live.textContent = ""; setTimeout(() => (live.textContent = t), 30); };
 
+  const custom = () => ["textScale", "contrast", "font", "readAloud", "voiceInput", "simpleWords", "reducedMotion", "extraTime", "bigTargets"].some((k) => p[k] !== DEF[k]);
   function apply() {
+    document.querySelectorAll("[data-a11y-open]").forEach((b) => { b.classList.toggle("a11y-custom", custom()); b.title = custom() ? "Display settings are changed on this device" : "Display and help"; });
     root.dataset.a11yText = String(p.textScale);
     root.dataset.a11yContrast = p.contrast;
     root.dataset.a11yFont = p.font;
@@ -88,6 +90,7 @@
 <fieldset><legend>Text size</legend>${seg("textScale", [[1, "A"], [1.25, "A+"], [1.5, "A++"], [2, "A+++"]], p.textScale)}</fieldset>
 <fieldset><legend>Contrast and font</legend>${seg("contrast", [["default", "Normal"], ["high", "High contrast"]], p.contrast)}<div style="height:6px"></div>${seg("font", [["default", "Default font"], ["hyperlegible", "Clearer font"]], p.font)}</fieldset>
 <fieldset><legend>Help</legend>${tog("readAloud", "Read pages aloud", "A button reads the page; payment updates are spoken.")}${tog("voiceInput", "Speak instead of typing", "A microphone appears beside text boxes.")}${tog("simpleWords", "Plain words", "Shorter sentences for the important messages.")}${tog("bigTargets", "Bigger buttons", "44 px targets and more space.")}${tog("extraTime", "More time", "No auto-refresh, no countdowns.")}<label class="tog"><input type="checkbox" data-tog="reducedMotion" ${p.reducedMotion === true ? "checked" : ""}><span>Stop all motion</span></label></fieldset>
+<div class="row" style="margin:4px 0 10px"><button type="button" class="btn small" id="a11y-reset">Reset to default</button></div>
 <p class="small muted">Head-movement pointer and voice chat are listed in the project roadmap; this app offers keyboard, voice input and read-aloud today.</p>`;
     d.addEventListener("click", (e) => {
       const b = e.target.closest("[data-set]"); if (!b) return;
@@ -97,6 +100,7 @@
     });
     d.addEventListener("change", (e) => { const c = e.target.closest("[data-tog]"); if (!c) return; p[c.dataset.tog] = c.checked; save(); apply(); announce(`${c.parentElement.textContent.trim().split("\n")[0]} ${c.checked ? "on" : "off"}`); });
     d.querySelector("#a11y-close").addEventListener("click", () => { d.remove(); opener().focus(); });
+    d.querySelector("#a11y-reset").addEventListener("click", () => { const seen = p.seen; p = { ...DEF, seen }; save(); apply(); d.remove(); panel(); announce("Display settings reset"); });
     document.body.appendChild(d); d.querySelector("button").focus();
     d.addEventListener("keydown", (e) => { if (e.key === "Escape") { d.remove(); opener().focus(); } });
   }
@@ -129,21 +133,38 @@
     document.body.appendChild(w); w.querySelector("button").focus();
   }
 
+  // Header menus (account, More, Test mode, drawer): one open at a time, closed by a click outside or Escape.
+  const MENUS = "details.umenu, details.tn-more, details.testmode, details.mnav";
+  document.addEventListener("click", (e) => {
+    const more = e.target.closest("[data-open-menu]");
+    if (more) { const m = document.querySelector("details.mnav"); if (m) m.open = !m.open; return; }
+    for (const d of document.querySelectorAll(MENUS)) if (d.open && !d.contains(e.target)) d.open = false;
+  });
+  document.addEventListener("toggle", (e) => {
+    const t = e.target; if (!(t instanceof HTMLDetailsElement) || !t.open || !t.matches(MENUS)) return;
+    for (const d of document.querySelectorAll(MENUS)) if (d !== t && d.open) d.open = false;
+  }, true);
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") for (const d of document.querySelectorAll(MENUS)) if (d.open) { d.open = false; d.querySelector("summary")?.focus(); } });
+
   apply();
   const boot = () => {
     if (!document.querySelector("[data-a11y-open]")) document.body.appendChild(fab);
     for (const b of document.querySelectorAll("[data-q]")) { const [k, v] = b.dataset.q.split(":"); const val = v === "true" ? true : isNaN(Number(v)) ? v : Number(v); b.setAttribute("aria-pressed", String(p[k] === val)); }
     apply();
     if (document.querySelector("[data-a11y-first]")) firstVisit();
-    // Mark the current page in the sidebar when the server did not (longest matching link wins).
-    if (!document.querySelector(".sb-nav a.active")) {
+    // Mark the current page in every navigation (sidebar, rail, top bar, bottom bar): longest matching link wins.
+    const NAVS = ".sb-nav a, .topnav > a, .dock a";
+    if (!document.querySelector(".sb-nav a.active, .topnav > a.active")) {
       const here = location.pathname;
       let best = null, len = -1;
-      for (const a of document.querySelectorAll(".sb-nav a")) {
+      for (const a of document.querySelectorAll(NAVS)) {
         const h = a.getAttribute("href") || "";
         if ((here === h || (h !== "/" && here.startsWith(h + "/"))) && h.length > len) { best = h; len = h.length; }
       }
-      if (best) for (const a of document.querySelectorAll(`.sb-nav a[href="${best}"]`)) { a.classList.add("active"); a.setAttribute("aria-current", "page"); }
+      if (best) for (const a of document.querySelectorAll(NAVS)) if (a.getAttribute("href") === best) { a.classList.add("active"); a.setAttribute("aria-current", "page"); }
+    } else {
+      const act = document.querySelector(".sb-nav a.active")?.getAttribute("href");
+      if (act) for (const a of document.querySelectorAll(".topnav > a, .dock a")) if (a.getAttribute("href") === act) a.classList.add("active");
     }
   };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot); else boot();

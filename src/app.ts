@@ -1,3 +1,4 @@
+import compression from "compression";
 import express from "express";
 import cookieParser from "cookie-parser";
 import { readFileSync } from "node:fs";
@@ -14,6 +15,8 @@ import { guardRouter } from "./web/guard.js";
 import { safetyRouter } from "./web/safety.js";
 import { foundationRouter, runsApi } from "./web/foundation.js";
 import { installChannelHandlers } from "./channels/handlers.js";
+import { uiApi } from "./web/ui-api.js";
+import { spaRouter } from "./web/spa.js";
 import { KeptError } from "./store.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -21,6 +24,8 @@ const root = join(here, "..");
 
 export function createApp() {
   const app = express();
+  // gzip pages, assets and JSON; never streams (MCP and server-sent events must flush as they go).
+  app.use(compression({ filter: (req, res) => !/\/mcp$|\/events?$|\/stream/.test(req.path) && !/event-stream/.test(String(res.getHeader("Content-Type") ?? "")) && compression.filter(req, res) }));
   app.disable("x-powered-by");
   app.set("trust proxy", 1);
   app.use(express.json({ limit: "200kb" }));
@@ -60,6 +65,8 @@ export function createApp() {
 
   app.post("/webhooks/paypal", (req, res, next) => receiveWebhook(req, res).catch(next));
   installChannelHandlers();
+  app.use(uiApi());
+  app.use(spaRouter());
   app.use("/api/v1", runsApi());
   app.use("/api/v1", apiRouter());
   app.use(guardRouter());

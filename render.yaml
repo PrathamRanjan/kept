@@ -21,7 +21,9 @@ envVarGroups:
       - key: SESSION_SECRET
         generateValue: true
       - key: KEPT_BRAIN
-        value: local
+        value: openai
+      - key: OPENAI_API_KEY
+        sync: false
       - key: KEPT_DEMO_MODE
         value: "true"
 

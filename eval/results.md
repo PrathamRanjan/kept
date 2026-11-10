@@ -1,11 +1,11 @@
-# Cancel-reason classification eval (Kept, 2026-11-09)
+# Cancel-reason classification eval (Kept, 2026-11-10)
 
 Three arms over 16 labelled cancel reasons (heldout; held-out ids frozen 2026-11-09 in eval/reasons-heldout.json, before any tuning of the rules or prompts). Traps: quality complaints phrased with money words, instruction text inside the reason, mixed reasons.
 
 | Arm | Cases | Correct | Traps | Traps caught | $ a naive tool wrongly gives away | $ Kept wrongly gives away | Cost (est.) | p50 | p95 |
 |---|---|---|---|---|---|---|---|---|---|
 | oracle | 16 | 16 | 4 | 4 | 57.60 | 0.00 | $0.0000 | 0 ms | 0 ms |
-| rules | 16 | 11 | 4 | 1 | 57.60 | 43.20 | $0.0000 | 0 ms | 1 ms |
+| rules | 16 | 11 | 4 | 1 | 57.60 | 43.20 | $0.0000 | 0 ms | 0 ms |
 
 The model arm did not run: no OPENAI_API_KEY. Run `npm run eval:reasons` with the key set to fill it.
 

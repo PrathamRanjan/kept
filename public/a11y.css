@@ -39,6 +39,11 @@ html[data-a11y-simple="on"] [data-simple]::after { content: attr(data-simple); f
 .a11y-quick { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .a11y-quick button[aria-pressed="true"] { background: var(--ui-primary); color: var(--ui-primary-fg); border-color: var(--ui-primary); }
 html[data-a11y-text="1.5"] .shell, html[data-a11y-text="2"] .shell { grid-template-columns: minmax(0, 1fr); }
-html[data-a11y-text="1.5"] .sidebar, html[data-a11y-text="2"] .sidebar { display: none; }
+html[data-a11y-text="1.5"] .shell > .sidebar, html[data-a11y-text="2"] .shell > .sidebar { display: none; }
+html[data-a11y-text="1.5"] .topnav, html[data-a11y-text="2"] .topnav { display: none; }
 html[data-a11y-text="1.5"] .mnav, html[data-a11y-text="2"] .mnav { display: block; }
 html[data-a11y-text="1.5"] .mnav[open] .sidebar, html[data-a11y-text="2"] .mnav[open] .sidebar { display: flex; position: fixed; inset: 3.5rem 0 0 0; height: auto; z-index: 40; width: min(360px, 92vw); }
+
+/* The Display button carries a dot when this device has changed settings, so a changed look is never a mystery. */
+[data-a11y-open].a11y-custom { position: relative; }
+[data-a11y-open].a11y-custom::after { content: ""; position: absolute; top: 4px; right: 4px; width: 7px; height: 7px; border-radius: 50%; background: var(--ui-warning); box-shadow: 0 0 0 2px var(--ui-bg); }
