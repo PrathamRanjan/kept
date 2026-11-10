@@ -258,6 +258,9 @@ async function load(ref: string) {
   return { db, s, m };
 }
 
+/** A member asking not to be persuaded. Matched in code so no model can talk past it. */
+export const NO_OFFER_WANTED = /\b(?:do(?:n'?t| not)|no need to|stop)\s+(?:try(?:ing)?\s+(?:to\s+)?)?(?:keep|retain|persuade|convince|talk me out|offer)|\bno (?:offers?|deals?|discounts?)\b|\bjust cancel\b/i;
+
 function assertLive(s: Subscriber) {
   if (s.is_sample) throw new KeptError("This is a labelled sample subscriber; it has no PayPal subscription to change.", "sample_row", 409);
 }
@@ -547,10 +550,16 @@ export async function requestCancel(ref: string, opts: { reason?: string; hearOf
       await logEvent(db, { merchantId: m.id, subscriberId: s.id, source: actor.kind, type: "offer.declined", summary: `${actorLabel(actor)} asked to cancel directly; the open offer was closed` });
     }
 
-    if (opts.hearOffer && unread) {
+    // The member's own words win over a hear_offer flag an assistant set: "don't try to keep me" means no offer.
+    const declined = opts.hearOffer && NO_OFFER_WANTED.test(reason);
+    if (declined) {
+      await run.step({ actor: "code", tool: "eligibility", args: { reason: reason.slice(0, 120) }, result: { chosen: null, eligible: [], note: "the member asked not to be offered anything" }, gate: "n/a" });
+      await logEvent(db, { merchantId: m.id, subscriberId: s.id, source: "system", type: "offer.none", summary: "No offer made: the member asked not to be kept, so Kept cancelled as asked." });
+    }
+    if (opts.hearOffer && unread && !declined) {
       await logEvent(db, { merchantId: m.id, subscriberId: s.id, source: "system", type: "offer.none", summary: "No offer made: Kept couldn't read the reason just now (the model did not answer), so it made no offer and cancelled as asked." });
     }
-    if (opts.hearOffer && !unread) {
+    if (opts.hearOffer && !unread && !declined) {
       // Anything that goes wrong while preparing an offer falls through to the cancel. Cancelling is never blocked.
       try {
         const policy = await rulesFor(m);

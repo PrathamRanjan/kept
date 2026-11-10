@@ -22,6 +22,7 @@
     "webhook:register": "tsx --env-file-if-exists=.env scripts/register-webhook.ts",
     "eval:reasons": "tsx --env-file-if-exists=.env scripts/eval-reasons.ts",
     "eval:adversarial": "tsx --env-file-if-exists=.env scripts/eval-adversarial.ts",
+    "eval:b5": "tsx --env-file-if-exists=.env scripts/eval-b5.ts",
     "cli": "tsx --env-file-if-exists=.env scripts/kept-cli.ts",
     "build:web": "npm --prefix web ci --include=dev && npm --prefix web run build",
     "e2e": "playwright test",

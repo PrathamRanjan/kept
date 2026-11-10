@@ -71,9 +71,17 @@ async function shopRef(ref: string) {
   return s;
 }
 
+/** Billing periods in an average month, so "cheapest" compares like with like ($1 a day is not cheaper than $12 a month). */
+const PER_MONTH: Record<string, number> = { DAY: 365.25 / 12, WEEK: 365.25 / 12 / 7, MONTH: 1, YEAR: 1 / 12 };
+export function aboutPerMonth(p: { price: number; interval_unit: string; interval_count: number }) {
+  return Math.round((Number(p.price) * (PER_MONTH[p.interval_unit] ?? 1) * 100) / Math.max(1, p.interval_count || 1)) / 100;
+}
+
 async function planList(m: Merchant) {
   const plans = (await plansFor(await getDb(), m.id)).filter((p) => p.kind !== "promo");
-  return plans.map((p) => ({ plan_id: p.id, name: p.name, description: p.description, price: money(p.price), currency: m.currency, billing: intervalWords(p), lighter_plan: p.kind === "lite" }));
+  const monthly = plans.map((p) => aboutPerMonth(p));
+  const low = Math.min(...monthly);
+  return plans.map((p, i) => ({ plan_id: p.id, name: p.name, description: p.description, price: money(p.price), currency: m.currency, billing: intervalWords(p), about_per_month: monthly[i].toFixed(2), cheapest_per_month: monthly[i] === low, lighter_plan: p.kind === "lite" }));
 }
 
 const refArg = z.string().min(6).describe("The subscription_ref returned by start_subscription (also shown on the subscriber's manage page).");
@@ -140,7 +148,7 @@ export function buildBuyerServer(fixed: Merchant | null, agentId: string): McpSe
 
   server.registerTool(
     "list_plans",
-    { title: "List plans", description: "Current subscription plans with prices and billing intervals.", inputSchema: { ...shopArg }, annotations: { readOnlyHint: true } },
+    { title: "List plans", description: "Current subscription plans with prices and billing intervals. about_per_month (computed by Kept) compares plans with different intervals; cheapest_per_month marks the lowest.", inputSchema: { ...shopArg }, annotations: { readOnlyHint: true } },
     async (args: any) => guard("list_plans", args, undefined, async () => ({ plans: await planList(await shopFor(fixed, args.shop)) })),
   );
 
