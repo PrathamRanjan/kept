@@ -32,7 +32,7 @@ Live site: https://pph-kept.onrender.com · Source: https://github.com/PrathamRa
 
 **Wired but not run live:** outstanding-balance capture and Invoicing v2 (the sandbox can't make a renewal fail on demand).
 
-**Not live:** Log in with PayPal (the feature is off on the sandbox app), WhatsApp (no token), Telegram (token set, no chat linked yet), web push (keys set, no browser subscribed yet). **Not part of Kept:** Twilio calls and SMS, Channel3.
+**Not live:** Log in with PayPal (the feature is off on the sandbox app), WhatsApp (no token), Telegram (token set, no chat linked yet), web push (keys set, no browser subscribed yet). **SMS (Twilio):** live, with verified opt-in; a real code text was delivered on 10 Nov. **Not part of Kept:** phone calls, Channel3.
 
 **APIMatic:** only `docs/openapi.yaml`; no portal or SDK was generated.
 

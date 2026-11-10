@@ -72,4 +72,5 @@ Since e53e013 (10 Nov) Kept has no sample members, no fault switches, no mock Pa
 - **Web push:** VAPID keys are set; it is live once a browser turns notifications on.
 - **WhatsApp:** no WhatsApp Cloud API token.
 - **Log in with PayPal:** the feature is off on the sandbox app.
-- **Phone calls, SMS (Twilio), Channel3:** not part of Kept.
+- **SMS (Twilio):** live since ae0dfbb. A verification text to the demo phone was delivered (Twilio status `delivered`). Replies reach Kept only if the number's messaging webhook points at `/webhooks/twilio`; today it points at another app.
+- **Phone calls, Channel3:** not part of Kept.
