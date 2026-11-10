@@ -196,3 +196,13 @@ Tests: `test/safety.test.ts`; the model's measured results are on `/dashboard/sa
 ## Accessibility (9 Nov 2026)
 
 `public/a11y.js` and `public/a11y.css` on every page, the subscriber's included: a **Display and help** button with text size, high contrast, Atkinson Hyperlegible, read-aloud, voice input (on-device where the browser supports it), plain words, bigger targets, more time and no motion. A first-visit card offers the same choices. The profile stays in this browser's `localStorage`; typing and buttons always work without it. Offers on the manage page carry no timers.
+
+## Wave 1 of the master improvement spec (10 Nov 2026): acceptance log
+
+Each item was built, tested, deployed to https://pph-kept.onrender.com and then checked on the live site. Results are recorded as they happened, including what failed or could not be verified.
+
+### 1. A2.1 Saved demo wallet
+
+- **Built:** Vault v3 calls (read a payment token, create a setup token, exchange it for a payment token), a daily `wallet_check` job, and `/admin/paypal/wallet` (admin key only) with "check with PayPal now" and a re-approval flow that reads the new token back before saving it. Settings: `PAYPAL_DEMO_VAULT_TOKEN`, `PAYPAL_DEMO_BUYER_EMAIL`, `KEPT_ADMIN_KEY` (local `.env` and Render; values never printed).
+- **Live check (commit `ad4952b`, 10 Nov 14:06 UTC): passed.** `/admin` without the key returns 401. With the key, `/admin/paypal/wallet.json?check=1` read the token back from PayPal: `ok: true`, "PayPal has the token (usage MERCHANT)", buyer `sb-kw6yh45846125@personal.example.com`, token shown masked.
+- **What the wallet cannot do in Kept (probed on the sandbox before building):** PayPal Subscriptions do not accept a vaulted wallet. Creating a subscription on the $1 daily plan with `payment_source.paypal.vault_id`, or with `subscriber.payment_source.token`, returned `201 APPROVAL_PENDING` with an approve link both times. So the spec's "main money loop with no login" (A2 acceptance) is met in Kept through the approval pool (item 2), which needs the owner to approve subscriptions ahead of time. Not met through the wallet.
