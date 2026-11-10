@@ -165,6 +165,8 @@ async function build(steps: DriveStep[], opts: { name: TourName; last?: { label:
     nextBtnText: "Next",
     prevBtnText: "Back",
     doneBtnText: opts.last ? opts.last.label : "Done",
+    // Driver.js marks the highlighted element as a popup trigger, which is wrong for a plain section.
+    onHighlighted: (el) => ["aria-haspopup", "aria-expanded", "aria-controls"].forEach((a) => el?.removeAttribute(a)),
     onPopoverRender: (popover) => {
       if (!opts.showNever) return;
       const b = document.createElement("button");

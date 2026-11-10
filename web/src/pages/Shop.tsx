@@ -127,7 +127,7 @@ function PlanCard({ plan, shop, clientId }: { plan: PlanJson; shop: ShopData["sh
         </div>
       </div>
       <div className="mt-5 grid gap-2">
-        {clientId && <div ref={btn} className="min-h-11" aria-label={`Subscribe to ${plan.name} with PayPal`} />}
+        {clientId && <div ref={btn} role="group" className="min-h-11" aria-label={`Subscribe to ${plan.name} with PayPal`} />}
         <Button type="submit" variant={clientId ? "outline" : "default"} disabled={busy}>
           <Lock aria-hidden="true" />
           {busy ? "Opening PayPal…" : clientId ? "Or continue on PayPal's page" : "Subscribe with PayPal"}

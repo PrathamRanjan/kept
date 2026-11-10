@@ -34,6 +34,8 @@ export function createApp() {
   app.use((_req, res, next) => {
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+    // PayPal's button frames ask for the Payment Request feature; delegate it to PayPal only.
+    res.setHeader("Permissions-Policy", 'payment=(self "https://www.paypal.com" "https://www.sandbox.paypal.com"), camera=(), geolocation=()');
     next();
   });
   app.use("/static", express.static(join(root, "public"), { maxAge: 0, setHeaders: (res, file) => { if (/[\\/]safety[\\/]/.test(file)) res.setHeader("Cache-Control", "public, max-age=86400"); } }));
