@@ -110,7 +110,11 @@ Live site: https://pph-kept.onrender.com · Source: https://github.com/PrathamRa
 | Cancel, ticking "show me one offer" | One offer: pause for 2 billing cycles, open 60 minutes; trace "Rules allow: pause 2. Chose pause 2." (the audit's P0 fix working live: before it, this cancel got no offer) | ACTIVE (nothing moves while the offer is open) |
 | "No thanks, cancel now" | Cancelled; the card ends with a closed "ended" stamp; run `run_8t6tcvtixfg3kr4r` | **CANCELLED at 2026-11-10T01:35:32Z** (`scripts/pp-sub-check.mts`) |
 
-Amounts match: one $1.00 payment and no further charge. The buyer's activity page needs a full sandbox account sign-in, which the assistant doesn't do, so this run is matched against PayPal's subscription API rather than the activity page. The earlier audit run (I-0KYH3B8BGX18, −$18.25) was matched against buyer activity.
+**Matched against the sandbox buyer's activity:**
+- **Activity entry:** one "−$1.00 USD, 10 Nov, Automatic Payment" with buyer-side transaction **8FE839418E6501739**, item $1.00, total $1.00. It shows under "Test Store", the shared sandbox merchant's name.
+- **PayPal's subscription-transactions API:** for I-5BRL6CY4FTUP it lists exactly one COMPLETED 1.00 USD payment, seller-side id **44200766TX384903F**, at 2026-11-10T01:34:01Z. That is the same second as Kept's paid stamp.
+- **Why the ids differ:** PayPal gives the buyer's and seller's records of one payment different ids.
+- **After the cancel:** no further charge.
 
 ## 9. Top 3 changes left
 
