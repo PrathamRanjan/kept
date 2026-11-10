@@ -127,7 +127,6 @@ describe("UI JSON API", () => {
     expect((await c.postJson("/ui/owner/ask", { question: "Who has a failed payment?" })).json.answer).toBeTruthy();
     expect((await c.postJson("/ui/owner/reconcile", {})).json.message).toMatch(/Checked \d+/);
     expect((await c.postJson(`/ui/owner/member/${ref}/sync`, {})).json.message).toMatch(/PayPal shows active/);
-    expect((await c.postJson(`/ui/owner/member/${ref}/simulate-failure`, {})).status).toBeLessThan(500);
     expect((await c.get(`/ui/owner/member/${ref}`)).json).toBeTruthy();
     expect((await c.get("/ui/owner/runs")).json).toBeTruthy();
     // No held approval exists here; deciding an unknown one is a clean 4xx, never a 5xx.

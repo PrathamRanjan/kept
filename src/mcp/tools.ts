@@ -325,7 +325,7 @@ export function buildOwnerServer(m: Merchant): McpServer {
         return { scorecards: jurisdiction ? cards.filter((c) => c.jurisdiction === jurisdiction) : cards };
       }),
   );
-  server.registerTool("fairness", { title: "Fairness scorecard", description: "One-call cancel rate, offers shown versus accepted, and the modelled dark-pattern baseline.", annotations: { readOnlyHint: true } }, async () => wrap(() => fairness(m.id)));
+  server.registerTool("fairness", { title: "Fairness scorecard", description: "One-call cancel rate, offers made versus accepted, and time to cancel, measured from this shop's own event log.", annotations: { readOnlyHint: true } }, async () => wrap(() => fairness(m.id)));
   server.registerTool("pending_approvals", { title: "Pending approvals", description: "Money moves waiting for the owner. Read-only: approve them on the dashboard or by passkey.", annotations: { readOnlyHint: true } }, async () => wrap(async () => ({ approvals: await pendingApprovals(m.id) })));
   server.registerTool(
     "recent_runs",

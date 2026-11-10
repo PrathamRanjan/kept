@@ -6,7 +6,7 @@
   btn.addEventListener("click", async () => {
     try {
       const { key } = await fetch("/push/public-key").then((r) => r.json());
-      if (!key) { alert("Web push is not configured on this server yet (VAPID keys missing). The simulator at /dashboard/channels still shows every message."); return; }
+      if (!key) { alert("Web push is not configured on this server yet (VAPID keys missing)."); return; }
       const reg = await navigator.serviceWorker.ready;
       const perm = await Notification.requestPermission();
       if (perm !== "granted") return;

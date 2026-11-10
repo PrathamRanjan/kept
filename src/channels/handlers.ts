@@ -1,5 +1,5 @@
 /**
- * What Kept does with an inbound channel message (Telegram, WhatsApp or the in-app simulator).
+ * What Kept does with an inbound channel message (Telegram or WhatsApp).
  *  - "link subscriber:<ref>" / "link owner:<owner key>" ties the chat to a party.
  *  - Buttons: approve:/decline:<approval id> (owner), skip:/keep:/cancel:/fixed:<ref> (subscriber).
  *  - Words: "status", "pending", "help".

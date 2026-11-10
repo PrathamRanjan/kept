@@ -1,5 +1,5 @@
 /**
- * Policy backtest and earned autonomy (roadmap K3, B.6). Replays 90 days of seeded cancellation requests through
+ * Policy backtest and earned autonomy (roadmap K3, B.6). Replays the shop's real cancellation requests from the last 90 days through
  * a candidate policy and the owner's autonomy limits: how many would have got an offer automatically (run), how
  * many would have been held for the owner (wait), how many got nothing (deny), and the money kept versus held.
  * What-if sliders change the discount percent and pause length before the owner adopts anything. Earned autonomy
@@ -7,7 +7,7 @@
  */
 import type { Queryable } from "../db.js";
 import { getDb } from "../db.js";
-import { newId } from "../lib/ids.js";
+import { plansFor, type Plan } from "../store.js";
 import { LocalBrain } from "../brain/local.js";
 import type { ReasonCategory } from "../brain/types.js";
 import { eligibleOffers, type PlanLite } from "../policy/eligibility.js";
@@ -30,36 +30,43 @@ export interface HistoryRow {
 
 const picker = new LocalBrain();
 
-/** Deterministic 90-day sample: 36 cancellation requests with a labelled reason and what happened. */
-export async function seedHistory(merchantId: string, planPrice: number, q?: Queryable) {
-  const db = q ?? (await getDb());
-  const n = Number((await db.query<{ c: string }>("SELECT count(*) AS c FROM subscription_history WHERE merchant_id = $1", [merchantId])).rows[0].c);
-  if (n) return n;
-  const reasons: [string, ReasonCategory, string | null, boolean][] = [
-    ["too much coffee piling up", "too_much", "skip", true], ["money is tight this month", "price", "discount", true], ["travelling for six weeks", "away", "pause", true],
-    ["the last bag tasted stale", "quality", null, true], ["switching to a cheaper roaster", "competitor", "discount", false], ["cutting down on caffeine", "no_need", null, true],
-    ["too expensive right now", "price", "switch_plan", true], ["still have two bags unopened", "too_much", "skip", true], ["moving house next month", "away", "pause", true],
-    ["", "other", null, true], ["card got declined twice", "payment", null, true], ["grinder broke, taking a break", "no_need", "pause", true],
-    ["found a local subscription for less", "competitor", null, false], ["we drink less in summer", "too_much", "skip", true], ["budget cuts at home", "price", "discount", true],
-    ["beans arrived late twice", "quality", null, true], ["going abroad for work", "away", "pause", true], ["just don't need it", "no_need", null, true],
-  ];
-  let seed = 11;
-  const rand = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
-  const now = Date.now();
-  for (let i = 0; i < 36; i++) {
-    const [reason, category, accepted, approve] = reasons[i % reasons.length];
-    const at = new Date(now - Math.floor(rand() * 90) * 864e5 - Math.floor(rand() * 86400) * 1000);
-    const heard = rand() < 0.65;
-    await db.query("INSERT INTO subscription_history (id, merchant_id, at, subscriber, plan_price, tenure_days, reason, category, heard_offer, accepted_type, owner_would_approve) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)", [
-      newId("hist"), merchantId, at, `Subscriber ${i + 1}`, (planPrice * (rand() < 0.3 ? 0.5 : 1)).toFixed(2), Math.floor(rand() * 400), reason, category, heard, heard ? accepted : null, approve,
-    ]);
-  }
-  return 36;
-}
-
+/**
+ * The shop's real cancellation requests in the last 90 days, from its own records: every live (non-sample)
+ * member who asked to cancel or asked to hear an offer, with their reason, whether they heard an offer, and
+ * what they accepted. Nothing is invented; a new shop simply has an empty history.
+ */
 export async function history(merchantId: string, q?: Queryable): Promise<HistoryRow[]> {
   const db = q ?? (await getDb());
-  return (await db.query<any>("SELECT * FROM subscription_history WHERE merchant_id = $1 ORDER BY at", [merchantId])).rows.map((r) => ({ ...r, at: new Date(r.at), plan_price: Number(r.plan_price), tenure_days: Number(r.tenure_days) }));
+  const rows = (
+    await db.query<any>(
+      `SELECT s.id, s.subscriber_name, s.started_at, s.cancelled_at, p.price,
+         (SELECT f.text FROM feedback f WHERE f.subscriber_id = s.id ORDER BY f.created_at LIMIT 1) AS reason,
+         (SELECT f.category FROM feedback f WHERE f.subscriber_id = s.id ORDER BY f.created_at LIMIT 1) AS fb_category,
+         (SELECT min(e.created_at) FROM event_log e WHERE e.subscriber_id = s.id AND e.type IN ('offer.made','offer.none','offer.held','offer.blocked','cancel.pending','subscription.cancelled')) AS asked_at,
+         (SELECT count(*) FROM event_log e WHERE e.subscriber_id = s.id AND e.type IN ('offer.made','offer.none','offer.held','offer.blocked')) AS heard,
+         (SELECT o.reason_category FROM offers o WHERE o.subscriber_id = s.id ORDER BY o.created_at LIMIT 1) AS offer_category,
+         (SELECT o.type FROM offers o WHERE o.subscriber_id = s.id AND o.status = 'accepted' ORDER BY o.created_at LIMIT 1) AS accepted_type
+       FROM subscribers s LEFT JOIN plans p ON p.id = COALESCE(s.home_plan_id, s.plan_id)
+       WHERE s.merchant_id = $1 AND NOT s.is_sample`,
+      [merchantId],
+    )
+  ).rows;
+  const since = Date.now() - 90 * 864e5;
+  return rows
+    .filter((r) => r.asked_at && new Date(r.asked_at).getTime() >= since)
+    .map((r) => ({
+      id: r.id,
+      at: new Date(r.asked_at),
+      subscriber: r.subscriber_name ?? "Member",
+      plan_price: Number(r.price ?? 0),
+      tenure_days: Math.max(0, Math.floor((new Date(r.asked_at).getTime() - new Date(r.started_at ?? r.asked_at).getTime()) / 864e5)),
+      reason: r.reason ?? "",
+      category: (r.fb_category ?? r.offer_category ?? "other") as ReasonCategory,
+      heard_offer: Number(r.heard) > 0,
+      accepted_type: r.accepted_type ?? null,
+      owner_would_approve: true,
+    }))
+    .sort((x, y) => x.at.getTime() - y.at.getTime());
 }
 
 export interface BacktestRow {
@@ -85,25 +92,32 @@ export interface Backtest {
   settings: GuardSettings;
 }
 
-/** Plans the backtest assumes: the shop's real plans if given, else a regular, a lite and a promo at the rule's percent. */
-function syntheticPlans(rules: Rules, price: number): PlanLite[] {
-  const promoPrice = Math.round(price * (100 - rules.discount.percent)) / 100;
-  return [
-    { id: "regular", name: "Regular", kind: "regular", price, base_plan_id: null, discount_percent: null, interval_unit: "MONTH", interval_count: 1, active: true },
-    { id: "lite", name: "Lite", kind: "lite", price: Math.round(price * 50) / 100, base_plan_id: null, discount_percent: null, interval_unit: "MONTH", interval_count: 1, active: true },
-    { id: "promo", name: `Regular (${rules.discount.percent}% off)`, kind: "promo", price: promoPrice, base_plan_id: "regular", discount_percent: rules.discount.percent, interval_unit: "MONTH", interval_count: 1, active: true },
-  ];
+/**
+ * The shop's real PayPal plans. A what-if discount percent the shop has no promo plan for yet gets the price that
+ * plan would have (the regular price less that percent), so the owner can see the effect before adopting it.
+ */
+function plansForBacktest(real: Plan[], rules: Rules, homeId: string | undefined): PlanLite[] {
+  const lite: PlanLite[] = real.map((p) => ({ id: p.id, name: p.name, kind: p.kind, price: Number(p.price), base_plan_id: p.base_plan_id, discount_percent: p.discount_percent, interval_unit: p.interval_unit, interval_count: p.interval_count, active: p.active }));
+  const home = lite.find((p) => p.id === homeId) ?? lite.find((p) => p.kind === "regular");
+  if (home && rules.discount.enabled && !lite.some((p) => p.kind === "promo" && p.base_plan_id === home.id && p.discount_percent === rules.discount.percent)) {
+    lite.push({ id: `whatif-${home.id}`, name: `${home.name} (${rules.discount.percent}% off)`, kind: "promo", price: Math.round(home.price * (100 - rules.discount.percent)) / 100, base_plan_id: home.id, discount_percent: rules.discount.percent, interval_unit: home.interval_unit, interval_count: home.interval_count, active: true });
+  }
+  return lite;
 }
 
 export async function backtest(merchantId: string, rules: Rules, overrides: Partial<GuardSettings> = {}, q?: Queryable): Promise<Backtest> {
   const db = q ?? (await getDb());
   const rows = await history(merchantId, db);
+  const real = await plansFor(db, merchantId, true);
+  const homeOf = new Map((await db.query<any>("SELECT id, COALESCE(home_plan_id, plan_id) AS home FROM subscribers WHERE merchant_id = $1", [merchantId])).rows.map((r: any) => [r.id, r.home as string]));
   const settings = { ...(await guardSettings(merchantId, db)), ...overrides };
   const compliance = scoreCompliance(rules, rules.jurisdiction ?? "US_FEDERAL");
   const blocked = compliance.rules.filter((r) => r.status === "fail");
   const out: Backtest = { cases: rows.length, run: 0, wait: 0, deny: 0, kept_auto_usd: 0, held_usd: 0, cancels_without_offer: 0, compliance_blocked: 0, rows: [], settings };
   for (const h of rows) {
-    const plans = syntheticPlans(rules, h.plan_price);
+    const home = homeOf.get(h.id);
+    const plans = plansForBacktest(real, rules, home);
+    const homeId = plans.find((p) => p.id === home)?.id ?? plans.find((p) => p.kind === "regular")?.id ?? "";
     const row: BacktestRow = { at: h.at.toISOString().slice(0, 10), subscriber: h.subscriber, reason: h.reason, category: h.category, outcome: "deny", offer: null, kept_usd: 0, note: "" };
     if (!h.heard_offer) {
       row.note = "did not ask to hear an offer: cancelled in one step";
@@ -119,7 +133,7 @@ export async function backtest(merchantId: string, rules: Rules, overrides: Part
       out.rows.push(row);
       continue;
     }
-    const eligible = eligibleOffers({ rules, subscriber: { status: "ACTIVE", plan_id: "regular", home_plan_id: "regular", started_at: new Date(h.at.getTime() - h.tenure_days * 864e5) }, plans, skipsAt: [], lastOfferAcceptedAt: null, now: h.at });
+    const eligible = eligibleOffers({ rules, subscriber: { status: "ACTIVE", plan_id: homeId, home_plan_id: homeId, started_at: new Date(h.at.getTime() - h.tenure_days * 864e5) }, plans, skipsAt: [], lastOfferAcceptedAt: null, now: h.at });
     const choice = picker.pickOffer(eligible, h.category);
     const chosen = eligible.find((o) => o.key === choice.key);
     if (!chosen) {
@@ -175,7 +189,7 @@ export async function suggestAutonomy(merchantId: string, q?: Queryable): Promis
     const s = Math.min(Math.max(...approvedPct), ceiling);
     if (s > cur.auto_discount_max_pct) out.push({ field: "auto_discount_max_pct", current: cur.auto_discount_max_pct, suggested: s, basis: `you approved ${approvedPct.length} discount${approvedPct.length > 1 ? "s" : ""} up to ${Math.max(...approvedPct)}%${declinedPct.length ? ` and declined one at ${Math.min(...declinedPct)}%` : ""}` });
   } else if (histPct >= 3 && cur.auto_discount_max_pct < 15) {
-    out.push({ field: "auto_discount_max_pct", current: cur.auto_discount_max_pct, suggested: 15, basis: `${histPct} discounts in the sample history were ones you would have approved; no approvals of your own yet, so the suggestion is modest` });
+    out.push({ field: "auto_discount_max_pct", current: cur.auto_discount_max_pct, suggested: 15, basis: `${histPct} discounts in your real cancellation requests were ones you would have approved; no approvals of your own yet, so the suggestion is modest` });
   }
   const approvedCycles = decided.filter((d) => d.status === "approved" && d.payload.offer?.type === "pause").map((d) => Number(d.payload.offer.cycles));
   const declinedCycles = decided.filter((d) => d.status === "declined" && d.payload.offer?.type === "pause").map((d) => Number(d.payload.offer.cycles));

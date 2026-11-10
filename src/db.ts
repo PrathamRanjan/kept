@@ -283,11 +283,6 @@ CREATE TABLE IF NOT EXISTS guard_settings (
   merchant_id TEXT PRIMARY KEY, auto_discount_max_pct INTEGER NOT NULL DEFAULT 15, auto_pause_max_cycles INTEGER NOT NULL DEFAULT 2,
   approve_capture_above_cents INTEGER NOT NULL DEFAULT 5000, updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
--- Seeded 90-day history of cancellation requests, for the policy backtest (labelled sample data).
-CREATE TABLE IF NOT EXISTS subscription_history (
-  id TEXT PRIMARY KEY, merchant_id TEXT NOT NULL, at TIMESTAMPTZ NOT NULL, subscriber TEXT NOT NULL, plan_price NUMERIC(12,2) NOT NULL, tenure_days INTEGER NOT NULL,
-  reason TEXT NOT NULL, category TEXT NOT NULL, heard_offer BOOLEAN NOT NULL, accepted_type TEXT, owner_would_approve BOOLEAN NOT NULL DEFAULT true, is_sample BOOLEAN NOT NULL DEFAULT true
-);
 CREATE TABLE IF NOT EXISTS invoices (
   id TEXT PRIMARY KEY, merchant_id TEXT NOT NULL, subscriber_id TEXT NOT NULL, paypal_invoice_id TEXT, amount NUMERIC(12,2) NOT NULL, currency TEXT NOT NULL,
   status TEXT NOT NULL, run_id TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -296,6 +291,18 @@ ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS run_id TEXT;
 ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS jurisdiction TEXT;
 ALTER TABLE offers ADD COLUMN IF NOT EXISTS run_id TEXT;
 ALTER TABLE event_log ADD COLUMN IF NOT EXISTS run_id TEXT;
+-- The in-app simulator is gone: old rows become the in-app message record, and "simulated" becomes "not_sent".
+UPDATE channel_messages SET channel = 'inapp' WHERE channel = 'simulator';
+UPDATE channel_messages SET status = CASE WHEN channel = 'inapp' THEN 'sent' ELSE 'not_sent' END WHERE status = 'simulated';
+DELETE FROM party_links WHERE channel = 'simulator';
+DROP TABLE IF EXISTS subscription_history;
+-- Sample members are gone: every member on the dashboard is a real PayPal sandbox subscription.
+DELETE FROM offers WHERE subscriber_id IN (SELECT id FROM subscribers WHERE is_sample);
+DELETE FROM feedback WHERE subscriber_id IN (SELECT id FROM subscribers WHERE is_sample);
+DELETE FROM payments WHERE is_sample OR subscriber_id IN (SELECT id FROM subscribers WHERE is_sample);
+DELETE FROM invoices WHERE subscriber_id IN (SELECT id FROM subscribers WHERE is_sample);
+DELETE FROM event_log WHERE is_sample OR subscriber_id IN (SELECT id FROM subscribers WHERE is_sample);
+DELETE FROM subscribers WHERE is_sample;
 `;
 
 let shared: Db | null = null;

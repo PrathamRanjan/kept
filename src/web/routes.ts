@@ -10,7 +10,6 @@ import { newId } from "../lib/ids.js";
 import { describeRules } from "../policy/rules.js";
 import { money } from "../policy/eligibility.js";
 import { paypalFor } from "../paypal/index.js";
-import { armedFaults, armFault, FAULTABLE } from "../paypal/faults.js";
 import { WEBHOOK_EVENTS } from "../paypal/client.js";
 import * as svc from "../service.js";
 import { currentPolicy, intervalWords, KeptError, listMerchants, Merchant, merchantById, merchantBySlug, merchantByToken, openOfferFor, plansFor, subscriberByRef, subscribersFor, toOffer } from "../store.js";
@@ -317,7 +316,6 @@ export function webRouter(): Router {
       <div class="page-head"><div><h1>Today at ${m.name}</h1><p>${stats.active} active members, ${fmtMoney(stats.mrr, m.currency)} a month. ${needs ? `${needs} thing${needs === 1 ? "" : "s"} need${needs === 1 ? "s" : ""} you.` : "Nothing needs you right now."}</p></div>
         <div class="row"><form method="post" action="/dashboard/reconcile" class="inline"><button class="btn" type="submit">${raw(icon("repeat"))}Check against PayPal</button></form><a class="btn primary" href="/s/${m.slug}">${raw(icon("store"))}Open shop page</a></div></div>
       ${flash(req)}
-      ${stats.sampleRows ? html`<div class="banner info">${stats.sampleRows} members are labelled <span class="pill sample">sample</span> rows so the dashboard isn't empty. Everything else is live on the PayPal sandbox.</div>` : ""}
       <div class="kpis">
         <div class="kpi"><div class="label">Active members</div><div class="value">${stats.active}</div><div class="hint">${stats.suspended} paused</div></div>
         <div class="kpi"><div class="label">Monthly revenue</div><div class="value">${fmtMoney(stats.mrr, m.currency)}</div><div class="hint">monthly equivalent</div></div>
@@ -346,7 +344,7 @@ export function webRouter(): Router {
       </div>
 
       <div class="section-title"><h2>Members</h2><p>${subs.length} in all. Open one to see exactly what they see.</p></div>
-      ${subs.length ? html`<div class="rows" style="margin-bottom:1.5rem">${subs.slice(0, 40).map((s) => html`<div class="r"><span class="av ${s.status === "CANCELLED" ? "muted" : ""}">${(s.subscriber_name ?? s.subscriber_email ?? "?")[0].toUpperCase()}</span><span><div class="t"><a href="/manage/${s.ref}">${s.subscriber_name ?? s.subscriber_email ?? s.ref.slice(0, 12)}</a> ${s.is_sample ? html`<span class="pill sample">sample</span>` : ""} ${s.channel === "agent" ? html`<span class="pill agent">via AI assistant</span>` : ""}</div><div class="s">${planName(s.plan_id)}${s.promo_until ? ` · discount until ${fmtDate(s.promo_until)}` : ""}${s.resume_at ? ` · resumes ${fmtDate(s.resume_at)}` : ""}${s.next_billing_time && s.status === "ACTIVE" ? ` · renews ${fmtDate(s.next_billing_time)}` : ""}</div></span><span class="m"><span class="pill ${s.status}">${s.status.toLowerCase()}</span>${s.kept_state === "payment_failed" ? html` <span class="pill bad">payment failed</span>` : ""}${s.kept_state === "unconfirmed" ? html` <span class="pill warn">re-checking</span>` : ""}</span><span class="act row">${!s.is_sample && s.paypal_subscription_id ? html`<form method="post" action="/dashboard/sub/${s.ref}/sync" class="inline"><button class="btn small ghost" type="submit" title="Read this subscription back from PayPal">Re-read</button></form>` : ""}${config.demoMode && s.status === "ACTIVE" && s.kept_state !== "payment_failed" ? html`<form method="post" action="/dashboard/sub/${s.ref}/simulate-failure" class="inline"><button class="btn small ghost" type="submit" title="Demo only: records a failed renewal without touching PayPal">Simulate failed renewal</button></form>` : ""}</span></div>`)}</div>` : html`<div class="empty" style="margin-bottom:1.5rem">No members yet. Share your shop page or agent endpoint.</div>`}
+      ${subs.length ? html`<div class="rows" style="margin-bottom:1.5rem">${subs.slice(0, 40).map((s) => html`<div class="r"><span class="av ${s.status === "CANCELLED" ? "muted" : ""}">${(s.subscriber_name ?? s.subscriber_email ?? "?")[0].toUpperCase()}</span><span><div class="t"><a href="/manage/${s.ref}">${s.subscriber_name ?? s.subscriber_email ?? s.ref.slice(0, 12)}</a> ${s.is_sample ? html`<span class="pill sample">sample</span>` : ""} ${s.channel === "agent" ? html`<span class="pill agent">via AI assistant</span>` : ""}</div><div class="s">${planName(s.plan_id)}${s.promo_until ? ` · discount until ${fmtDate(s.promo_until)}` : ""}${s.resume_at ? ` · resumes ${fmtDate(s.resume_at)}` : ""}${s.next_billing_time && s.status === "ACTIVE" ? ` · renews ${fmtDate(s.next_billing_time)}` : ""}</div></span><span class="m"><span class="pill ${s.status}">${s.status.toLowerCase()}</span>${s.kept_state === "payment_failed" ? html` <span class="pill bad">payment failed</span>` : ""}${s.kept_state === "unconfirmed" ? html` <span class="pill warn">re-checking</span>` : ""}</span><span class="act row">${!s.is_sample && s.paypal_subscription_id ? html`<form method="post" action="/dashboard/sub/${s.ref}/sync" class="inline"><button class="btn small ghost" type="submit" title="Read this subscription back from PayPal">Re-read</button></form>` : ""}</span></div>`)}</div>` : html`<div class="empty" style="margin-bottom:1.5rem">No members yet. Share your shop page or agent endpoint.</div>`}
 
       <div class="grid g2">
         <div class="card"><h2>Why people cancel</h2><p class="sub">${reasonTotal} reasons given.</p>
@@ -372,7 +370,6 @@ export function webRouter(): Router {
             <details style="margin-top:8px"><summary>Show owner key</summary><div class="codebox">${m.owner_token}</div></details></div>
           <div><h3>PayPal webhooks</h3>${webhookOk ? html`<p><span class="pill good">configured</span> Events are signature-verified with PayPal before Kept acts on them.</p>` : html`<p><span class="pill warn">not registered</span> Kept still reconciles by reading PayPal, but webhooks make changes instant. Webhooks need a public HTTPS URL (for example on Render).</p>`}
             <form method="post" action="/dashboard/webhook" class="inline"><button class="btn" type="submit" ${config.appUrl.startsWith("https://") ? "" : "disabled"}>Register webhook for ${config.appUrl}</button></form>
-            ${config.demoMode ? html`<form method="post" action="/dashboard/fault" class="inline" style="margin-left:6px"><input type="hidden" name="method" value="cancelSubscription"><button class="btn" type="submit" title="Demo only: the next PayPal cancel call fails once with a 503">Failure lab: fail the next PayPal cancel</button></form>${armedFaults().length ? html`<span class="muted small"> Armed: ${armedFaults().join(", ")}</span>` : ""}` : ""}
             <p class="muted" style="margin-top:8px">PayPal environment: ${m.paypal_env}. Product: <code>${m.paypal_product_id ?? "not created yet"}</code></p></div>
         </div>
       </div>
@@ -413,29 +410,6 @@ export function webRouter(): Router {
     try {
       const after = await svc.syncSubscription(s.ref, "owner");
       back(res, "/dashboard", `PayPal shows ${after.status}.`);
-    } catch (e) {
-      back(res, "/dashboard", errMsg(e), true);
-    }
-  }));
-
-  r.post("/dashboard/fault", page(async (req, res) => {
-    const m = await requireOwner(req, res);
-    if (!m) return;
-    if (!config.demoMode) return res.status(403).send("Demo mode is off.");
-    const method = String(req.body.method ?? "");
-    if (!(FAULTABLE as readonly string[]).includes(method)) return back(res, "/dashboard", "Unknown fault.", true);
-    armFault(method as (typeof FAULTABLE)[number]);
-    back(res, "/dashboard", `Armed: the next PayPal ${method} call fails once with a 503. Kept keeps the request and retries until PayPal confirms.`);
-  }));
-
-  r.post("/dashboard/sub/:ref/simulate-failure", page(async (req, res) => {
-    const m = await requireOwner(req, res);
-    if (!m) return;
-    const s = await subscriberByRef(await getDb(), req.params.ref);
-    if (!s || s.merchant_id !== m.id) return back(res, "/dashboard", "Not your subscriber.", true);
-    try {
-      await svc.simulateFailedPayment(s.ref);
-      back(res, "/dashboard", "Simulated a failed renewal (no PayPal call). The subscriber's page now shows how to fix it.");
     } catch (e) {
       back(res, "/dashboard", errMsg(e), true);
     }

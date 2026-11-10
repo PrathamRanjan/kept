@@ -295,14 +295,6 @@ export function uiApi(): Router {
     return { ok: true, message: `PayPal shows ${after.status.toLowerCase()}.` };
   }));
 
-  r.post("/ui/owner/member/:ref/simulate-failure", j(async (req) => {
-    const m = await needOwner(req);
-    const s = await subscriberByRef(await getDb(), req.params.ref);
-    if (!s || s.merchant_id !== m.id) throw new KeptError("Not your member.", "forbidden", 403);
-    await svc.simulateFailedPayment(s.ref);
-    return { ok: true, message: "Simulated a failed renewal (no PayPal call). Their page now shows how to fix it." };
-  }));
-
   r.get("/ui/owner/member/:ref", j(async (req) => {
     const m = await needOwner(req);
     const s = await subscriberByRef(await getDb(), req.params.ref);

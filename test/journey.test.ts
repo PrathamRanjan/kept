@@ -6,6 +6,7 @@ import { config } from "../src/config.js";
 import { openDb, setDb, type Db } from "../src/db.js";
 import { setPayPalFactory } from "../src/paypal/index.js";
 import { FakePayPal } from "../src/paypal/fake.js";
+import * as svc from "../src/service.js";
 import { tick } from "../src/worker.js";
 import { Client } from "./client.js";
 import { isFoundationRoute, isUiRoute, serveTracked } from "./journey-coverage.js";
@@ -116,9 +117,10 @@ describe("Kept acceptance journey", () => {
     ok(await manage("resume"));
     ok(await manage("switch", { plan_id: lite }));
 
-    // A renewal fails (simulated from the dashboard): Ada promises a date, then says it's fixed.
+    // A renewal fails (PayPal reports it; the fake stands in for the sandbox here): Ada promises a date, then says it's fixed.
     expect((await owner.get("/dashboard")).text).toMatch(/Kept by fair offers/);
-    ok(await owner.post(`/dashboard/sub/${ada.ref}/simulate-failure`));
+    fake.failRenewal(ada.paypal_subscription_id);
+    await svc.handlePaymentFailed(ada.id, "webhook");
     ok(await manage("promise", { date: new Date(Date.now() + 3 * 864e5).toISOString().slice(0, 10) }));
     expect((await manage("payment-fixed")).status).toBe(302);
 
@@ -127,10 +129,8 @@ describe("Kept acceptance journey", () => {
     const c1 = ok(await manage("cancel", { reason: "moving abroad", hear_offer: "1" }));
     expect(loc(c1)).toMatch(/one offer/);
     const offer = await one("SELECT id FROM offers WHERE subscriber_id = $1 AND status = 'open'", [ada.id]);
-    // The owner arms the failure lab: PayPal's next cancel call fails once.
-    expect(loc(await anon.post("/dashboard/fault", { method: "cancelSubscription" }))).toMatch(/login|err=/);
-    ok(await owner.post("/dashboard/fault", { method: "cancelSubscription" }));
-    expect((await owner.get("/dashboard")).text).toMatch(/Armed: cancelSubscription/);
+    // PayPal's next cancel call fails once (test double only; there is no failure switch in the app).
+    fake.failNext = "cancelSubscription";
     ok(await anon.post(`/offer/${offer.id}/decline`));
     expect((await anon.get(`/manage/${ada.ref}`)).text).toMatch(/Cancellation pending/);
     await runJobs();

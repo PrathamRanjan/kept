@@ -86,7 +86,7 @@ Requires Node 22+. No database to install: locally Kept uses PGlite (Postgres co
 git clone <this repo> kept && cd kept
 npm install
 cp .env.example .env        # add your PayPal sandbox client id and secret
-npm run seed                # creates the demo shop's real sandbox plans + labelled sample rows
+npm run seed                # creates the demo shop's real sandbox plans and rules (no sample members)
 npm run build && npm start  # http://localhost:3000
 ```
 
@@ -114,16 +114,23 @@ npm test
 4. Run `npm run webhook:register` with `APP_URL` set (or click **Register webhook** in the dashboard) and set `PAYPAL_WEBHOOK_ID`.
 5. Open a Render shell on the web service and run `npm run seed` for the demo shop.
 
-## What's real and what's simulated
+## What's live and what isn't
+
+Nothing in Kept is simulated and there are no sample members: every member is a real PayPal sandbox subscription, and every number is read from them.
 
 | Part | Status |
 |---|---|
-| Products, plans, subscriptions, approval, suspend, activate, revise, cancel, capture | Real PayPal sandbox calls |
-| Webhooks | Real and signature-verified once registered on a public URL |
+| Products, plans, subscriptions, approval, suspend, activate, revise, cancel | Live PayPal sandbox calls, read back after every write |
+| Webhooks | Live and signature-verified; unsigned events are refused |
 | Buyer agents | Real MCP clients |
 | Renewals | Real; the demo shop has a $1 **daily** plan so a renewal happens within a day |
-| Failed renewal | The dashboard's **Simulate failed renewal** button (demo mode) records one without touching PayPal, clearly labelled. The real path is the verified `BILLING.SUBSCRIPTION.PAYMENT.FAILED` webhook |
-| Sample subscribers | ~30 rows marked `sample` everywhere so the dashboard isn't empty |
+| Failed renewal, balance capture, invoices | Real code, run only when PayPal reports a failed renewal (verified `BILLING.SUBSCRIPTION.PAYMENT.FAILED` webhook or read-back). There is no switch to fake one |
+| Backtest and fairness scorecard | Computed from the shop's own records; a new shop shows an empty history |
+| Telegram | Live when `TELEGRAM_BOT_TOKEN` is set and a chat is linked from the member page |
+| Web push | Live when VAPID keys are set and a browser turns notifications on |
+| WhatsApp | Code present; not live without a WhatsApp Cloud API token |
+| Log in with PayPal | Code present; off until the feature is enabled on the sandbox app (`PAYPAL_LOGIN_ENABLED`) |
+| Phone calls / SMS | Not part of Kept |
 
 ## Licence
 
@@ -165,12 +172,12 @@ Roadmap Parts B and C for Kept, all behind tests (`npm test`: 71 tests, includin
 - **Model brain (B.1)**: `KEPT_BRAIN=openai` with `OPENAI_API_KEY` turns on model drafting of plans and rules (prices grounded to a quote from the owner's text), reason classification with instruction text quarantined first, offer wording checked for invented numbers, and owner Q&A. Every call is logged in `ai_calls` with cost and latency; without a key the deterministic rules brain runs and the evidence page says so. Schemas are checked against a forbidden-field list (`new_price`, `plan_id`, `paypal_*`…) in code and in a structural test.
 - **Traces (B.2)**: every action is a run with steps (actor, tool, redacted args, rule hit, gate decision, PayPal request id, ms). `/trace/:id`, `/dashboard/traces`, `/api/v1/runs`, MCP `get_trace` (ownership checked). Writes return `run_id`.
 - **Dry-run gate (B.3, K3)**: `src/guard/dryrun.ts`. Checks kill switches, integer money and provenance, the owner's rules, autonomy limits (discount %, pause cycles, capture threshold), the compliance scorecard, and live PayPal state before any write. Outcomes: allowed, denied, dry_run_refused, held (approval row, owner notified with Approve/Decline buttons). A cancel is never held or denied by rules, autonomy, an agent or merchant kill switch; only the global kill, and then it is marked pending and retried.
-- **Earned autonomy and backtest (K3)**: `/dashboard/guard` shows the fairness scorecard (one-call cancel rate, offers shown vs accepted, modelled dark-pattern baseline), a 90-day backtest over labelled sample history with what-if sliders (run / wait / deny, dollars kept automatically vs held), suggestions to raise limits after held moves kept being approved, pending approvals (passkey countersign above `KEPT_COUNTERSIGN_ABOVE_CENTS`), kill switches (global, merchant, agent, all agents), and a hash-chained audit log.
+- **Earned autonomy and backtest (K3)**: `/dashboard/guard` shows the fairness scorecard (one-call cancel rate, offers made vs accepted, time to cancel, measured from the shop's own event log), a backtest that replays the shop's real cancellation requests from the last 90 days with what-if sliders (run / wait / deny, dollars kept automatically vs held), suggestions to raise limits after held moves kept being approved, pending approvals (passkey countersign above `KEPT_COUNTERSIGN_ABOVE_CENTS`), kill switches (global, merchant, agent, all agents), and a hash-chained audit log.
 - **Compliance scorecard (K2)**: `/dashboard/compliance` scores the policy per jurisdiction (ROSCA, CA, CO, NY; EU/UK informational). A failing rule blocks the offer step in the gate. Plain-words rules that ask for the forbidden ("three offers before cancel", "must call to cancel") are refused with the citation. Sources are listed in `docs/compliance.md`, each marked [verify].
 - **Evals (B.4, B.5, K1)**: `/dashboard/eval` and `npm run eval:reasons` (36 labelled cancel reasons with money-word, injection and mixed traps, held-out ids frozen in `eval/reasons-heldout.json`; arms rules / model / oracle; dollars a naive tool would wrongly give away vs Kept; cost; p50/p95) and `npm run eval:adversarial` (26 hostile moves through the gate and service layer; none reach PayPal; kill switches restored). CSV export and an explorer with chip filters.
-- **Channels and PWA (B.8)**: Telegram and WhatsApp webhooks with a simulator at `/dashboard/channels` when no tokens are set; subscribers get failed-renewal messages with "I fixed it" / "Cancel instead" buttons; owners get held approvals with Approve / Decline. `link subscriber:<ref>` / `link owner:<key>` binds a chat. Web manifest, service worker and push subscription (VAPID keys optional; simulated without).
+- **Channels and PWA (B.8)**: Telegram and WhatsApp webhooks; every notice is also kept in the in-app message log at `/dashboard/channels`, and a channel without credentials is logged as "not sent"; subscribers get failed-renewal messages with "I fixed it" / "Cancel instead" buttons; owners get held approvals with Approve / Decline. `link subscriber:<ref>` / `link owner:<key>` binds a chat. Web manifest, service worker and push subscription (needs VAPID keys and a browser that turns notifications on).
 - **Money desk (K5)**: `/dashboard/money`: Transaction Search and balances (read-only, also MCP `search_transactions`), Invoicing v2 for outstanding balances (`POST /api/v1/subscriptions/:ref/invoice`, status read back by the worker), `PayPal-Mock-Response` negative tests, the webhook simulator, renewal reminders (`renewalReminderDays`). Owner clicks are their own approval; agent-initiated captures and invoices above the threshold are held.
-- **Judge mode (B.10)**: `/judge` walks six beats in an isolated session. **Evidence**: `/dashboard/evidence` labels each capability real / simulated / modelled.
+- **Judge mode (B.10)**: `/judge` walks six beats in an isolated session. **Evidence**: `/dashboard/evidence` labels each capability live, not configured or not wired, with counts.
 - **Agent surface**: owner MCP adds `recent_runs`, `search_transactions`, `compliance_scorecard`, `fairness`, `pending_approvals` (all read-only); `/skill.md` and `/llms.txt` describe the guarantees; `npm run cli -- …` is a shell client over the API.
 
 Waiting on keys (add to `.env`, nothing else to wire): `TELEGRAM_BOT_TOKEN`/`TELEGRAM_WEBHOOK_SECRET`, `WHATSAPP_TOKEN`/`WHATSAPP_PHONE_ID`, `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`, `PAYPAL_LOGIN_ENABLED=true` once the sandbox app has Log in with PayPal. The APIMatic developer portal for `docs/openapi.yaml` is also parked until you have the account.

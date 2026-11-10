@@ -2,7 +2,7 @@ import { useState } from "react";
 import { FlaskConical, X } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
-/** Small and honest: which parts are live sandbox and which are simulated, plus the reset. */
+/** Small and honest: what runs live on the PayPal sandbox and what is not live yet, plus the reset. */
 export function DemoRibbon() {
   const [hidden, setHidden] = useState(() => {
     try {
@@ -24,17 +24,18 @@ export function DemoRibbon() {
           <PopoverContent align="end" className="w-[min(92vw,360px)] text-sm">
             <p className="m-0 mb-2 font-semibold">Live on the PayPal sandbox</p>
             <ul className="m-0 mb-3 list-disc space-y-1 pl-5 text-ink-2">
-              <li>Plans, subscriptions, skip, pause, switch, cancel, capture</li>
+              <li>Plans, subscriptions, skip, pause, switch, cancel</li>
               <li>Signature-verified webhooks, transaction search</li>
               <li>AI drafting and reason labels (OpenAI), with a rules fallback</li>
               <li>MCP endpoints for AI assistants</li>
             </ul>
-            <p className="m-0 mb-2 font-semibold">Simulated or sample</p>
+            <p className="m-0 mb-2 font-semibold">Not live yet</p>
             <ul className="m-0 mb-3 list-disc space-y-1 pl-5 text-ink-2">
-              <li>Rows marked "sample" (no PayPal subscription behind them)</li>
-              <li>"Simulate failed renewal" (no PayPal call)</li>
-              <li>The 90-day backtest history and the dark-pattern baseline</li>
+              <li>WhatsApp (no WhatsApp Business token on this server)</li>
+              <li>Log in with PayPal (turned off on the sandbox app)</li>
+              <li>Balance capture and invoices run only when PayPal reports a real failed renewal</li>
             </ul>
+            <p className="m-0 mb-3 text-ink-2">No sample members and nothing simulated: every member is a real sandbox subscription.</p>
             <div className="flex flex-wrap gap-3">
               <a className="font-medium text-stamp underline" href="/dashboard/evidence">Evidence page</a>
               <a className="font-medium text-stamp underline" href="/judge/reset">Reset judge session</a>

@@ -15,17 +15,6 @@ export class FakePayPal implements PayPalApi {
   reviseNeedsConsent = false;
   failNext: string | null = null;
   invoices = new Map<string, PayPalInvoice & { input: InvoiceInput }>();
-  simulated: { webhookId: string; eventType: string }[] = [];
-  mockNext: string | null = null;
-
-  /** Negative test: the next write fails the way the sandbox would for this mock code. */
-  private consumeMock(method: string) {
-    if (!this.mockNext) return;
-    const code = this.mockNext;
-    this.mockNext = null;
-    this.calls.push({ method: `${method}:mock`, args: [code] });
-    throw new PayPalError(`Mocked ${code}`, 422, code, `mock-${code.toLowerCase()}`, [{ issue: code, description: `Simulated by PayPal-Mock-Response (${code})` }]);
-  }
 
   private id(prefix: string) {
     return prefix + randomBytes(6).toString("hex").toUpperCase();
@@ -161,7 +150,6 @@ export class FakePayPal implements PayPalApi {
 
   async captureOutstanding(id: string, amount: string, currency: string, _note: string, requestId: string) {
     this.calls.push({ method: "captureOutstanding", args: [id, amount] });
-    this.consumeMock("captureOutstanding");
     return this.idem(requestId, () => {
       const s = this.sub(id);
       const out = Number(s.billing_info?.outstanding_balance?.value ?? 0);
@@ -205,7 +193,6 @@ export class FakePayPal implements PayPalApi {
 
   async createInvoice(input: InvoiceInput, requestId: string) {
     this.calls.push({ method: "createInvoice", args: [input.amount, input.currency] });
-    this.consumeMock("createInvoice");
     return this.idem(requestId, () => {
       const id = this.id("INV2-");
       const inv = { id, status: "DRAFT", detail: { reference: input.reference, currency_code: input.currency, invoice_number: id }, amount: { value: input.amount, currency_code: input.currency }, links: [{ rel: "self", href: `https://api-m.sandbox.paypal.com/v2/invoicing/invoices/${id}` }], input };
@@ -216,7 +203,6 @@ export class FakePayPal implements PayPalApi {
 
   async sendInvoice(invoiceId: string, requestId: string) {
     this.calls.push({ method: "sendInvoice", args: [invoiceId] });
-    this.consumeMock("sendInvoice");
     return this.idem(requestId, () => {
       const inv = this.invoices.get(invoiceId);
       if (!inv) throw new PayPalError("Invoice not found", 404, "RESOURCE_NOT_FOUND", "fake", []);
@@ -253,12 +239,5 @@ export class FakePayPal implements PayPalApi {
     return [{ currency: "USD", total: total.toFixed(2), available: total.toFixed(2), withheld: "0.00" }];
   }
 
-  async simulateWebhookEvent(webhookId: string, eventType: string) {
-    this.simulated.push({ webhookId, eventType });
-    return { id: this.id("WH-SIM-") };
-  }
 
-  withMockResponse(code: string) {
-    this.mockNext = code;
-  }
 }

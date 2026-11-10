@@ -56,7 +56,7 @@ export default function Members({ d, reload }: { d: Today; reload: () => void })
     [d.members, filter, q],
   );
 
-  async function memberAction(m: Member, what: "sync" | "simulate-failure") {
+  async function memberAction(m: Member, what: "sync") {
     try {
       toast.success((await api.post<{ message: string }>(`/ui/owner/member/${m.ref}/${what}`)).message);
       reload();
@@ -167,17 +167,6 @@ export default function Members({ d, reload }: { d: Today; reload: () => void })
             ))}
           </ul>
         </>
-      )}
-      {d.demoMode && (
-        <details className="mt-6 rounded-xl border border-dashed border-pause p-4 text-sm">
-          <summary className="min-h-10 cursor-pointer font-medium">Demo tools (labelled, no PayPal call)</summary>
-          <p className="text-ink-2">Record a failed renewal for a live member to see the recovery flow. The real path is PayPal's signature-verified PAYMENT.FAILED webhook.</p>
-          <div className="flex flex-wrap gap-2">
-            {d.members.filter((m) => !m.sample && m.status === "ACTIVE" && m.kept_state !== "payment_failed").slice(0, 4).map((m) => (
-              <Button key={m.ref} size="sm" variant="outline" onClick={() => memberAction(m, "simulate-failure")}>Simulate failed renewal: {m.name}</Button>
-            ))}
-          </div>
-        </details>
       )}
     </>
   );

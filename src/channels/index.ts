@@ -1,6 +1,6 @@
 /**
- * Channels (roadmap B.8, K6): Telegram and WhatsApp Cloud API adapters with reply buttons, an in-app simulator so
- * the demo runs without a phone, and web push for the subscriber and owner PWA. Outbound messages are queued in channel_messages
+ * Channels (roadmap B.8, K6): Telegram and WhatsApp Cloud API adapters with reply buttons, an in-app message record
+ * (every notice is also kept in Kept's own message log, which the owner and member pages show), and web push for the PWA. Outbound messages are queued in channel_messages
  * and sent by the worker; inbound messages are matched to a subscriber or the owner by party_links.
  * Subscribers are addressed by subscriber id (party "subscriber"); the shop owner by merchant id (party "owner").
  */
@@ -11,7 +11,7 @@ import { enqueue } from "../jobs.js";
 import { newId } from "../lib/ids.js";
 
 export type Party = "subscriber" | "owner";
-export type Channel = "telegram" | "whatsapp" | "simulator";
+export type Channel = "telegram" | "whatsapp" | "inapp";
 export interface Button {
   id: string;
   label: string;
@@ -34,12 +34,11 @@ export async function send(opts: { channel: Channel; address: string; body: stri
   return id;
 }
 
-/** Sends to every channel a party has linked (plus the simulator). Pass `q` from inside db.tx. */
+/** Sends to every channel a party has linked, and always keeps an in-app copy. Pass `q` from inside db.tx. */
 export async function notifyParty(party: Party, partyId: string, body: string, buttons?: Button[], entity?: string, entityId?: string, q?: Queryable) {
   const db = q ?? (await getDb());
   const links = (await db.query<{ channel: Channel; address: string }>("SELECT channel, address FROM party_links WHERE party = $1 AND party_id = $2", [party, partyId])).rows;
-  const targets = links.length ? links : [{ channel: "simulator" as Channel, address: `${party}:${partyId}` }];
-  if (links.length && !links.some((l) => l.channel === "simulator")) targets.push({ channel: "simulator", address: `${party}:${partyId}` });
+  const targets = [...links.filter((l) => l.channel !== "inapp"), { channel: "inapp" as Channel, address: `${party}:${partyId}` }];
   for (const t of targets) await send({ channel: t.channel, address: t.address, body, buttons, entity, entityId }, db);
 }
 
@@ -67,8 +66,9 @@ export async function deliver(messageId: string): Promise<void> {
       const data = (await res.json()) as any;
       if (!res.ok) throw new Error(`WhatsApp: ${data.error?.message ?? res.status}`);
       externalId = data.messages?.[0]?.id ?? null;
-    } else if (m.channel !== "simulator") {
-      await db.query("UPDATE channel_messages SET status = 'simulated' WHERE id = $1", [messageId]);
+    } else if (m.channel !== "inapp") {
+      // A linked channel whose credentials are not configured on this server: nothing was sent, and the log says so.
+      await db.query("UPDATE channel_messages SET status = 'not_sent' WHERE id = $1", [messageId]);
       return;
     }
     await db.query("UPDATE channel_messages SET status = 'sent', external_id = $2 WHERE id = $1", [messageId, externalId]);

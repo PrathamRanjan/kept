@@ -11,7 +11,7 @@ import { plansFor, type Merchant } from "../src/store.js";
 import { verifyChain } from "../src/guard/audit.js";
 import { isKilled, setKill } from "../src/guard/kill.js";
 import { dryRun, pendingApprovals, saveGuardSettings } from "../src/guard/dryrun.js";
-import { backtest, seedHistory } from "../src/guard/backtest.js";
+import { backtest } from "../src/guard/backtest.js";
 import { tick } from "../src/worker.js";
 import { Client } from "./client.js";
 import { DEMO_FAKE_FAILED } from "../src/web/safety.js";
@@ -117,10 +117,6 @@ describe("Kept foundation", () => {
     await saveGuardSettings(m.id, { auto_discount_max_pct: 5, auto_pause_max_cycles: 1, approve_capture_above_cents: 1000 }, "test");
     expect((await owner.get("/dashboard/guard/audit.json")).json.ok).toBe(true);
     expect((await owner.get("/dashboard/guard/kills.json")).json.kills).toBeTruthy();
-    const bt = await backtest(m.id, (await svc.previewRules(rulesText)).value, { auto_discount_max_pct: 5 });
-    expect(bt.cases).toBeGreaterThan(20);
-    expect(bt.wait).toBeGreaterThan(0); // 15% offers wait at 5% autonomy
-    expect(bt.cancels_without_offer).toBeGreaterThan(0); // subscribers who never asked for an offer cancelled in one step
 
     // A 15% discount is above the 5% autonomy: the offer is held, the cancel is NOT. Cancel never waits.
     const held = await svc.requestCancel(ada.ref, { reason: "too expensive for me", hearOffer: true }, agent);
@@ -137,6 +133,15 @@ describe("Kept foundation", () => {
     ok(await owner.post(`/dashboard/guard/approvals/${approvalId}/approve`));
     expect((await one("SELECT status FROM approvals WHERE id = $1", [approvalId])).status).toBe("approved");
     expect(loc(await owner.post(`/dashboard/guard/approvals/${approvalId}/decline`))).toMatch(/already|Already|ok=/);
+
+    // The backtest replays only this shop's real requests: Ada's held offer and Bo's plain one-step cancel.
+    const bo = await activeSubscriber("Bo");
+    expect((await svc.requestCancel(bo.ref, { reason: "moving house" }, agent)).status).toBe("cancelled");
+    const bt = await backtest(m.id, (await svc.previewRules(rulesText)).value, { auto_discount_max_pct: 5 });
+    expect(bt.cases).toBeGreaterThanOrEqual(2);
+    expect(bt.rows.map((r) => r.subscriber)).toEqual(expect.arrayContaining(["Ada", "Bo"]));
+    expect(bt.wait).toBeGreaterThan(0); // Ada's 15% offer waits at 5% autonomy, as it did live
+    expect(bt.cancels_without_offer).toBeGreaterThan(0); // Bo never asked for an offer and cancelled in one step
 
     // Kill switches: agent kill blocks that agent's money moves but not its cancel; global kill shows the banner.
     const ben = await activeSubscriber("Ben");
@@ -195,16 +200,12 @@ describe("Kept foundation", () => {
     expect((await owner.get("/dashboard/money?lookup=1")).text).toMatch(/transactions/);
     expect((await owner.get("/dashboard/money/transactions.json")).json.transactions).toBeTruthy();
     expect((await anon.get("/dashboard/money/transactions.json")).status).toBe(401);
-    // Negative test: the fake honours the mock header, so the capture fails as PayPal would make it fail.
+    // A real failed renewal (PayPal reports it), then the owner collects the balance.
     const cara = await activeSubscriber("Cara");
     fake.failRenewal(cara.paypalId);
     await svc.syncSubscription(cara.ref);
     await svc.handlePaymentFailed(cara.id, "webhook");
-    expect(loc(await owner.post("/dashboard/money/negative-test", { code: "INTERNAL_SERVER_ERROR", ref: cara.ref }))).toMatch(/refused to pretend/);
     expect(loc(await owner.post(`/dashboard/money/sub/${cara.ref}/collect`))).toMatch(/Collected/);
-    expect(loc(await owner.post("/dashboard/money/webhook-simulate", { event_type: "BILLING.SUBSCRIPTION.CANCELLED" }))).toMatch(/err=/); // no webhook yet
-    config.paypal.webhookId = "WH-FAKE";
-    ok(await owner.post("/dashboard/money/webhook-simulate", { event_type: "BILLING.SUBSCRIPTION.CANCELLED" }));
 
     /* ---- evals ---- */
     expect((await owner.get("/dashboard/eval")).text).toMatch(/Evals/);
@@ -221,16 +222,19 @@ describe("Kept foundation", () => {
     expect((await isKilled("global"))?.engaged ?? false).toBe(false);
     expect((await one("SELECT status FROM subscribers WHERE id = $1", [dan.id])).status).toBe("ACTIVE");
 
-    /* ---- channels: simulator, linking, inbound commands, webhooks ---- */
-    expect((await owner.get("/dashboard/channels")).text).toMatch(/simulated/);
-    ok(await owner.post("/dashboard/channels/reply", { address: `owner:${m.id}`, text: "pending" }));
-    expect((await owner.get(`/dashboard/channels?address=subscriber:${dan.id}`)).status).toBe(200);
-    expect((await anon.postJson("/channels/link", { ref: dan.ref })).json.linked).toBe(true);
-    ok(await owner.post("/dashboard/channels/reply", { address: `subscriber:${dan.id}`, text: "status" }));
-    const last = await one("SELECT body FROM channel_messages WHERE address = $1 AND direction = 'out' ORDER BY created_at DESC LIMIT 1", [`subscriber:${dan.id}`]);
+    /* ---- channels: the in-app record, Telegram linking, inbound commands, webhooks ---- */
+    expect((await owner.get("/dashboard/channels")).text).toMatch(/Telegram/);
+    expect((await owner.get("/dashboard/channels")).text).not.toMatch(/simulat/i);
+    const tg = async (chat: number, text: string) => expect((await anon.postJson("/webhooks/telegram", { message: { chat: { id: chat }, text } }, { "x-telegram-bot-api-secret-token": "tg-secret" })).status).toBe(200);
+    await tg(4242, `link subscriber:${dan.ref}`);
+    expect(await one("SELECT * FROM party_links WHERE channel = 'telegram' AND address = '4242'")).toMatchObject({ party: "subscriber", party_id: dan.id });
+    await tg(4242, "status");
+    const last = await one("SELECT body, status FROM channel_messages WHERE channel = 'telegram' AND address = '4242' AND direction = 'out' ORDER BY created_at DESC LIMIT 1");
     expect(last.body).toMatch(/ACTIVE|active/);
-    ok(await owner.post("/dashboard/channels/reply", { address: `subscriber:${dan.id}`, text: `cancel` }));
+    // Every notice to Dan now goes to his Telegram chat and is kept in the in-app record.
+    await tg(4242, "cancel");
     expect((await one("SELECT status FROM subscribers WHERE id = $1", [dan.id])).status).toBe("CANCELLED");
+    expect((await one("SELECT count(*) AS c FROM channel_messages WHERE channel = 'simulator' OR status = 'simulated'")).c).toBe(0);
     expect((await anon.postJson("/webhooks/telegram", { message: { chat: { id: 1 }, text: "hi" } })).status).toBe(401);
     expect((await anon.postJson("/webhooks/telegram", { message: { chat: { id: 1 }, text: `link subscriber:${ada.ref}` } }, { "x-telegram-bot-api-secret-token": "tg-secret" })).status).toBe(200);
     expect((await anon.get("/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token=kept-verify&hub.challenge=abc")).text).toBe("abc");
@@ -243,7 +247,7 @@ describe("Kept foundation", () => {
     expect((await anon.get("/sw.js")).text).toMatch(/push/);
     expect((await anon.get("/push/public-key")).status).toBe(200);
     expect((await anon.postJson("/push/subscribe", { endpoint: "https://push.example/x", keys: {} })).status).toBe(401);
-    expect((await anon.postJson(`/push/subscribe?ref=${ada.ref}`, { endpoint: "https://push.example/x", keys: {} })).json.simulated).toBe(true);
+    expect((await anon.postJson(`/push/subscribe?ref=${ada.ref}`, { endpoint: "https://push.example/x", keys: {} })).json.ok).toBe(true);
     expect((await owner.postJson("/push/subscribe", { endpoint: "https://push.example/o", keys: {} })).status).toBe(200);
 
     /* ---- evidence and judge mode ---- */
@@ -278,7 +282,6 @@ describe("Kept foundation", () => {
     await db.query("UPDATE jobs SET run_at = now() WHERE status = 'pending'");
     await tick();
     await svc.sendRenewalReminders(new Date());
-    await seedHistory(m.id, 24);
 
     expect(srv.failures).toEqual([]);
     expect(srv.missed((r) => !isFoundationRoute(r))).toEqual([]);

@@ -8,7 +8,7 @@ import { Router, type Request, type Response, type NextFunction } from "express"
 import { config } from "../config.js";
 import { getDb } from "../db.js";
 import { recentAudit, verifyChain } from "../guard/audit.js";
-import { adoptSuggestions, backtest, history, seedHistory, suggestAutonomy } from "../guard/backtest.js";
+import { adoptSuggestions, backtest, history, suggestAutonomy } from "../guard/backtest.js";
 import { decideApproval, guardSettings, pendingApprovals, saveGuardSettings } from "../guard/dryrun.js";
 import { isKilled, listKills, setKill } from "../guard/kill.js";
 import { finishRegistration, hasPasskey, newChallenge, PASSKEY_JS, verifyAssertion } from "../guard/passkey.js";
@@ -70,8 +70,6 @@ export function guardRouter(): Router {
     const db = await getDb();
     const policy = await currentPolicy(db, m.id);
     const plans = await plansFor(db, m.id, true);
-    const regular = plans.find((p) => p.kind === "regular") ?? plans[0];
-    await seedHistory(m.id, regular?.price ?? 24, db);
     const settings = await guardSettings(m.id, db);
     const candidateText = typeof req.query.text === "string" ? req.query.text : policy?.source_text ?? "";
     const pct = typeof req.query.pct === "string" ? Number(req.query.pct) : settings.auto_discount_max_pct;
@@ -95,13 +93,13 @@ export function guardRouter(): Router {
       <h1>Approvals and limits</h1><p class="muted">What the agents and the offer step may do on their own, tested against the last 90 days before you adopt it. Cancelling is never part of this: it always works in one step.</p>
       ${flash(req)}${await killBanner(m.id)}
 
-      <div class="card"><h2>Fairness scorecard</h2><p class="sub">From this shop's own event log, next to a modelled dark-pattern flow (labelled modelled, not measured).</p>
+      <div class="card"><h2>Fairness scorecard</h2><p class="sub">Measured from this shop's own event log.</p>
         <div class="score">
-          <div class="tile"><div class="label">One-call cancel rate</div><div class="big">${fair.one_call_cancel_rate}%</div><div class="hint">${fair.cancels} cancels; baseline: ${fair.baseline.steps_to_cancel} steps</div></div>
-          <div class="tile"><div class="label">Offers made → accepted</div><div class="big">${fair.offers_made} → ${fair.offers_accepted}</div><div class="hint">${fair.offers_declined_or_expired} declined or expired, all cancelled at once; baseline: ${fair.baseline.offers_before_cancel} offers</div></div>
-          <div class="tile"><div class="label">Time to cancel (median)</div><div class="big">${fair.median_seconds_to_cancel === null ? "—" : `${fair.median_seconds_to_cancel}s`}</div><div class="hint">p95 ${fair.p95_seconds_to_cancel ?? "—"}s; modelled baseline ${fair.baseline.modelled_seconds_to_cancel}s</div></div>
+          <div class="tile"><div class="label">One-call cancel rate</div><div class="big">${fair.one_call_cancel_rate}%</div><div class="hint">${fair.cancels} cancels, each one step</div></div>
+          <div class="tile"><div class="label">Offers made → accepted</div><div class="big">${fair.offers_made} → ${fair.offers_accepted}</div><div class="hint">${fair.offers_declined_or_expired} declined or expired, all cancelled at once; never more than one offer</div></div>
+          <div class="tile"><div class="label">Time to cancel (median)</div><div class="big">${fair.median_seconds_to_cancel === null ? "—" : `${fair.median_seconds_to_cancel}s`}</div><div class="hint">p95 ${fair.p95_seconds_to_cancel ?? "—"}s, from request to PayPal's confirmation</div></div>
           <div class="tile"><div class="label">Offers held or blocked</div><div class="big">${fair.held_offers + fair.compliance_blocked_offers}</div><div class="hint">${fair.held_offers} above autonomy, ${fair.compliance_blocked_offers} by a compliance rule</div></div>
-        </div><p class="small muted">${fair.baseline.note}</p></div>
+        </div></div>
 
       <div class="card"><h2>Policy in plain words, backtested</h2>
         <form method="get" action="/dashboard/guard">
@@ -117,7 +115,7 @@ export function guardRouter(): Router {
             <div class="tile"><div class="label">Would run on its own</div><div class="big">${bt.run}</div><div class="hint">kept about ${fmtMoney(bt.kept_auto_usd, m.currency)} over 3 cycles</div></div>
             <div class="tile"><div class="label">Would wait for you</div><div class="big">${bt.wait}</div><div class="hint">${fmtMoney(bt.held_usd, m.currency)} not offered unless you approve</div></div>
             <div class="tile"><div class="label">No offer</div><div class="big">${bt.deny}</div><div class="hint">${bt.cancels_without_offer} never asked; ${bt.compliance_blocked} blocked by a compliance rule</div></div>
-            <div class="tile"><div class="label">Sample history</div><div class="big">${bt.cases}</div><div class="hint">90 days, labelled sample rows</div></div>
+            <div class="tile"><div class="label">Real requests replayed</div><div class="big">${bt.cases}</div><div class="hint">this shop's last 90 days</div></div>
           </div>
           <details><summary>Every case</summary><div class="table-wrap"><table class="evalgrid"><tr><th>Date</th><th>Subscriber</th><th>Reason</th><th>Outcome</th><th>Offer</th><th>Kept</th><th>Why</th></tr>${bt.rows.map((x) => html`<tr><td>${x.at}</td><td>${x.subscriber}</td><td>${x.reason || "—"} <small class="muted">${x.category}</small></td><td><span class="pill ${x.outcome}">${x.outcome}</span></td><td>${x.offer ?? "—"}</td><td>${x.kept_usd ? fmtMoney(x.kept_usd, m.currency) : "—"}</td><td class="small">${x.note}</td></tr>`)}</table></div></details>
           ${candidate && typeof req.query.text === "string" ? html`<form method="post" action="/dashboard/guard/adopt" class="row" style="margin-top:10px"><input type="hidden" name="text" value="${req.query.text}"><input type="hidden" name="pct" value="${pct}"><input type="hidden" name="cycles" value="${cycles}"><button class="btn primary" type="submit">Adopt these rules and limits</button></form>` : html`<form method="post" action="/dashboard/guard/limits" class="row" style="margin-top:10px"><input type="hidden" name="pct" value="${pct}"><input type="hidden" name="cycles" value="${cycles}"><button class="btn" type="submit">Save these autonomy limits</button></form>`}
@@ -150,7 +148,7 @@ export function guardRouter(): Router {
         </div>
       </div>
 
-      <div class="card"><h2>Sample history (${hist.length} rows, labelled)</h2><p class="sub">The 90 days the backtest replays. Seeded sample data so the backtest has something to say before a shop has its own history.</p>
+      <div class="card"><h2>History (${hist.length} real cancellation requests)</h2><p class="sub">What the backtest replays: every member of this shop who asked to cancel in the last 90 days. ${hist.length ? "" : "None yet; the backtest fills in as members use the shop."}</p>
         <details><summary>Show</summary><div class="table-wrap"><table class="evalgrid"><tr><th>Date</th><th>Reason</th><th>Category</th><th>Heard an offer</th><th>Accepted</th></tr>${hist.map((h) => html`<tr><td>${h.at.toISOString().slice(0, 10)}</td><td>${h.reason || "—"}</td><td>${h.category}</td><td>${h.heard_offer ? "yes" : "no"}</td><td>${h.accepted_type ?? "—"}</td></tr>`)}</table></div></details>
       </div>
     `));

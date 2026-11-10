@@ -733,30 +733,21 @@ export async function revertPromo(subscriberId: string) {
   await logEvent(db, { merchantId: m.id, subscriberId: s.id, source: "scheduler", type: "promo.ended", summary: `Discount period over; back to ${home.name}` });
 }
 
-export async function handlePaymentFailed(subscriberId: string, source: string, simulated = false) {
+export async function handlePaymentFailed(subscriberId: string, source: string) {
   const db = await getDb();
   const s = await subscriberById(db, subscriberId);
   if (!s) return;
   const m = (await merchantById(db, s.merchant_id))!;
   let sub = s;
-  if (!simulated && !s.is_sample) sub = (await exec.readBack(db, m, s)).sub;
+  if (!s.is_sample) sub = (await exec.readBack(db, m, s)).sub;
   const plan = await planById(db, sub.plan_id ?? "");
   const amount = sub.outstanding > 0 ? sub.outstanding : plan?.price ?? 0;
   const msg = await getBrain().explainPaymentFailure({ merchantName: m.name, amount, currency: m.currency, attempts: Math.max(1, sub.failed_payments), manageUrl: `${config.appUrl}/manage/${sub.ref}` });
-  await logEvent(db, { merchantId: m.id, subscriberId: s.id, source, type: "payment.failed", summary: `${simulated ? "[SIMULATED] " : ""}Renewal of ${amount.toFixed(2)} ${m.currency} failed; subscriber told how to fix it`, payload: { message: msg, simulated, wordedBy: getBrain().lastVia() } });
+  await logEvent(db, { merchantId: m.id, subscriberId: s.id, source, type: "payment.failed", summary: `Renewal of ${amount.toFixed(2)} ${m.currency} failed; subscriber told how to fix it`, payload: { message: msg, wordedBy: getBrain().lastVia() } });
   await notifyParty("subscriber", s.id, msg, [{ id: `fixed:${s.ref}`, label: "I fixed it" }, { id: `cancel:${s.ref}`, label: "Cancel instead" }], "subscriber", s.id, db);
   await updateSubscriber(db, s.id, { kept_state: "payment_failed" });
   await enqueue(db, "payment_followup", { subscriberId: s.id }, new Date(Date.now() + 24 * 3600_000), `followup:${s.id}`);
   return msg;
-}
-
-/** Demo only (KEPT_DEMO_MODE): records a failed renewal without touching PayPal. Clearly labelled. */
-export async function simulateFailedPayment(ref: string) {
-  if (!config.demoMode) throw new KeptError("Simulation is only available in demo mode.", "not_allowed", 403);
-  const { db, s } = await load(ref);
-  const plan = await planById(db, s.plan_id ?? "");
-  await updateSubscriber(db, s.id, { outstanding: plan?.price ?? 0, failed_payments: s.failed_payments + 1 });
-  return handlePaymentFailed(s.id, "simulation", true);
 }
 
 export async function paymentFixed(ref: string, actor: Actor, key = newId("k")) {
@@ -774,8 +765,6 @@ export async function paymentFixed(ref: string, actor: Actor, key = newId("k")) 
       return run.timed({ actor: "paypal", tool: "subscriptions.capture", args: { amount: fresh.outstanding.toFixed(2) }, pp_request_id: requestKey("capture", s.id, fresh.outstanding.toFixed(2), key) }, () => exec.captureOutstanding(db, m, fresh, key), (r) => ({ captured: r.captured }));
     });
   }
-  const simulated = (await db.query("SELECT 1 FROM event_log WHERE subscriber_id = $1 AND type = 'payment.failed' AND payload->>'simulated' = 'true' LIMIT 1", [s.id])).rows.length > 0;
-  if (!out.captured && simulated) out.note = "The failed payment was simulated, and PayPal shows nothing outstanding, so the simulated balance was cleared without a capture.";
   await updateSubscriber(db, s.id, { kept_state: null, outstanding: 0, failed_payments: 0 });
   await cancelJob(db, `followup:${s.id}`);
   await logEvent(db, { merchantId: m.id, subscriberId: s.id, source: actor.kind, type: "payment.recovered", summary: out.captured ? `Collected ${out.captured} ${m.currency} after payment method fix` : out.note });

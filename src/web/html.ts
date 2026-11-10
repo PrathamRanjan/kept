@@ -41,7 +41,7 @@ export const BRAND: Brand = {
   themeColor: "#2443c4",
   fonts: "family=Schibsted+Grotesk:wght@500;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500",
   layout: "topbar",
-  testMode: "Test mode: subscriptions run on the PayPal sandbox, so no real money moves. Rows marked sample are example data.",
+  testMode: "Test mode: subscriptions run on the PayPal sandbox, so no real money moves.",
   siteLinks: [["/#how", "How it works"], ["/#fair", "Fair by design"], ["/agents", "For AI agents"], ["/#try", "Sign in"]],
   cta: ["/#try", "Sign in"],
   siteFoot: "© 2026 Kept. Test mode: subscriptions run on the PayPal sandbox.",

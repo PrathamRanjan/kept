@@ -60,8 +60,8 @@ async function signInDemoOwner() {
 }
 
 const ownerSteps: DriveStep[] = [
-  { popover: { title: "Today at your shop", description: "This page answers three things: what happened, what needs you, and what happens next. Live members come first; sample rows are labelled." } },
-  { element: "[data-tour='kpis']", popover: { title: "Live numbers first", description: "Members and monthly revenue billed through PayPal. Labelled sample rows are counted separately, never mixed in." } },
+  { popover: { title: "Today at your shop", description: "This page answers three things: what happened, what needs you, and what happens next. Every member is a real PayPal sandbox subscription." } },
+  { element: "[data-tour='kpis']", popover: { title: "Live numbers first", description: "Members and monthly revenue billed through PayPal, read from the subscriptions themselves." } },
   { element: "[data-tour='needs']", popover: { title: "What needs you", description: "Moves Kept held because they're above the limits you set, failed renewals, and offers waiting on a member. Approve or decline in place." } },
   { element: "[data-tour='ask']", popover: { title: "Ask about your shop", description: "Plain questions, answered by the AI from your shop's live numbers. It reads; it can't act." } },
   { element: "[data-tour='nav-members']", popover: { title: "Every member's card", description: "Each subscription is a row of stamps, one per billing cycle: paid, skipped, paused, discounted, failed, and the next one." } },
@@ -124,7 +124,7 @@ const judgePages: PageSteps[] = [
   {
     match: (p) => p === "/dashboard",
     steps: [
-      { element: "[data-tour='kpis']", popover: { title: "The owner's morning · 4 of 6", description: "Live members and revenue from PayPal, with sample rows counted apart." } },
+      { element: "[data-tour='kpis']", popover: { title: "The owner's morning · 4 of 6", description: "Live members and revenue, billed through PayPal." } },
       { element: "[data-tour='needs']", popover: { title: "Only what needs them", description: "Held offers and collections, failed renewals, open offers. Approve or decline right here." } },
       { element: "[data-tour='calendar']", popover: { title: "Renewal calendar", description: "Bryntum Calendar: renewals, pauses with resume dates, discount ends and payment follow-ups." } },
     ],

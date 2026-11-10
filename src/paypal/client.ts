@@ -15,7 +15,6 @@ type Json = Record<string, unknown>;
  */
 export class PayPalClient implements PayPalApi {
   private token: { value: string; expiresAt: number; scopes: string[]; appId?: string } | null = null;
-  private mockNext: string | null = null;
   readonly env: "sandbox" | "live";
 
   constructor(private readonly creds: Creds, private readonly fetchImpl: typeof fetch = fetch) {
@@ -55,10 +54,6 @@ export class PayPalClient implements PayPalApi {
     };
     if (opts.requestId) headers["PayPal-Request-Id"] = opts.requestId;
     if (opts.prefer) headers["Prefer"] = opts.prefer;
-    if (this.mockNext && method !== "GET" && this.env === "sandbox") {
-      headers["PayPal-Mock-Response"] = JSON.stringify({ mock_application_codes: this.mockNext });
-      this.mockNext = null;
-    }
     let lastErr: unknown;
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
@@ -286,14 +281,7 @@ export class PayPalClient implements PayPalApi {
     return (data.balances ?? []).map((b) => ({ currency: b.currency, total: b.total_balance?.value ?? "0.00", available: b.available_balance?.value ?? "0.00", withheld: b.withheld_balance?.value ?? "0.00" }));
   }
 
-  async simulateWebhookEvent(webhookId: string, eventType: string) {
-    const { data } = await this.call<{ id: string }>("POST", "/v1/notifications/simulate-event", { webhook_id: webhookId, event_type: eventType });
-    return { id: data.id };
-  }
 
-  withMockResponse(code: string) {
-    this.mockNext = code.replace(/[^A-Z0-9_]/gi, "").slice(0, 40);
-  }
 }
 
 export const WEBHOOK_EVENTS = [

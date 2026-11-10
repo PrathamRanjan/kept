@@ -2,7 +2,6 @@ import { config } from "../config.js";
 import { decrypt } from "../lib/crypto.js";
 import { PayPalClient } from "./client.js";
 import type { PayPalApi } from "./types.js";
-import { withFaults } from "./faults.js";
 
 export interface MerchantCreds {
   id: string;
@@ -37,7 +36,7 @@ let factory: Factory = defaultFactory;
 
 export function paypalFor(m: MerchantCreds | null): PayPalApi {
   const api = factory(m);
-  return config.demoMode ? withFaults(api) : api;
+  return api;
 }
 
 /** Tests swap in FakePayPal here. */

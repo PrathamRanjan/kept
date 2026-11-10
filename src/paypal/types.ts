@@ -108,10 +108,6 @@ export interface PayPalApi {
   searchTransactions(startIso: string, endIso: string): Promise<SearchedTransaction[]>;
   /** Reporting: balances including withheld. */
   listBalances(): Promise<Balance[]>;
-  /** Webhook simulator: ask PayPal to send a sample event of this type to the webhook. */
-  simulateWebhookEvent(webhookId: string, eventType: string): Promise<{ id: string }>;
-  /** Negative testing: the next non-GET call carries PayPal-Mock-Response with this error code (sandbox only). */
-  withMockResponse(code: string): void;
 }
 
 export class PayPalError extends Error {

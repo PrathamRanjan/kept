@@ -1,6 +1,6 @@
 /**
  * Foundation routes (roadmap B.2, B.4, B.5, B.8, B.10, K5): traces, the eval explorer, channels and webhooks, the
- * PWA, the owner's money desk (Transaction Search, balances, invoices, negative tests, webhook simulator), the
+ * PWA, the owner's money desk (Transaction Search, balances, invoices, collections), the
  * evidence page and judge mode.
  */
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
@@ -8,7 +8,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { aiUsageSummary, hasOpenAI, providerLabel } from "../ai/provider.js";
-import { conversation, link, receive, recentMessages, telegramReady, telegramUpdate, whatsappUpdate } from "../channels/index.js";
+import { recentMessages, telegramReady, telegramUpdate, whatsappReady, whatsappUpdate } from "../channels/index.js";
+import { history } from "../guard/backtest.js";
 import { randomBytes } from "node:crypto";
 import { icon } from "./icons.js";
 import { messageFlag } from "./safetyui.js";
@@ -22,7 +23,6 @@ import { fairness } from "../eval/fairness.js";
 import { verifyChain } from "../guard/audit.js";
 import { newId } from "../lib/ids.js";
 import { paypalFor } from "../paypal/index.js";
-import { WEBHOOK_EVENTS } from "../paypal/client.js";
 import * as svc from "../service.js";
 import { currentPolicy, KeptError, type Merchant, merchantBySlug, plansFor, subscriberByRef, subscribersFor } from "../store.js";
 import { loadRun, recentRuns, renderTrace, runsFor } from "../trace.js";
@@ -166,11 +166,10 @@ export function foundationRouter(): Router {
       }
     }
     const failing = subs.filter((s) => s.kept_state === "payment_failed" && !s.is_sample);
-    const webhookId = m.paypal_webhook_id || config.paypal.webhookId;
     res.send(layout({ title: `${m.name} · Money`, nav: "dashboard", owner: nav(m) }, html`
-      <h1>Money desk</h1><p class="muted">Transaction Search and balances (read-only), invoices for failed renewals, PayPal negative tests and the webhook simulator. Every write here goes through the gate and leaves a trace.</p>${flash(req)}${await killBanner(m.id)}
+      <h1>Money desk</h1><p class="muted">Transaction Search and balances (read-only), and collecting or invoicing failed renewals. Every figure comes from PayPal.</p>${flash(req)}${await killBanner(m.id)}
       <div class="card"><h2>Failed renewals</h2><p class="sub">Collect the outstanding balance (capture) or send an invoice instead. Above your threshold either one waits for your approval on the guard page.</p>
-        ${failing.length ? failing.map((s) => html`<div class="event-row"><span>${s.subscriber_name ?? s.subscriber_email ?? s.ref}</span><span>outstanding ${fmtMoney(s.outstanding, m.currency)}</span><span class="row"><form method="post" action="/dashboard/money/sub/${s.ref}/collect" class="inline"><button class="btn small primary" type="submit">Collect now</button></form><form method="post" action="/dashboard/money/sub/${s.ref}/invoice" class="inline"><button class="btn small" type="submit">Send an invoice</button></form></span></div>`) : html`<p class="muted">No failed renewals right now.${config.demoMode ? " Use “Simulate failed renewal” on the dashboard to see this desk work." : ""}</p>`}
+        ${failing.length ? failing.map((s) => html`<div class="event-row"><span>${s.subscriber_name ?? s.subscriber_email ?? s.ref}</span><span>outstanding ${fmtMoney(s.outstanding, m.currency)}</span><span class="row"><form method="post" action="/dashboard/money/sub/${s.ref}/collect" class="inline"><button class="btn small primary" type="submit">Collect now</button></form><form method="post" action="/dashboard/money/sub/${s.ref}/invoice" class="inline"><button class="btn small" type="submit">Send an invoice</button></form></span></div>`) : html`<p class="muted">No failed renewals right now. This desk fills when PayPal reports a failed renewal.</p>`}
       </div>
       <div class="grid g2">
         <div class="card"><h2>Invoices (Invoicing v2)</h2>${invoices.length ? html`<table><tr><th>Invoice</th><th>Subscriber</th><th>Amount</th><th>Status</th><th>Trace</th></tr>${invoices.map((i: any) => html`<tr><td><code class="small">${i.paypal_invoice_id}</code></td><td>${i.subscriber_name ?? i.ref}</td><td>${fmtMoney(Number(i.amount), i.currency)}</td><td><span class="pill ${i.status === "PAID" ? "good" : ""}">${i.status}</span></td><td>${i.run_id ? html`<a href="/trace/${i.run_id}">run</a>` : ""}</td></tr>`)}</table>` : html`<p class="muted">No invoices yet.</p>`}
@@ -180,13 +179,6 @@ export function foundationRouter(): Router {
           ${txnErr ? html`<p class="banner bad">${txnErr}</p>` : ""}
           ${txns ? html`<p class="small muted">${txns.from.slice(0, 10)} to ${txns.to.slice(0, 10)} · ${txns.transactions.length} transactions${txns.balances.length ? ` · balance ${txns.balances.map((b) => `${b.total} ${b.currency}${Number(b.withheld) ? ` (withheld ${b.withheld})` : ""}`).join(", ")}` : ""}</p><div class="table-wrap"><table class="evalgrid"><tr><th>Date</th><th>Id</th><th>Amount</th><th>Status</th><th>Payer</th></tr>${txns.transactions.slice(0, 50).map((t) => html`<tr><td>${t.transaction_initiation_date.slice(0, 10)}</td><td><code class="small">${t.transaction_id}</code></td><td>${t.transaction_amount.value} ${t.transaction_amount.currency_code}</td><td>${t.transaction_status}</td><td>${t.payer_email ?? ""}</td></tr>`)}</table></div><a class="small" href="/dashboard/money/transactions.json">JSON</a>` : ""}
         </div>
-      </div>
-      <div class="grid g2">
-        <div class="card"><h2>Negative tests</h2><p class="sub">Sandbox only: the next write carries <code>PayPal-Mock-Response</code> with the code you pick, so you can watch Kept refuse, retry or hold instead of pretending. The attempt is a 1-unit capture on a failed-renewal subscriber, gated like any other.</p>
-          <form method="post" action="/dashboard/money/negative-test" class="row"><select name="code"><option>INTERNAL_SERVER_ERROR</option><option>PERMISSION_DENIED</option><option>SUBSCRIPTION_STATUS_INVALID</option><option>ZERO_OUTSTANDING_BALANCE</option></select><select name="ref">${failing.map((s) => html`<option value="${s.ref}">${s.subscriber_name ?? s.ref}</option>`)}</select><button class="btn" type="submit" ${failing.length ? "" : "disabled"}>Run</button></form>
-          <p class="small muted">Header support varies by endpoint; where PayPal ignores it the call simply succeeds and the page says so.</p></div>
-        <div class="card"><h2>Webhook simulator</h2><p class="sub">Ask PayPal to send a sample event to the registered webhook${webhookId ? ` (${webhookId})` : " (none registered yet)"}. Signature verification still applies.</p>
-          <form method="post" action="/dashboard/money/webhook-simulate" class="row"><select name="event_type">${WEBHOOK_EVENTS.map((e) => html`<option>${e}</option>`)}</select><button class="btn" type="submit" ${webhookId ? "" : "disabled"}>Simulate</button></form></div>
       </div>
     `));
   }));
@@ -221,50 +213,18 @@ export function foundationRouter(): Router {
     if (!m) throw new KeptError("Owner required", "unauthorized", 401);
     return svc.transactionsFor(m, 31);
   }));
-  r.post("/dashboard/money/negative-test", page(async (req, res) => {
-    const m = await requireOwner(req, res);
-    if (!m) return;
-    const code = String(req.body.code ?? "INTERNAL_SERVER_ERROR");
-    try {
-      paypalFor(m).withMockResponse(code);
-      const out = await svc.paymentFixed(String(req.body.ref), { kind: "owner" }, `negtest-${code}-${Date.now()}`);
-      back(res, "/dashboard/money", `PayPal did not honour the mock for this endpoint; the call succeeded (${out.captured ?? out.note}).`);
-    } catch (e) {
-      back(res, "/dashboard/money", `As intended, PayPal answered ${code} and Kept refused to pretend: ${errMsg(e)}`);
-    }
-  }));
-  r.post("/dashboard/money/webhook-simulate", page(async (req, res) => {
-    const m = await requireOwner(req, res);
-    if (!m) return;
-    const webhookId = m.paypal_webhook_id || config.paypal.webhookId;
-    if (!webhookId) return back(res, "/dashboard/money", "Register a webhook first.", true);
-    try {
-      const out = await paypalFor(m).simulateWebhookEvent(webhookId, String(req.body.event_type));
-      back(res, "/dashboard/money", `PayPal queued a simulated ${req.body.event_type} (${out.id}). It arrives signed; see the activity log.`);
-    } catch (e) {
-      back(res, "/dashboard/money", errMsg(e), true);
-    }
-  }));
-
   /* ---------------- channels and webhooks (B.8) ---------------- */
   r.get("/dashboard/channels", page(async (req, res) => {
     const m = await requireOwner(req, res);
     if (!m) return;
     const msgs = await recentMessages(80);
-    const addr = typeof req.query.address === "string" ? req.query.address : `owner:${m.id}`;
-    const conv = await conversation(addr, 40);
     const tg = Number((await (await getDb()).query<any>("SELECT count(*)::int AS n FROM party_links WHERE channel = 'telegram' AND party = 'owner' AND party_id = $1", [m.id])).rows[0]?.n ?? 0) > 0;
     res.send(layout({ title: "Messages", nav: "dashboard", owner: nav(m) }, html`
       <div class="page-head"><div><h1>Messages and alerts</h1><p>What reaches you and your members on their phones: renewal reminders with Skip and Keep buttons, and approvals for you.</p></div></div>${flash(req)}
       <section class="card" id="phone"><h2>Approvals on your phone</h2><p class="sub">Held offers and large collections arrive on Telegram with Approve and Decline buttons.</p>
         <div class="row">${tg ? html`<span class="pill good">Telegram connected</span>` : html`<span class="pill">Telegram not connected</span>`}<form method="post" action="/connect/telegram" class="inline" target="_blank"><button class="btn primary" type="submit">${raw(icon("message"))}${tg ? "Connect another chat" : "Connect Telegram"}</button></form><button class="btn" type="button" id="push-sub">${raw(icon("zap"))}Turn on notifications in this browser</button></div>
-        <p class="small muted">Telegram opens with a one-time code that lasts 15 minutes: press Start and you're done. Members connect from their own member page.${telegramReady() ? "" : " The bot token isn't set on this server, so messages are recorded below as simulated."}${pushReady() ? "" : " Browser notifications need VAPID keys on the server."}</p></section>
+        <p class="small muted">Telegram opens with a one-time code that lasts 15 minutes: press Start and you're done. Members connect from their own member page.${telegramReady() ? "" : " The bot token isn't set on this server, so Telegram messages are logged below as not sent."}${pushReady() ? "" : " Browser notifications need VAPID keys on the server."}</p></section>
       <div class="grid g2">
-        <div class="card"><h2>Message simulator</h2><p class="sub">What the phone channels would send, and your replies.</p>
-          <div class="chips"><a class="${addr === `owner:${m.id}` ? "on" : ""}" href="/dashboard/channels?address=owner:${m.id}">You (owner)</a>${(await subscribersFor(await getDb(), m.id)).filter((s) => !s.is_sample).slice(0, 6).map((s) => html`<a class="${addr === `subscriber:${s.id}` ? "on" : ""}" href="/dashboard/channels?address=subscriber:${s.id}">${s.subscriber_name ?? s.ref.slice(0, 10)}</a>`)}</div>
-          ${conv.map((x: any) => html`<div class="event-row"><span class="muted small">${fmtDate(x.created_at, true)}</span><span><span class="pill ${x.direction === "in" ? "agent" : ""}">${x.direction === "in" ? "received" : "sent"}</span></span><span>${x.direction === "in" ? messageFlag(String(x.body), "Kept only acts on its own buttons and commands; a message can't change where money goes.") : ""}${x.body}${x.buttons ? html`<div class="row">${(x.buttons as any[]).map((b) => html`<form method="post" action="/dashboard/channels/reply" class="inline"><input type="hidden" name="address" value="${addr}"><input type="hidden" name="reply_to" value="${x.id}"><input type="hidden" name="button" value="${b.id}"><button class="btn small" type="submit">${b.label}</button></form>`)}</div>` : ""} <small class="muted">${x.status}</small></span></div>`)}
-          <form method="post" action="/dashboard/channels/reply" class="row" style="margin-top:8px"><input type="hidden" name="address" value="${addr}"><label for="sim" class="sr">Reply</label><input id="sim" type="text" name="text" placeholder="pending · status · skip · approve:<id>" style="flex:1"><button class="btn" type="submit">Send</button></form>
-        </div>
         <div class="card"><h2>All recent messages</h2>${msgs.slice(0, 30).map((x: any) => html`<div class="small" style="padding:0.3rem 0;border-bottom:1px solid var(--ui-border)"><span class="muted">${fmtDate(x.created_at, true)}</span> ${x.channel} · ${x.direction === "in" ? "received" : "sent"} · ${String(x.body).slice(0, 90)} <span class="pill">${x.status}</span></div>`)}</div>
       </div>
       <script src="/static/pwa.js"></script>
@@ -285,24 +245,6 @@ export function foundationRouter(): Router {
     const s = await subscriberByRef(await getDb(), req.params.ref);
     if (!s || s.is_sample) return res.status(404).send("Subscription not found");
     res.redirect(303, await tgCode("subscriber", s.id));
-  }));
-  r.post("/dashboard/channels/reply", page(async (req, res) => {
-    const m = await requireOwner(req, res);
-    if (!m) return;
-    const address = String(req.body.address ?? `owner:${m.id}`);
-    // The simulator address is the party itself, so link it on first use.
-    const [party, partyId] = address.split(":");
-    if ((party === "owner" && partyId === m.id) || party === "subscriber") await link("simulator", address, party as any, partyId);
-    const reply = await receive("simulator", address, String(req.body.text ?? req.body.button ?? ""), req.body.button ? String(req.body.button) : null, req.body.reply_to ? String(req.body.reply_to) : null);
-    back(res, `/dashboard/channels?address=${encodeURIComponent(address)}`, reply ?? "Sent.");
-  }));
-  r.post("/channels/link", json(async (req) => {
-    // A subscriber links their own chat from the manage page simulator; the owner from the dashboard.
-    const ref = String(req.body.ref ?? "");
-    const s = await subscriberByRef(await getDb(), ref);
-    if (!s) throw new KeptError("No subscription with that reference.", "not_found", 404);
-    await link("simulator", `subscriber:${s.id}`, "subscriber", s.id);
-    return { linked: true };
   }));
   r.post("/webhooks/telegram", json(async (req, res) => {
     if (config.channels.telegramSecret && req.header("x-telegram-bot-api-secret-token") !== config.channels.telegramSecret) {
@@ -333,7 +275,7 @@ export function foundationRouter(): Router {
     if (!owner && !ref) throw new KeptError("Sign in or open your manage page first.", "unauthorized", 401);
     if (!req.body?.endpoint) throw new KeptError("Not a push subscription", "invalid", 400);
     await subscribe(owner ? "owner" : "subscriber", owner ? owner.id : ref!.id, req.body);
-    return { subscribed: pushReady(), simulated: !pushReady() };
+    return { ok: true, sending: pushReady() };
   }));
 
   /* ---------------- evidence (what is real) ---------------- */
@@ -343,22 +285,27 @@ export function foundationRouter(): Router {
     const usage = await aiUsageSummary();
     const chain = await verifyChain();
     const fair = await fairness(m.id);
+    const dbe = await getDb();
+    const linked = (await dbe.query<any>("SELECT channel, count(*)::int AS n FROM party_links WHERE channel IN ('telegram','whatsapp') GROUP BY channel")).rows;
+    const nLinked = (c: string) => Number(linked.find((x: any) => x.channel === c)?.n ?? 0);
     const rows: [string, string, string][] = [
       ["Subscriptions: create, revise, suspend, activate, cancel, capture outstanding, transactions", "real (sandbox)", "every write behind the gate with a trace step and PayPal-Request-Id"],
-      ["Invoicing v2 create and send", "real (sandbox)", "outstanding balance after a failed renewal; status read back by the worker"],
+      ["Invoicing v2 create and send", "real (sandbox)", "only when a renewal genuinely fails on PayPal and the owner chooses to invoice"],
       ["Transaction Search and balances", "real (sandbox, read-only)", "money desk and the owner's MCP tool"],
-      ["Webhooks (verified) and the webhook simulator", "real (sandbox)", "simulate-event through the API"],
-      ["PayPal-Mock-Response negative tests", "real where PayPal honours the header", "the page says when an endpoint ignored it"],
-      ["Log in with PayPal", config.paypal.loginEnabled ? "on" : "off (PAYPAL_LOGIN_ENABLED)", "needs a sandbox app with Log in with PayPal enabled"],
+      ["Webhooks", "real (sandbox), signature-verified", "unsigned or invalid events are refused"],
+      ["Failed renewals", "real only", "shown only when PayPal reports a failed payment by verified webhook or read-back; no test switch exists"],
+      ["Log in with PayPal", config.paypal.loginEnabled ? "on" : "off (PAYPAL_LOGIN_ENABLED)", "needs Log in with PayPal enabled on the sandbox app"],
       ["Model brain", hasOpenAI() ? "live (OpenAI)" : "rules only", providerLabel()],
-      ["Telegram / push", telegramReady() || pushReady() ? "partly connected" : "simulated", "messages recorded with buttons; simulator on /dashboard/channels"],
+      ["Telegram", telegramReady() ? `bot connected · ${nLinked("telegram")} chats linked` : "not configured", "renewal reminders and owner approvals with buttons"],
+      ["WhatsApp", whatsappReady() ? `connected · ${nLinked("whatsapp")} linked` : "not configured (no WhatsApp Cloud API token)", "same messages as Telegram when configured"],
+      ["Web push", pushReady() ? "configured (VAPID)" : "not configured", "to browsers that turn on notifications"],
       ["Passkey countersign", "real WebAuthn, attestation not verified", "ES256/RS256 with Node crypto"],
-      ["90-day history for the backtest", "seeded sample", "labelled sample rows, replaced by the shop's own history as it accrues"],
-      ["Dark-pattern baseline on the fairness scorecard", "modelled", fair.baseline.note],
+      ["Backtest history", `real · ${(await history(m.id)).length} requests`, "this shop's own cancellation requests from the last 90 days"],
+      ["Fairness scorecard", "measured", `${fair.cancels} cancels, ${fair.offers_made} offers, from this shop's event log`],
     ];
     res.send(layout({ title: `${m.name} · Evidence`, nav: "dashboard", owner: nav(m) }, html`
       <h1>Evidence: what is real</h1><p class="muted">Labelled honestly, row by row.</p>
-      <div class="card"><table><tr><th>Capability</th><th>Status</th><th>Note</th></tr>${rows.map(([a, b, c]) => html`<tr><td>${a}</td><td><span class="pill ${/^real|live|on$/.test(b) ? "good" : /simulated|modelled|sample|off|rules/.test(b) ? "warn" : ""}">${b}</span></td><td class="small">${c}</td></tr>`)}</table></div>
+      <div class="card"><table><tr><th>Capability</th><th>Status</th><th>Note</th></tr>${rows.map(([a, b, c]) => html`<tr><td>${a}</td><td><span class="pill ${/^real|live|on$/.test(b) ? "good" : /not sent|off|rules|not wired/.test(b) ? "warn" : ""}">${b}</span></td><td class="small">${c}</td></tr>`)}</table></div>
       <div class="grid g2"><div class="card"><h2>Model usage</h2><p>${usage.ok}/${usage.calls} calls ok, estimated $${usage.cost_usd.toFixed(4)}.</p>${usage.by_purpose.map((p) => html`<div class="small">${p.purpose}: ${p.calls} calls, p50 ${p.p50_ms} ms, $${p.cost_usd.toFixed(4)}${p.replayed ? `, ${p.replayed} replayed` : ""}</div>`)}</div>
       <div class="card"><h2>Audit chain</h2><p>${chain.ok ? html`<span class="pill good">verified</span>` : html`<span class="pill bad">broken</span>`} ${chain.rows} rows.</p><p><a href="/dashboard/eval">Evals</a> · <a href="/dashboard/traces">Agent runs</a> · <a href="/dashboard/compliance">Compliance</a> · <a href="/dashboard/guard">Guard</a></p></div></div>
     `));
@@ -381,7 +328,7 @@ export function foundationRouter(): Router {
       ["An agent cancels a coffee subscription for its human", `Claude Desktop (or any MCP client) calls cancel_subscription with hear_offer=true on ${config.appUrl}/s/${m?.slug ?? "<shop>"}/mcp. One honest offer comes back; the agent relays it.`],
       ["The human declines; the cancel is honoured in one call", "respond_to_offer(accept=false) cancels at PayPal and reads back CANCELLED. No second offer, no survey, no hurdle."],
       ["The trace", `Every step: reason classified (model or rules), eligibility in code, the gate's decision with the rule it hit, PayPal request id. <a href="/dashboard/traces">Agent runs</a>.`],
-      ["The owner's dashboard: fairness scorecard, backtest, compliance", `<a href="/dashboard/guard">Guard</a> shows one-call cancel rate against a modelled dark-pattern flow, the 90-day backtest with what-if sliders, earned autonomy. <a href="/dashboard/compliance">Compliance</a> scores the policy per jurisdiction.`],
+      ["The owner's dashboard: fairness scorecard, backtest, compliance", `<a href="/dashboard/guard">Guard</a> shows the measured one-call cancel rate, the 90-day backtest of real requests with what-if sliders, earned autonomy. <a href="/dashboard/compliance">Compliance</a> scores the policy per jurisdiction.`],
       ["A rule the law forbids is refused with the citation", `On <a href="/onboard/rules">Rules</a> type "three offers before cancel": refused, citing ROSCA §8403(3) and Cal. §17602(d). Type "customers must call to cancel": refused, citing CA, CO and NY.`],
       ["Evidence and evals", `<a href="/dashboard/evidence">What is real</a>, <a href="/dashboard/eval">three-arm reason eval with the dollars column</a>, adversarial harness: 26 hostile moves, none reach PayPal.`],
     ];
