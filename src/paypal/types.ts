@@ -108,6 +108,15 @@ export interface PayPalApi {
   searchTransactions(startIso: string, endIso: string): Promise<SearchedTransaction[]>;
   /** Reporting: balances including withheld. */
   listBalances(): Promise<Balance[]>;
+  /* ---- Wave 1 (A2.1 saved demo wallet, A2.2 approval pool, A1 workspace routing) ---- */
+  /** Vault v3: read a saved payment token (the demo wallet health check). Returns null when PayPal no longer has it. */
+  getPaymentToken(id: string): Promise<{ id: string; customerId: string | null; payerEmail: string | null; usageType: string | null } | null>;
+  /** Vault v3: start a buyer approval to save their PayPal for merchant use (usage_type MERCHANT). */
+  createSetupToken(urls: { returnUrl: string; cancelUrl: string }, requestId: string): Promise<{ id: string; status: string; approveUrl: string | null }>;
+  /** Vault v3: turn an approved setup token into a payment token. */
+  createPaymentToken(setupTokenId: string, requestId: string): Promise<{ id: string; customerId: string | null; payerEmail: string | null }>;
+  /** Subscriptions: replace custom_id (used to tag a pool subscription with the workspace that claimed it). */
+  setSubscriptionCustomId(id: string, customId: string): Promise<void>;
 }
 
 export class PayPalError extends Error {

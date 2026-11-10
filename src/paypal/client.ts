@@ -145,6 +145,33 @@ export class PayPalClient implements PayPalApi {
     return { id: data.id, status: data.status, approveUrl: approve };
   }
 
+  async getPaymentToken(id: string) {
+    const { status, data } = await this.call<any>("GET", `/v3/vault/payment-tokens/${encodeURIComponent(id)}`, undefined, { allow404: true }).catch((e) => {
+      if (e instanceof PayPalError && (e.status === 404 || e.status === 422)) return { status: 404, data: null };
+      throw e;
+    });
+    if (status === 404 || !data?.id) return null;
+    const pp = data.payment_source?.paypal ?? {};
+    return { id: String(data.id), customerId: data.customer?.id ? String(data.customer.id) : null, payerEmail: pp.email_address ? String(pp.email_address) : null, usageType: pp.usage_type ? String(pp.usage_type) : null };
+  }
+
+  async createSetupToken(urls: { returnUrl: string; cancelUrl: string }, requestId: string) {
+    const { data } = await this.call<any>("POST", "/v3/vault/setup-tokens", {
+      payment_source: { paypal: { usage_type: "MERCHANT", usage_pattern: "IMMEDIATE", experience_context: { return_url: urls.returnUrl, cancel_url: urls.cancelUrl, shipping_preference: "NO_SHIPPING", vault_instruction: "ON_PAYER_APPROVAL" } } },
+    }, { requestId });
+    const approve = (data.links ?? []).find((l: any) => l.rel === "approve")?.href ?? null;
+    return { id: String(data.id), status: String(data.status ?? ""), approveUrl: approve };
+  }
+
+  async createPaymentToken(setupTokenId: string, requestId: string) {
+    const { data } = await this.call<any>("POST", "/v3/vault/payment-tokens", { payment_source: { token: { id: setupTokenId, type: "SETUP_TOKEN" } } }, { requestId });
+    return { id: String(data.id), customerId: data.customer?.id ? String(data.customer.id) : null, payerEmail: data.payment_source?.paypal?.email_address ?? null };
+  }
+
+  async setSubscriptionCustomId(id: string, customId: string) {
+    await this.call("PATCH", `/v1/billing/subscriptions/${encodeURIComponent(id)}`, [{ op: "replace", path: "/custom_id", value: customId.slice(0, 127) }]);
+  }
+
   async getSubscription(id: string) {
     const { data } = await this.call<PayPalSubscription>("GET", `/v1/billing/subscriptions/${encodeURIComponent(id)}`);
     return data;

@@ -6,6 +6,7 @@ import { listMerchants } from "./store.js";
 import { processWebhook } from "./webhooks.js";
 import { deliver } from "./channels/index.js";
 import { sendPush } from "./channels/push.js";
+import { checkWallet } from "./demo/wallet.js";
 
 export const handlers: Record<JobType, Handler> = {
   process_webhook: (p) => processWebhook(p.eventId),
@@ -24,6 +25,8 @@ export const handlers: Record<JobType, Handler> = {
   send_push: (p) => sendPush(p.subscriptionId, p.payload),
   renewal_reminders: () => svc.sendRenewalReminders().then(() => undefined),
   invoice_check: () => svc.checkInvoices().then(() => undefined),
+  /* Wave 1 */
+  wallet_check: () => checkWallet().then(() => undefined),
 };
 
 export async function tick(): Promise<number> {
@@ -57,6 +60,7 @@ export async function scheduleSlowJobs() {
   const stamp = new Date().toISOString().slice(0, 13);
   await enqueue(db, "renewal_reminders", {}, new Date(), `reminders:${stamp}`);
   await enqueue(db, "invoice_check", {}, new Date(), `invoices:${stamp}`);
+  await enqueue(db, "wallet_check", {}, new Date(), `wallet:${stamp.slice(0, 10)}`);
 }
 
 export function stopWorker() {

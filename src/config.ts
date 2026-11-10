@@ -19,7 +19,15 @@ export const config = {
     clientSecret: process.env.PAYPAL_CLIENT_SECRET || "",
     webhookId: process.env.PAYPAL_WEBHOOK_ID || "",
     loginEnabled: bool(process.env.PAYPAL_LOGIN_ENABLED, false),
+    /** A2.1: the saved demo wallet (Vault v3 payment token, usage MERCHANT), shared by the eight hackathon apps. */
+    demoVaultToken: process.env.PAYPAL_DEMO_VAULT_TOKEN || "",
+    demoBuyerEmail: process.env.PAYPAL_DEMO_BUYER_EMAIL || "",
   },
+  /** Admin key: the showcase shop, the approval pool, the wallet re-approval and global switches. Never shown to visitors. */
+  adminKey: process.env.KEPT_ADMIN_KEY || "",
+  /** The commit this build runs (Render sets RENDER_GIT_COMMIT). Shown by /healthz. */
+  commit: process.env.RENDER_GIT_COMMIT || process.env.GIT_COMMIT || "",
+  production: process.env.NODE_ENV === "production",
   sessionSecret: process.env.SESSION_SECRET || randomBytes(32).toString("hex"),
   /** "openai" uses the model brain (with the local brain as its fallback); "local" never calls a model. */
   brain: (process.env.KEPT_BRAIN || (process.env.OPENAI_API_KEY ? "openai" : "local")) as "local" | "openai",

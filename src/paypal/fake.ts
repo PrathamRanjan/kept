@@ -101,6 +101,38 @@ export class FakePayPal implements PayPalApi {
     s.billing_info = { ...s.billing_info, outstanding_balance: { value: out.toFixed(2), currency_code: plan.currency }, failed_payments_count: (s.billing_info?.failed_payments_count ?? 0) + 1 };
   }
 
+  vault = new Map<string, { id: string; customerId: string; payerEmail: string }>();
+  setupTokens = new Map<string, { id: string; approved: boolean }>();
+
+  async getPaymentToken(id: string) {
+    this.calls.push({ method: "getPaymentToken", args: [id] });
+    const t = this.vault.get(id);
+    return t ? { ...t, usageType: "MERCHANT" } : null;
+  }
+
+  async createSetupToken(_urls: { returnUrl: string; cancelUrl: string }, requestId: string) {
+    return this.idem(requestId, () => {
+      const id = this.id("ST-");
+      this.setupTokens.set(id, { id, approved: false });
+      return { id, status: "PAYER_ACTION_REQUIRED", approveUrl: `https://www.sandbox.paypal.com/agreements/approve?approval_session_id=${id}` };
+    });
+  }
+
+  async createPaymentToken(setupTokenId: string, requestId: string) {
+    return this.idem(requestId, () => {
+      const st = this.setupTokens.get(setupTokenId);
+      if (!st?.approved) throw new PayPalError("Setup token not approved", 422, "UNPROCESSABLE_ENTITY", undefined, null);
+      const t = { id: this.id("PT-"), customerId: this.id("C-"), payerEmail: "buyer@example.com" };
+      this.vault.set(t.id, t);
+      return t;
+    });
+  }
+
+  async setSubscriptionCustomId(id: string, customId: string) {
+    this.calls.push({ method: "setSubscriptionCustomId", args: [id, customId] });
+    (this.sub(id) as any).custom_id = customId;
+  }
+
   async getSubscription(id: string) {
     const { history, ...rest } = this.sub(id);
     return JSON.parse(JSON.stringify(rest)) as PayPalSubscription;
