@@ -3,6 +3,7 @@ import { Link, Route, Routes, useLocation } from "react-router-dom";
 import { AlertTriangle, ArrowRight, Check, Clock, RefreshCw, Sparkles, X } from "lucide-react";
 import { toast } from "sonner";
 import { OwnerShell } from "@/components/Shell";
+import { WorkspaceBar } from "@/components/WorkspaceBar";
 import { TrustStrip, WhoChip } from "@/components/Timeline";
 import { Empty, ErrorState, PageSkeleton } from "@/components/States";
 import { Button } from "@/components/ui/button";
@@ -225,6 +226,7 @@ function TodayPage({ d, reload }: { d: Today; reload: () => void }) {
 
   return (
     <>
+      <WorkspaceBar />
       {d.killed && (
         <div className="mb-5 rounded-lg border-2 border-fail bg-fail-wash p-4 text-fail" role="alert">
           <b>Everything is stopped.</b> A kill switch is on: Kept makes no PayPal changes except cancels. <a className="underline" href="/dashboard/guard">Review it</a>.
@@ -247,8 +249,8 @@ function TodayPage({ d, reload }: { d: Today; reload: () => void }) {
         {[
           { l: "Live members", v: String(s.live?.active ?? s.active), h: s.sampleRows ? `+${s.active - (s.live?.active ?? 0)} sample · ${s.live?.suspended ?? 0} paused` : `${s.suspended} paused` },
           { l: "Billed monthly", v: fmtMoney(s.live?.mrr ?? s.mrr, cur), h: s.sampleRows ? `${fmtMoney(s.mrr, cur)} incl. sample` : "monthly equivalent" },
-          { l: "Kept by fair offers", v: fmtMoney(s.revenueKept3, cur), h: `${s.offersAccepted} of ${s.offersMade} offers taken` },
-          { l: "One-step cancels", v: String(s.cancelsHonoured), h: `${s.agentShare}% of changes via AI assistants` },
+          { l: "Kept by fair offers", v: fmtMoney(s.live?.revenueKept3 ?? s.revenueKept3, cur), h: s.sampleRows ? `${s.live?.offersAccepted ?? 0} of ${s.live?.offersMade ?? 0} real offers taken · ${fmtMoney(s.revenueKept3, cur)} incl. sample` : `${s.offersAccepted} of ${s.offersMade} offers taken` },
+          { l: "One-step cancels", v: String(s.live?.cancelsHonoured ?? s.cancelsHonoured), h: s.sampleRows ? `+${s.cancelsHonoured - (s.live?.cancelsHonoured ?? 0)} sample · ${s.agentShare}% of changes via AI assistants incl. sample` : `${s.agentShare}% of changes via AI assistants` },
         ].map((k) => (
           <div key={k.l} className="rounded-xl border border-rule bg-card p-4">
             <p className="m-0 text-sm text-ink-2">{k.l}</p>

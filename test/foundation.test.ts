@@ -146,7 +146,7 @@ describe("Kept foundation", () => {
     // Kill switches: agent kill blocks that agent's money moves but not its cancel; global kill shows the banner.
     const ben = await activeSubscriber("Ben");
     ok(await owner.post("/dashboard/guard/kill", { scope: "agent:test-agent", engaged: "true", reason: "misbehaving" }));
-    expect(await isKilled("agent:test-agent")).toBeTruthy();
+    expect(await isKilled(`merchant:${m.id}:agent:test-agent`)).toBeTruthy();
     await expect(svc.skipNext(ben.ref, agent)).rejects.toMatchObject({ code: "denied" });
     const dCancel = await dryRun({ action: "cancel", merchantId: m.id, agentScope: "agent:test-agent", entity: "subscriber", entityId: ben.id, paypalSubscriptionId: ben.paypalId, merchant: m });
     expect(dCancel.decision).toBe("allowed");
@@ -209,6 +209,12 @@ describe("Kept foundation", () => {
 
     /* ---- evals ---- */
     expect((await owner.get("/dashboard/eval")).text).toMatch(/Evals/);
+    // Running the evals spends model credit and rewrites the published files: an owner is refused, the admin runs them.
+    const refused = await owner.post("/dashboard/eval/run", { suite: "reasons" });
+    expect(refused.location ?? "").toMatch(/err=/);
+    const savedKey = config.adminKey;
+    (config as any).adminKey = "admin-test-key-0123456789";
+    await owner.post("/admin/login", { key: config.adminKey, next: "/admin" });
     ok(await owner.post("/dashboard/eval/run", { suite: "reasons" }));
     const evalPage = (await owner.get("/dashboard/eval?suite=reasons&arm=rules&outcome=wrong&trap=injection")).text;
     expect(evalPage).toMatch(/rules/);
@@ -218,6 +224,7 @@ describe("Kept foundation", () => {
     ok(await owner.post("/dashboard/eval/run", { suite: "adversarial" }));
     expect((await owner.get("/dashboard/eval?suite=adversarial")).text).toMatch(/guard/);
     expect((await owner.get("/dashboard/eval/adversarial.md")).text).toMatch(/hostile|adversarial/i);
+    (config as any).adminKey = savedKey;
     // The harness restored every kill switch and no PayPal write happened to Dan.
     expect((await isKilled("global"))?.engaged ?? false).toBe(false);
     expect((await one("SELECT status FROM subscribers WHERE id = $1", [dan.id])).status).toBe("ACTIVE");

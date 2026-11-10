@@ -116,8 +116,13 @@ describe("UI JSON API", () => {
     const anon = new Client(srv.base);
     expect((await anon.get("/ui/owner/today")).status).toBe(401);
     const c = new Client(srv.base);
-    expect((await c.postJson("/ui/demo/owner", {})).json.ok).toBe(true);
+    // "Continue as the owner" opens a private copy only when a showcase exists; this test shop is not one, so the
+    // owner signs in with the shop's own key. The private-copy path is covered in wave1.test.ts.
+    await c.post("/login/token", { token: m.owner_token });
     expect((await c.get("/ui/session")).json.owner).toMatchObject({ slug: m.slug });
+    const visitor = new Client(srv.base);
+    expect((await visitor.postJson("/ui/demo/owner", {})).json.ok).toBe(true);
+    expect((await visitor.get("/ui/session")).json.owner.slug).not.toBe(m.slug);
     const ref = await member("Dee");
     const t = (await c.get("/ui/owner/today")).json;
     expect(t.stats.live.active).toBeGreaterThanOrEqual(1);

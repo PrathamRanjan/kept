@@ -39,7 +39,7 @@ export async function readBack(q: Queryable, m: Merchant, s: Subscriber): Promis
     await updateSubscriber(q, s.id, { kept_state: "unconfirmed" });
     return { sub: { ...s, kept_state: "unconfirmed" }, pp: null };
   }
-  const plan = await planByPayPalId(q, pp.plan_id);
+  const plan = await planByPayPalId(q, m.id, pp.plan_id);
   const bi = pp.billing_info ?? {};
   const fields: Record<string, unknown> = {
     status: pp.status,
@@ -78,7 +78,8 @@ export async function createSubscription(
     const out = await paypalFor(m).createSubscription(
       {
         planId: plan.paypal_plan_id,
-        customId: s.id,
+        // "<shop>:<member>": a webhook that reaches Kept before the row is linked can still find its shop.
+        customId: `${m.id}:${s.id}`,
         brandName: m.name,
         returnUrl: `${config.appUrl}/r/${s.ref}`,
         cancelUrl: `${config.appUrl}/r/${s.ref}?cancelled=1`,
@@ -88,6 +89,7 @@ export async function createSubscription(
       requestKey("create-sub", s.id, key),
     );
     await updateSubscriber(q, s.id, { paypal_subscription_id: out.id, approval_url: out.approveUrl, status: out.status });
+    await q.query("INSERT INTO paypal_refs (resource_id, ws_id, merchant_id, kind) VALUES ($1, (SELECT id FROM workspaces WHERE tenant_id = $2), $2, 'subscription') ON CONFLICT (resource_id) DO NOTHING", [out.id, m.id]);
     await record(q, m, s, "paypal.subscription.created", `PayPal subscription ${out.id} created; waiting for the subscriber to approve on PayPal`, undefined, out);
     return { paypalId: out.id, approveUrl: out.approveUrl };
   } catch (e) {

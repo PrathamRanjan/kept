@@ -7,6 +7,7 @@ import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Router, type Request, type Response, type NextFunction } from "express";
+import { isAdmin } from "./admin.js";
 import { aiUsageSummary, hasOpenAI, providerLabel } from "../ai/provider.js";
 import { recentMessages, telegramReady, telegramUpdate, twilioInbound, whatsappReady, whatsappUpdate } from "../channels/index.js";
 import { history } from "../guard/backtest.js";
@@ -114,6 +115,8 @@ export function foundationRouter(): Router {
   r.post("/dashboard/eval/run", page(async (req, res) => {
     const m = await requireOwner(req, res);
     if (!m) return;
+    // A run spends model money and rewrites the published eval files, so it is for the site admin.
+    if (!isAdmin(req)) return back(res, "/dashboard/eval", "Running the evals is for the site admin (it spends model credit and rewrites the published results). The latest results are below.", true);
     const suite = String(req.body.suite ?? "reasons");
     try {
       mkdirSync(join(root, "eval"), { recursive: true });
@@ -178,7 +181,7 @@ export function foundationRouter(): Router {
         <div class="card"><h2>Transaction Search and balances</h2><p class="sub">Read-only, through the merchant's own credentials. The owner's agent gets the same through the read-only MCP tool search_transactions.</p>
           <a class="btn" href="/dashboard/money?lookup=1">Look up the last 31 days</a>
           ${txnErr ? html`<p class="banner bad">${txnErr}</p>` : ""}
-          ${txns ? html`<p class="small muted">${txns.from.slice(0, 10)} to ${txns.to.slice(0, 10)} · ${txns.transactions.length} transactions${txns.balances.length ? ` · balance ${txns.balances.map((b) => `${b.total} ${b.currency}${Number(b.withheld) ? ` (withheld ${b.withheld})` : ""}`).join(", ")}` : ""}</p><div class="table-wrap"><table class="evalgrid"><tr><th>Date</th><th>Id</th><th>Amount</th><th>Status</th><th>Payer</th></tr>${txns.transactions.slice(0, 50).map((t) => html`<tr><td>${t.transaction_initiation_date.slice(0, 10)}</td><td><code class="small">${t.transaction_id}</code></td><td>${t.transaction_amount.value} ${t.transaction_amount.currency_code}</td><td>${t.transaction_status}</td><td>${t.payer_email ?? ""}</td></tr>`)}</table></div><a class="small" href="/dashboard/money/transactions.json">JSON</a>` : ""}
+          ${txns ? html`<p class="small muted">${txns.from.slice(0, 10)} to ${txns.to.slice(0, 10)} · ${txns.transactions.length} transactions on this shop's subscriptions${txns.otherShopsHidden ? ` (${txns.otherShopsHidden} from other shops on the shared sandbox account hidden)` : ""}${txns.balances.length ? ` · balance of ${txns.balancesScope}: ${txns.balances.map((b) => `${b.total} ${b.currency}${Number(b.withheld) ? ` (withheld ${b.withheld})` : ""}`).join(", ")}` : ""}</p><div class="table-wrap"><table class="evalgrid"><tr><th>Date</th><th>Id</th><th>Amount</th><th>Status</th><th>Payer</th></tr>${txns.transactions.slice(0, 50).map((t) => html`<tr><td>${t.transaction_initiation_date.slice(0, 10)}</td><td><code class="small">${t.transaction_id}</code></td><td>${t.transaction_amount.value} ${t.transaction_amount.currency_code}</td><td>${t.transaction_status}</td><td>${t.payer_email ?? ""}</td></tr>`)}</table></div><a class="small" href="/dashboard/money/transactions.json">JSON</a>` : ""}
         </div>
       </div>
     `));
@@ -330,7 +333,7 @@ export function foundationRouter(): Router {
     const chain = await verifyChain();
     const fair = await fairness(m.id);
     const dbe = await getDb();
-    const linked = (await dbe.query<any>("SELECT channel, count(*)::int AS n FROM party_links WHERE channel IN ('telegram','whatsapp','sms') GROUP BY channel")).rows;
+    const linked = (await dbe.query<any>("SELECT channel, count(*)::int AS n FROM party_links WHERE channel IN ('telegram','whatsapp','sms') AND ((party = 'owner' AND party_id = $1) OR (party = 'subscriber' AND party_id IN (SELECT id FROM subscribers WHERE merchant_id = $1))) GROUP BY channel", [m.id])).rows;
     const nLinked = (c: string) => Number(linked.find((x: any) => x.channel === c)?.n ?? 0);
     const rows: [string, string, string][] = [
       ["Subscriptions: create, revise, suspend, activate, cancel, capture outstanding, transactions", "real (sandbox)", "every write behind the gate with a trace step and PayPal-Request-Id"],
@@ -381,7 +384,7 @@ export function foundationRouter(): Router {
       <h1>Judge mode</h1><p class="muted">Isolated session ${sid.slice(0, 12)} · beat ${beat + 1} of ${beats.length}. ${config.demoMode ? html`Sign in as the demo owner from <a href="/login">Owner sign-in</a> to open the dashboard links.` : ""}</p>
       <div class="card beats">${beats.map(([t, d], i) => html`<div class="beat" style="${i === beat ? "background:var(--accent-soft);border-radius:8px;padding:10px" : ""}"><div><b>${t}</b><div class="small">${raw(d)}</div></div></div>`)}
         <div class="row" style="margin-top:10px"><a class="btn" href="/judge?beat=${Math.max(0, beat - 1)}">Back</a><a class="btn primary" href="/judge?beat=${Math.min(beats.length - 1, beat + 1)}">Next</a><a class="btn" href="/judge/reset">Reset session</a></div></div>
-      <p class="small muted">Rate limited per session; the demo owner's shop is shared across judges in this build (per-judge isolated shops are a deployment step).</p>
+      <p class="small muted">Each visitor gets a private copy of the demo shop (<a href="/demo">start or open yours</a>); nobody else sees what you do in it, and it is removed 48 hours after your last visit.</p>
     `));
   }));
   r.get("/judge/reset", page(async (req, res) => {

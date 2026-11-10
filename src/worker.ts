@@ -7,6 +7,8 @@ import { processWebhook } from "./webhooks.js";
 import { deliver } from "./channels/index.js";
 import { sendPush } from "./channels/push.js";
 import { checkWallet } from "./demo/wallet.js";
+import { ensureShowcase, expireIdle, rebuildShowcase } from "./demo/workspaces.js";
+import { syncPool } from "./demo/pool.js";
 
 export const handlers: Record<JobType, Handler> = {
   process_webhook: (p) => processWebhook(p.eventId),
@@ -27,6 +29,9 @@ export const handlers: Record<JobType, Handler> = {
   invoice_check: () => svc.checkInvoices().then(() => undefined),
   /* Wave 1 */
   wallet_check: () => checkWallet().then(() => undefined),
+  workspace_expiry: () => expireIdle().then(() => undefined),
+  pool_sync: () => syncPool().then(() => undefined),
+  showcase_rebuild: () => rebuildShowcase().then(() => undefined),
 };
 
 export async function tick(): Promise<number> {
@@ -52,6 +57,8 @@ export function startWorker(intervalMs = config.workerIntervalMs) {
   }, intervalMs);
   // Slow loop: renewal reminders and invoice read-backs every 10 minutes (deduplicated by day).
   slow = setInterval(() => scheduleSlowJobs().catch((e) => console.error("[kept worker]", (e as Error).message)), 10 * 60_000);
+  // And once shortly after boot, so a restart never waits ten minutes for expiry or the pool read-back.
+  setTimeout(() => scheduleSlowJobs().catch((e) => console.error("[kept worker]", (e as Error).message)), 5_000).unref();
   console.log(`[kept] worker running every ${intervalMs} ms`);
 }
 
@@ -61,6 +68,18 @@ export async function scheduleSlowJobs() {
   await enqueue(db, "renewal_reminders", {}, new Date(), `reminders:${stamp}`);
   await enqueue(db, "invoice_check", {}, new Date(), `invoices:${stamp}`);
   await enqueue(db, "wallet_check", {}, new Date(), `wallet:${stamp.slice(0, 10)}`);
+  // Demo workspaces: idle expiry and pool read-back hourly; the showcase is rebuilt once a day at 04:00 UTC.
+  await enqueue(db, "workspace_expiry", {}, new Date(), `wsexpire:${stamp}`);
+  await enqueue(db, "pool_sync", {}, new Date(), `pool:${stamp}`);
+  const day = stamp.slice(0, 10);
+  const at = new Date(`${day}T04:00:00Z`);
+  if (Date.now() > at.getTime()) at.setUTCDate(at.getUTCDate() + 1);
+  try {
+    await ensureShowcase(db);
+    await enqueue(db, "showcase_rebuild", {}, at, `showcase:${at.toISOString().slice(0, 10)}`);
+  } catch {
+    /* no showcase shop on this server (tests, a fresh install): nothing to rebuild */
+  }
 }
 
 export function stopWorker() {

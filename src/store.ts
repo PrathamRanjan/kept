@@ -118,6 +118,11 @@ export async function listMerchants(q: Queryable): Promise<Merchant[]> {
   return (await q.query<Merchant>("SELECT * FROM merchants ORDER BY created_at")).rows;
 }
 
+/** Shops a stranger may discover (directory, find_shops, llms.txt): private visitor workspaces are left out. */
+export async function listPublicMerchants(q: Queryable): Promise<Merchant[]> {
+  return (await q.query<Merchant>("SELECT * FROM merchants WHERE id NOT IN (SELECT tenant_id FROM workspaces WHERE kind = 'visitor') ORDER BY created_at")).rows;
+}
+
 export async function plansFor(q: Queryable, merchantId: string, includeInactive = false): Promise<Plan[]> {
   const r = await q.query("SELECT * FROM plans WHERE merchant_id = $1" + (includeInactive ? "" : " AND active") + " ORDER BY kind DESC, price DESC", [merchantId]);
   return r.rows.map(toPlan);
@@ -128,8 +133,9 @@ export async function planById(q: Queryable, id: string): Promise<Plan | null> {
   return r.rows[0] ? toPlan(r.rows[0]) : null;
 }
 
-export async function planByPayPalId(q: Queryable, ppId: string): Promise<Plan | null> {
-  const r = await q.query("SELECT * FROM plans WHERE paypal_plan_id = $1", [ppId]);
+/** A PayPal plan id is shared by every demo workspace cloned from the showcase, so the lookup is per shop. */
+export async function planByPayPalId(q: Queryable, merchantId: string, ppId: string): Promise<Plan | null> {
+  const r = await q.query("SELECT * FROM plans WHERE merchant_id = $1 AND paypal_plan_id = $2", [merchantId, ppId]);
   return r.rows[0] ? toPlan(r.rows[0]) : null;
 }
 

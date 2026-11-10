@@ -41,5 +41,6 @@ export function messageFlag(text: string, context = "Only pay through the app; n
 /** Safe redirect target from a form's `next` field. */
 export const nextOf = (v: unknown, fallback: string) => {
   const n = String(v ?? "");
-  return n.startsWith("/") && !n.startsWith("//") ? n : fallback;
+  // "/\\evil.com" is treated as "//evil.com" by browsers, so a backslash anywhere is refused.
+  return n.startsWith("/") && !n.startsWith("//") && !n.includes("\\") ? n : fallback;
 };

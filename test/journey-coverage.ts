@@ -79,5 +79,5 @@ export const SMS_ROUTE = /\/(dashboard\/channels\/sms\/|webhooks\/twilio|ui\/man
 export const isSmsRoute = (r: string) => SMS_ROUTE.test(r);
 
 /** Wave 1 routes (admin, wallet, pool, private demo workspaces, health); walked in wave1.test.ts. */
-export const WAVE1_ROUTE = /^(GET|POST|ALL) \/(admin|demo\/(start|join|reset|status|me)|healthz)/;
+export const WAVE1_ROUTE = /^(GET|POST|ALL) \/(admin|demo\/|healthz)/;
 export const isWave1Route = (r: string) => WAVE1_ROUTE.test(r);

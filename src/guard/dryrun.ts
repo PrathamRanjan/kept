@@ -120,7 +120,10 @@ export async function dryRun(move: MoneyMove, opts: { createApproval?: boolean; 
     checks.push({ name: "kill switch", ok: false, note: `global kill engaged: ${global.reason ?? "no reason given"}` });
     return deny(`Stopped by the global kill switch${global.reason ? ` (${global.reason})` : ""}.`, "kill:global");
   }
-  for (const scope of [`merchant:${move.merchantId}`, move.agentScope, move.agentScope.startsWith("agent:") ? "agents" : null].filter(Boolean) as string[]) {
+  // Admin scopes ("agents", "agent:<id>") cover every shop; an owner's own switches carry the shop id.
+  const isAgent = move.agentScope.startsWith("agent:");
+  const scopes = [`merchant:${move.merchantId}`, move.agentScope, isAgent ? "agents" : null, isAgent ? `merchant:${move.merchantId}:agents` : null, isAgent ? `merchant:${move.merchantId}:${move.agentScope}` : null];
+  for (const scope of scopes.filter(Boolean) as string[]) {
     const k = await isKilled(scope, db);
     if (k?.engaged) {
       if (isCancel) {
@@ -232,7 +235,7 @@ export async function dryRun(move: MoneyMove, opts: { createApproval?: boolean; 
     const id = newId("apr");
     const hash = payloadHash(move);
     await db.query("INSERT INTO approvals (id, merchant_id, action, payload_hash, payload, status) VALUES ($1,$2,$3,$4,$5,'pending')", [id, move.merchantId, move.action, hash, JSON.stringify({ ...move, reason, ...(safety && safety.level !== "clear" ? { safety_rule: safety.rule, safety_reasons: safety.reasons, safety_risk: safety.risk } : {}) })]);
-    await appendAudit("approval.requested", "approval", id, { merchantId: move.merchantId, action: move.action, cents: move.cents ?? null, offer: move.offer ?? null, hash });
+    await appendAudit("approval.requested", "approval", id, { merchantId: move.merchantId, action: move.action, cents: move.cents ?? null, offer: move.offer ?? null, hash }, db, move.merchantId);
     const label = move.action === "offer" ? `${move.offer?.type} ${move.offer?.percent ? `${move.offer.percent}%` : move.offer?.cycles ? `${move.offer.cycles} cycles` : ""}`.trim() : `${move.action} ${((move.cents ?? 0) / 100).toFixed(2)}`;
     await notifyParty("owner", move.merchantId, `Kept held a ${label} (${reason}). Approve or decline.`, [{ id: `approve:${id}`, label: "Approve" }, { id: `decline:${id}`, label: "Decline" }], "approval", id, db);
     return { decision: "held", reason, policy, approvalId: id, checks };
@@ -262,7 +265,7 @@ export async function decideApproval(id: string, merchantId: string, approve: bo
     if (await hasPasskey(merchantId, db)) throw new Error(`Approvals of ${(cents / 100).toFixed(2)} and above need your passkey.`);
   }
   await db.query("UPDATE approvals SET status = $2, method = $3, decided_at = now() WHERE id = $1", [id, approve ? "approved" : "declined", method]);
-  await appendAudit(approve ? "approval.approved" : "approval.declined", "approval", id, { by, method, hash: a.payload_hash, action: a.action });
+  await appendAudit(approve ? "approval.approved" : "approval.declined", "approval", id, { by, method, hash: a.payload_hash, action: a.action }, db, merchantId);
   return { status: approve ? "approved" : "declined", payload, replayed: false };
 }
 

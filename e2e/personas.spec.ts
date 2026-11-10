@@ -93,7 +93,7 @@ test("owner: today, ask, approvals and members", async ({ page, isMobile }) => {
 
   await page.goto("/dashboard/members");
   await expect(page.getByRole("heading", { level: 1, name: "Members" })).toBeVisible();
-  if (isMobile) await expect(page.getByRole("link", { name: /Ada|Grace|Test Member/ }).first()).toBeVisible();
+  if (isMobile) await expect(page.getByRole("link", { name: /Maya Chen|Ada|Grace|Test Member/ }).first()).toBeVisible();
   else await expect(page.locator(".ag-row").first()).toBeVisible();
   await noSideScroll(page);
 });

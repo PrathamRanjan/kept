@@ -12,7 +12,7 @@ import { money } from "../policy/eligibility.js";
 import { paypalFor } from "../paypal/index.js";
 import { WEBHOOK_EVENTS } from "../paypal/client.js";
 import * as svc from "../service.js";
-import { currentPolicy, intervalWords, KeptError, listMerchants, Merchant, merchantById, merchantBySlug, merchantByToken, openOfferFor, plansFor, subscriberByRef, subscribersFor, toOffer } from "../store.js";
+import { currentPolicy, intervalWords, KeptError, listMerchants, listPublicMerchants, Merchant, merchantById, merchantBySlug, merchantByToken, openOfferFor, plansFor, subscriberByRef, subscribersFor, toOffer } from "../store.js";
 import { esc, fmtDate, fmtMoney, html, layout, raw, Raw } from "./html.js";
 import { landing } from "./landing.js";
 import { icon } from "./icons.js";
@@ -20,6 +20,7 @@ import { guardCard } from "./safetyui.js";
 import { pendingApprovals } from "../guard/dryrun.js";
 import type { DraftPlan } from "../brain/types.js";
 
+import { ensureWorkspace } from "./demo.js";
 const COOKIE = "kept_owner";
 
 type Page = (req: Request, res: Response) => Promise<unknown>;
@@ -84,16 +85,17 @@ export function webRouter(): Router {
     if (!m) return back(res, "/login", "That owner key didn't match a shop.", true);
     setOwner(res, m);
     const next = String(req.body.next ?? "/dashboard");
-    res.redirect(next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard");
+    res.redirect(next.startsWith("/") && !next.startsWith("//") && !next.includes("\\") ? next : "/dashboard");
   }));
 
-  r.post("/login/demo", page(async (_req, res) => {
+  r.post("/login/demo", page(async (req, res) => {
     if (!config.demoMode) return res.status(403).send("Demo mode is off.");
-    const db = await getDb();
-    const slug = process.env.KEPT_DEMO_SHOP || "ember-oak-coffee-club";
-    const m = (await merchantBySlug(db, slug)) ?? (await listMerchants(db))[0];
-    if (!m) return back(res, "/onboard", "No demo shop yet. Run npm run seed, or set up a shop.", true);
-    setOwner(res, m);
+    // Every visitor gets a private copy of the demo shop; nobody signs in to the shared showcase.
+    try {
+      await ensureWorkspace(req, res);
+    } catch (e) {
+      return back(res, "/demo", (e as Error).message, true);
+    }
     res.redirect("/dashboard");
   }));
 
@@ -186,7 +188,7 @@ export function webRouter(): Router {
   r.post("/onboard/plans/preview", page(async (req, res) => {
     const m = await requireOwner(req, res);
     if (!m) return;
-    const draft = await svc.previewPlans(String(req.body.text ?? ""), m.currency);
+    const draft = await svc.previewPlans(String(req.body.text ?? ""), m.currency, m.id);
     res.send(layout({ title: "Check plans · Kept", nav: "onboard", owner: ownerNav(m) }, html`
       <h1>Check your plans</h1><p class="muted">Edit anything below, then create them on PayPal.</p>
       ${draft.warnings.length ? html`<div class="banner warn">${draft.warnings.map((w) => html`<div>${w}</div>`)}</div>` : ""}
@@ -247,7 +249,7 @@ export function webRouter(): Router {
     const m = await requireOwner(req, res);
     if (!m) return;
     const text = String(req.body.text ?? "");
-    const p = await svc.previewRules(text);
+    const p = await svc.previewRules(text, m.id);
     const replay = p.valid ? await svc.replayRules(m.id, p.value) : null;
     res.send(layout({ title: "Check rules · Kept", nav: "onboard", owner: ownerNav(m) }, html`
       <h1>Check your rules</h1>
@@ -500,7 +502,7 @@ export function webRouter(): Router {
   }));
 
   r.get("/llms.txt", page(async (_req, res) => {
-    const shops = await listMerchants(await getDb());
+    const shops = await listPublicMerchants(await getDb());
     res.type("text/plain").send(`# Kept\n\n> PayPal subscriptions that AI agents can manage, with fair retention for small shops.\n\n## Directory MCP endpoint\n\n- ${config.appUrl}/mcp (tool find_shops, then the subscription tools)\n\n## Shops\n\n${shops.map((m) => `- [${m.name}](${config.appUrl}/s/${m.slug}/llms.txt): ${m.tagline}`).join("\n")}\n\n## API\n\n- OpenAPI: ${config.appUrl}/openapi.yaml\n- Agent skill: ${config.appUrl}/skill.md\n\n## Guarantees\n\n- cancel_subscription cancels in one call; hear_offer=true returns at most one optional offer.\n- Every write returns run_id; get_trace(subscription_ref, run_id) shows each step and the gate's decision.\n- Moves the owner must approve return error "held" with approvalId; do not retry.\n- Owner read-only MCP at ${config.appUrl}/owner/mcp (Bearer owner key): shop_summary, ask, list_subscribers, recent_events, recent_runs, search_transactions, compliance_scorecard, fairness, pending_approvals.\n`);
   }));
   r.get("/skill.md", (_req, res) => {
@@ -612,7 +614,7 @@ export function webRouter(): Router {
 
   /* ------------------------------------------------------------------ agents guide */
   r.get("/agents", page(async (req, res) => {
-    const shops = await listMerchants(await getDb());
+    const shops = await listPublicMerchants(await getDb());
     const ex = shops[0]?.slug ?? "your-shop";
     res.send(layout({ title: "Connect an AI agent · Kept", nav: "agents", owner: ownerNav(await ownerOf(req)) }, html`
       <h1>Connect an AI agent</h1><p class="lead muted">Kept speaks the Model Context Protocol (Streamable HTTP, stateless). Any MCP client can subscribe and manage subscriptions for its user.</p>

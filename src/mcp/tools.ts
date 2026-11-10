@@ -6,7 +6,7 @@ import { newId } from "../lib/ids.js";
 import { describeRules } from "../policy/rules.js";
 import { money } from "../policy/eligibility.js";
 import * as svc from "../service.js";
-import { currentPolicy, intervalWords, KeptError, listMerchants, Merchant, merchantBySlug, plansFor, subscriberByRef, offerById } from "../store.js";
+import { currentPolicy, intervalWords, KeptError, listMerchants, listPublicMerchants, Merchant, merchantBySlug, plansFor, subscriberByRef, offerById } from "../store.js";
 import { loadRun, runsFor } from "../trace.js";
 import { pendingApprovals } from "../guard/dryrun.js";
 import { scoreAll, type Jurisdiction, JURISDICTIONS } from "../policy/compliance.js";
@@ -112,7 +112,7 @@ export function buildBuyerServer(fixed: Merchant | null, agentId: string): McpSe
       { title: "Find subscription shops", description: "Search shops that sell subscriptions through Kept. Returns each shop's slug, plans and its own MCP URL.", inputSchema: { query: z.string().optional().describe("Words to match, e.g. 'coffee'") }, annotations: { readOnlyHint: true } },
       async ({ query }) =>
         guard("find_shops", { query }, undefined, async () => {
-          const all = await listMerchants(await getDb());
+          const all = await listPublicMerchants(await getDb());
           const q = (query ?? "").toLowerCase().split(/\s+/).filter(Boolean);
           const out = [];
           for (const m of all) {

@@ -14,6 +14,7 @@ import type { PlanJson } from "@/lib/types";
 import { resumeTour, startTour } from "@/tours";
 
 interface ShopData {
+  showcase?: boolean;
   shop: { name: string; slug: string; tagline: string | null; currency: string };
   plans: PlanJson[];
   promise: string[];
@@ -163,6 +164,11 @@ export default function Shop() {
             <p className="m-0 text-sm font-medium uppercase tracking-wider text-ink-2">Subscribe</p>
             <h1 className="mt-1 text-4xl font-bold sm:text-5xl">{data.shop.name}</h1>
             {data.shop.tagline && <p className="mt-2 max-w-[60ch] text-lg text-ink-2">{data.shop.tagline}</p>}
+            {data.showcase && (
+              <div role="note" className="mt-5 rounded-lg border border-rule bg-stamp-wash p-4">
+                This is the read-only showcase. To subscribe for real on the PayPal sandbox, <a className="font-medium text-stamp underline" href="/demo">start your own private demo shop</a>: its shop page works the same way, on the same plans.
+              </div>
+            )}
             <div data-tour="plans" className="mt-8 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
               {data.plans.length ? data.plans.map((p) => <PlanCard key={p.id} plan={p} shop={data.shop} clientId={data.paypalClientId} />) : <Empty title="No plans yet">This shop hasn't published plans.</Empty>}
             </div>

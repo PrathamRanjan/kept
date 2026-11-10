@@ -1,4 +1,5 @@
 import { getDb } from "./db.js";
+import { spendAllowance } from "./demo/allowance.js";
 import { config } from "./config.js";
 import { getBrain } from "./brain/index.js";
 import type { DraftPlan, ReasonCategory, ShopStats } from "./brain/types.js";
@@ -117,7 +118,8 @@ export async function createMerchant(input: {
   return m;
 }
 
-export async function previewPlans(text: string, currency: string) {
+export async function previewPlans(text: string, currency: string, merchantId?: string) {
+  await spendAllowance(merchantId);
   const d = await getBrain().draftPlans(text, currency);
   return { ...d, brain: getBrain().lastVia() };
 }
@@ -141,11 +143,11 @@ async function createPayPalPlan(m: Merchant, p: { name: string; description: str
     requestKey("plan", m.id, p.name, money(p.price), p.intervalUnit, p.intervalCount, p.basePlanId ?? "", p.discountPercent ?? ""),
   );
   await db.query(
-    "INSERT INTO plans (id, merchant_id, paypal_plan_id, name, description, kind, base_plan_id, discount_percent, price, interval_unit, interval_count) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT (paypal_plan_id) DO NOTHING",
+    "INSERT INTO plans (id, merchant_id, paypal_plan_id, name, description, kind, base_plan_id, discount_percent, price, interval_unit, interval_count) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT (merchant_id, paypal_plan_id) DO NOTHING",
     [id, m.id, out.id, p.name, p.description, p.kind, p.basePlanId ?? null, p.discountPercent ?? null, money(p.price), p.intervalUnit, p.intervalCount],
   );
   await logEvent(db, { merchantId: m.id, source: "executor", type: "paypal.plan.created", summary: `PayPal plan ${out.id} created for ${p.name} (${money(p.price)} ${m.currency})`, paypal: out });
-  return (await planById(db, id)) ?? (await db.query("SELECT * FROM plans WHERE paypal_plan_id = $1", [out.id])).rows.map((r: any) => ({ ...r, price: Number(r.price) }))[0];
+  return (await planById(db, id)) ?? (await db.query("SELECT * FROM plans WHERE merchant_id = $1 AND paypal_plan_id = $2", [m.id, out.id])).rows.map((r: any) => ({ ...r, price: Number(r.price) }))[0];
 }
 
 export async function createPlans(merchantId: string, drafts: DraftPlan[]): Promise<Plan[]> {
@@ -200,7 +202,8 @@ export async function replayRules(merchantId: string, draftRules: unknown) {
   return { cases: rows.length, changed: rows.filter((r) => r.changed).length, rows };
 }
 
-export async function previewRules(text: string) {
+export async function previewRules(text: string, merchantId?: string) {
+  await spendAllowance(merchantId);
   const draft = await getBrain().draftRules(text);
   const check = validateRules(draft.value);
   return { ...draft, brain: getBrain().lastVia(), valid: check.ok, errors: check.errors, description: check.ok ? describeRules(check.rules!) : [] };
@@ -259,6 +262,10 @@ function assertLive(s: Subscriber) {
 }
 
 export async function startSubscription(m: Merchant, planId: string, who: { name?: string | null; email?: string | null }, actor: Actor, key = newId("k")) {
+  // The showcase feeds the landing page and is rebuilt nightly; new members belong in the visitor's own copy.
+  if (await (await import("./demo/workspaces.js")).isShowcase(m.id)) {
+    throw new KeptError("This is the read-only showcase shop. Start your own private demo at /demo: its shop page works the same way, on the same PayPal sandbox plans.", "showcase_read_only", 409);
+  }
   const db = await getDb();
   const plan = await planById(db, planId);
   if (!plan || plan.merchant_id !== m.id || !plan.active || plan.kind === "promo") throw new KeptError("That plan isn't available. Call list_plans for current plans.", "invalid_plan", 404);
@@ -631,7 +638,7 @@ export async function respondToOffer(offerId: string, accept: boolean, actor: Ac
     await db.query("UPDATE offers SET status = 'accepted', decided_at = now() WHERE id = $1", [o.id]);
     await db.query("UPDATE feedback SET outcome = $2 WHERE subscriber_id = $1 AND outcome IS NULL", [s.id, result.approvalUrl || (result as any).pending ? "awaiting_consent" : "kept"]);
     await logEvent(db, { merchantId: m.id, subscriberId: s.id, source: actor.kind, type: "offer.accepted", summary: `${actorLabel(actor)} accepted: ${o.terms.label}`, payload: { keptValue3: o.monthly_value } });
-    await appendAudit("offer.accepted", "offer", o.id, { subscriberId: s.id, type: o.type, terms: o.terms, by: actorLabel(actor) });
+    await appendAudit("offer.accepted", "offer", o.id, { subscriberId: s.id, type: o.type, terms: o.terms, by: actorLabel(actor) }, undefined, s.merchant_id);
     return { status: "kept" as const, subscription: (await subscriberById(db, s.id))!, ...result };
   });
 }
@@ -866,7 +873,7 @@ export async function subscriptionView(ref: string) {
   };
 }
 
-export async function computeStats(m: Merchant): Promise<ShopStats & { collected30: number; offersExpired: number; reasonsTotal: number; sampleRows: number; live: { active: number; suspended: number; mrr: number } }> {
+export async function computeStats(m: Merchant): Promise<ShopStats & { collected30: number; offersExpired: number; reasonsTotal: number; sampleRows: number; live: { active: number; suspended: number; mrr: number; revenueKept3: number; offersMade: number; offersAccepted: number; cancelsHonoured: number; agentShare: number; reasonsTotal: number } }> {
   const db = await getDb();
   const subs = await subscribersFor(db, m.id);
   const plans = await plansFor(db, m.id, true);
@@ -881,7 +888,7 @@ export async function computeStats(m: Merchant): Promise<ShopStats & { collected
   const offers = (await db.query("SELECT * FROM offers WHERE merchant_id = $1", [m.id])).rows.map(toOffer);
   // An accepted discount still waiting for the subscriber's PayPal approval is not counted as kept.
   const accepted = offers.filter((o) => o.status === "accepted" && !(o as any).consent_pending);
-  const fb = (await db.query<{ category: ReasonCategory; text: string }>("SELECT category, text FROM feedback WHERE merchant_id = $1 ORDER BY created_at DESC", [m.id])).rows;
+  const fb = (await db.query<{ category: ReasonCategory; text: string; is_sample: boolean }>("SELECT category, text, is_sample FROM feedback WHERE merchant_id = $1 ORDER BY created_at DESC", [m.id])).rows;
   const reasonMap = new Map<ReasonCategory, { count: number; examples: string[] }>();
   for (const f of fb) {
     const r = reasonMap.get(f.category) ?? { count: 0, examples: [] };
@@ -889,11 +896,21 @@ export async function computeStats(m: Merchant): Promise<ShopStats & { collected
     if (r.examples.length < 2) r.examples.push(f.text.slice(0, 90));
     reasonMap.set(f.category, r);
   }
-  const actions = (await db.query<{ source: string; c: string }>("SELECT source, count(*) AS c FROM event_log WHERE merchant_id = $1 AND source IN ('agent','web') GROUP BY source", [m.id])).rows;
-  const agentN = Number(actions.find((a) => a.source === "agent")?.c ?? 0);
-  const webN = Number(actions.find((a) => a.source === "web")?.c ?? 0);
-  const cancels = (await db.query<{ c: string }>("SELECT count(*) AS c FROM event_log WHERE merchant_id = $1 AND type = 'subscription.cancelled'", [m.id])).rows[0];
-  const collected = (await db.query<{ t: string }>("SELECT coalesce(sum(amount),0) AS t FROM payments WHERE merchant_id = $1 AND paid_at > now() - interval '30 days' AND status IN ('COMPLETED','completed')", [m.id])).rows[0];
+  const actionRows = (await db.query<{ source: string; is_sample: boolean; c: string }>("SELECT source, is_sample, count(*) AS c FROM event_log WHERE merchant_id = $1 AND source IN ('agent','web') GROUP BY source, is_sample", [m.id])).rows;
+  const count = (src: string, liveOnly: boolean) => actionRows.filter((a) => a.source === src && (!liveOnly || !a.is_sample)).reduce((t, a) => t + Number(a.c), 0);
+  const share = (liveOnly: boolean) => {
+    const a = count("agent", liveOnly);
+    const w = count("web", liveOnly);
+    return a + w ? Math.round((100 * a) / (a + w)) : 0;
+  };
+  const agentN = count("agent", false);
+  const webN = count("web", false);
+  const cancelRows = (await db.query<{ is_sample: boolean; c: string }>("SELECT is_sample, count(*) AS c FROM event_log WHERE merchant_id = $1 AND type = 'subscription.cancelled' GROUP BY is_sample", [m.id])).rows;
+  const cancels = { c: String(cancelRows.reduce((t, r) => t + Number(r.c), 0)) };
+  const liveCancels = cancelRows.filter((r) => !r.is_sample).reduce((t, r) => t + Number(r.c), 0);
+  // Only payments PayPal reported count as collected; sample payments are never "confirmed by PayPal".
+  const collected = (await db.query<{ t: string }>("SELECT coalesce(sum(amount),0) AS t FROM payments WHERE merchant_id = $1 AND NOT is_sample AND paid_at > now() - interval '30 days' AND status IN ('COMPLETED','completed')", [m.id])).rows[0];
+  const liveAccepted = accepted.filter((o) => !(o as any).is_sample);
   const in7 = Date.now() + 7 * 864e5;
   return {
     merchantName: m.name,
@@ -919,11 +936,18 @@ export async function computeStats(m: Merchant): Promise<ShopStats & { collected
       active: active.filter((s) => !s.is_sample).length,
       suspended: subs.filter((s) => s.status === "SUSPENDED" && !s.is_sample).length,
       mrr: Math.round(active.filter((s) => !s.is_sample).reduce((a, s) => a + monthly(s), 0) * 100) / 100,
+      revenueKept3: Math.round(liveAccepted.reduce((a, o) => a + o.monthly_value, 0) * 100) / 100,
+      offersMade: offers.filter((o) => !(o as any).is_sample).length,
+      offersAccepted: liveAccepted.length,
+      cancelsHonoured: liveCancels,
+      agentShare: share(true),
+      reasonsTotal: fb.filter((f: any) => !f.is_sample).length,
     },
   };
 }
 
 export async function askOwner(m: Merchant, question: string) {
+  await spendAllowance(m.id);
   const stats = await computeStats(m);
   return getBrain().answer(question.slice(0, 500), stats);
 }
@@ -950,7 +974,7 @@ export async function invoiceOutstanding(ref: string, actor: Actor, key = newId(
     const sent = await run.timed({ actor: "paypal", tool: "invoicing.send", args: { invoiceId: inv.id }, pp_request_id: requestKey("invoice-send", inv.id, key) }, () => pp.sendInvoice(inv.id, requestKey("invoice-send", inv.id, key)));
     await db.query("INSERT INTO invoices (id, merchant_id, subscriber_id, paypal_invoice_id, amount, currency, status, run_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)", [newId("inv"), m.id, s.id, inv.id, fresh.outstanding.toFixed(2), m.currency, sent.status, run.id]);
     await logEvent(db, { merchantId: m.id, subscriberId: s.id, source: actor.kind, type: "invoice.sent", summary: `Invoice ${inv.id} for ${fresh.outstanding.toFixed(2)} ${m.currency} sent to the subscriber (PayPal Invoicing)`, paypal: inv });
-    await appendAudit("invoice.sent", "subscriber", s.id, { invoiceId: inv.id, amount: fresh.outstanding.toFixed(2), by: actorLabel(actor) });
+    await appendAudit("invoice.sent", "subscriber", s.id, { invoiceId: inv.id, amount: fresh.outstanding.toFixed(2), by: actorLabel(actor) }, undefined, s.merchant_id);
     return { invoiceId: inv.id, amount: fresh.outstanding, status: sent.status, note: "Invoice sent. When PayPal shows it paid, the outstanding balance is cleared." };
   });
 }
@@ -983,8 +1007,11 @@ export async function checkInvoices() {
 export async function transactionsFor(m: Merchant, days = 31) {
   const end = new Date();
   const start = new Date(end.getTime() - Math.min(31, Math.max(1, days)) * 864e5);
-  const [txns, balances] = await Promise.all([paypalFor(m).searchTransactions(start.toISOString(), end.toISOString()), paypalFor(m).listBalances().catch(() => [])]);
-  return { from: start.toISOString(), to: end.toISOString(), transactions: txns, balances };
+  const [all, balances] = await Promise.all([paypalFor(m).searchTransactions(start.toISOString(), end.toISOString()), paypalFor(m).listBalances().catch(() => [])]);
+  // Every demo shop shares one sandbox PayPal account, so a shop sees only payments on its own subscriptions.
+  const own = new Set((await (await getDb()).query<{ id: string }>("SELECT paypal_subscription_id AS id FROM subscribers WHERE merchant_id = $1 AND paypal_subscription_id IS NOT NULL", [m.id])).rows.map((r) => r.id));
+  const transactions = all.filter((t) => t.paypal_reference_id && own.has(t.paypal_reference_id));
+  return { from: start.toISOString(), to: end.toISOString(), transactions, otherShopsHidden: all.length - transactions.length, balances, balancesScope: "the whole PayPal sandbox account, shared by every demo shop" };
 }
 
 /* ----------------------------------------------------------------------------------------------

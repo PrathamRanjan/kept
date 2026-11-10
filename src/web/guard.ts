@@ -10,7 +10,8 @@ import { getDb } from "../db.js";
 import { recentAudit, verifyChain } from "../guard/audit.js";
 import { adoptSuggestions, backtest, history, suggestAutonomy } from "../guard/backtest.js";
 import { decideApproval, guardSettings, pendingApprovals, saveGuardSettings } from "../guard/dryrun.js";
-import { isKilled, listKills, setKill } from "../guard/kill.js";
+import { isKilled, killsFor, listKills, ownerScope, setKill } from "../guard/kill.js";
+import { isAdmin } from "./admin.js";
 import { finishRegistration, hasPasskey, newChallenge, PASSKEY_JS, verifyAssertion } from "../guard/passkey.js";
 import { JURISDICTIONS, scoreAll, scoreCompliance, type Jurisdiction } from "../policy/compliance.js";
 import { describeRules, validateRules, type Rules } from "../policy/rules.js";
@@ -54,7 +55,7 @@ const errMsg = (e: unknown) => (e instanceof KeptError ? e.message : (e as Error
 
 /** The red banner every owner page shows while a kill switch is engaged. */
 export async function killBanner(merchantId: string): Promise<Raw> {
-  const kills = (await listKills()).filter((k) => k.engaged && (k.scope === "global" || k.scope === `merchant:${merchantId}` || k.scope === "agents" || k.scope.startsWith("agent:")));
+  const kills = (await killsFor(merchantId)).filter((k) => k.engaged);
   if (!kills.length) return raw("");
   return html`<div class="banner kill">Kill switch engaged: ${kills.map((k) => `${k.scope}${k.reason ? ` (${k.reason})` : ""}`).join(", ")}. Agents cannot move money in that scope; cancels still go through. <a href="/dashboard/guard">Release</a></div>`;
 }
@@ -77,14 +78,14 @@ export function guardRouter(): Router {
     let candidate: Rules | null = policy?.rules ?? null;
     let draftNotes: string[] = [];
     if (typeof req.query.text === "string" && req.query.text.trim()) {
-      const p = await svc.previewRules(req.query.text);
+      const p = await svc.previewRules(req.query.text, m.id);
       candidate = p.valid ? (validateRules(p.value).rules as Rules) : null;
       draftNotes = [...p.understood, ...p.warnings.map((w) => `Not used: ${w}`), `Drafted by: ${p.brain}`];
     }
     const bt = candidate ? await backtest(m.id, candidate, { auto_discount_max_pct: pct, auto_pause_max_cycles: cycles }, db) : null;
     const suggestions = await suggestAutonomy(m.id, db);
     const approvals = await pendingApprovals(m.id);
-    const kills = await listKills();
+    const kills = await killsFor(m.id);
     const chain = await verifyChain(db);
     const pk = await hasPasskey(m.id, db);
     const fair = await fairness(m.id);
@@ -137,14 +138,14 @@ export function guardRouter(): Router {
       </div>
 
       <div class="grid g2">
-        <div class="card"><h2>Kill switches</h2><p class="sub">Stop agents, this shop or everything. A cancel is never blocked by the agent or shop switch.</p>
-          <form method="post" action="/dashboard/guard/kill" class="row"><select name="scope"><option value="agents">All agents</option><option value="merchant:${m.id}">This shop</option><option value="global">Everything (global)</option></select><input type="text" name="reason" placeholder="Why (shown on the banner)"><input type="hidden" name="engaged" value="true"><button class="btn" type="submit">Engage</button></form>
+        <div class="card"><h2>Kill switches</h2><p class="sub">Stop agents in this shop, or the whole shop. A cancel is never blocked by these switches. The switch for every shop at once is for the site admin only.</p>
+          <form method="post" action="/dashboard/guard/kill" class="row"><select name="scope"><option value="agents">All agents (this shop)</option><option value="merchant:${m.id}">This shop</option></select><input type="text" name="reason" placeholder="Why (shown on the banner)"><input type="hidden" name="engaged" value="true"><button class="btn" type="submit">Engage</button></form>
           <form method="post" action="/dashboard/guard/kill" class="row" style="margin-top:6px"><input type="text" name="scope" placeholder="agent:<id> to stop one agent" style="flex:1"><input type="hidden" name="engaged" value="true"><button class="btn small" type="submit">Stop that agent</button></form>
           ${kills.filter((k) => k.engaged).length ? html`<ul>${kills.filter((k) => k.engaged).map((k) => html`<li><span class="pill bad">${k.scope}</span> ${k.reason ?? ""} <form method="post" action="/dashboard/guard/kill" class="inline"><input type="hidden" name="scope" value="${k.scope}"><input type="hidden" name="engaged" value="false"><button class="btn small" type="submit">Release</button></form></li>`)}</ul>` : html`<p class="muted">None engaged.</p>`}
         </div>
         <div class="card"><h2>Audit chain</h2><p class="sub">Every policy, approval, kill switch and money decision, hash-chained.</p>
           <p>${chain.ok ? html`<span class="pill good">chain verified</span>` : html`<span class="pill bad">chain broken at ${chain.broken_at}</span>`} ${chain.rows} rows · head <code class="small">${chain.head.slice(0, 16)}…</code> · <a href="/dashboard/guard/audit.json">verify endpoint</a></p>
-          ${(await recentAudit(12)).map((a: any) => html`<div class="small"><span class="muted">${new Date(a.at).toISOString().slice(0, 16).replace("T", " ")}</span> ${a.kind} <code>${String(a.hash).slice(0, 10)}</code></div>`)}
+          ${(await recentAudit(12, m.id)).map((a: any) => html`<div class="small"><span class="muted">${new Date(a.at).toISOString().slice(0, 16).replace("T", " ")}</span> ${a.kind} <code>${String(a.hash).slice(0, 10)}</code></div>`)}
         </div>
       </div>
 
@@ -158,7 +159,7 @@ export function guardRouter(): Router {
     const m = await requireOwner(req, res);
     if (!m) return;
     try {
-      const p = await svc.previewRules(String(req.body.text ?? ""));
+      const p = await svc.previewRules(String(req.body.text ?? ""), m.id);
       if (!p.valid) throw new KeptError(`These rules can't be approved: ${p.errors.join(" ")}`, "invalid_rules", 422);
       const out = await svc.approveRules(m.id, p.value, String(req.body.text ?? ""), p.understood);
       await saveGuardSettings(m.id, { auto_discount_max_pct: Number(req.body.pct), auto_pause_max_cycles: Number(req.body.cycles) }, "owner");
@@ -195,16 +196,21 @@ export function guardRouter(): Router {
     if (!m) return;
     const scope = String(req.body.scope ?? "").trim().slice(0, 120);
     if (!scope) return back(res, "/dashboard/guard", "Say which scope.", true);
-    if (scope.startsWith("merchant:") && scope !== `merchant:${m.id}`) return back(res, "/dashboard/guard", "You can only stop your own shop.", true);
-    await setKill(scope, String(req.body.engaged) === "true", String(req.body.reason ?? "").slice(0, 200) || null, `owner ${m.slug}`);
+    const mapped = ownerScope(m.id, scope, isAdmin(req));
+    if (!mapped) return back(res, "/dashboard/guard", "You can stop agents in your own shop or the shop itself. The switch for every shop is for the site admin.", true);
+    await setKill(mapped, String(req.body.engaged) === "true", String(req.body.reason ?? "").slice(0, 200) || null, `owner ${m.slug}`);
     back(res, "/dashboard/guard", String(req.body.engaged) === "true" ? `Kill switch engaged on ${scope}.` : `Released ${scope}.`);
   }));
   r.get("/dashboard/guard/audit.json", json(async (req) => {
     const m = await ownerOf(req);
     if (!m) throw new KeptError("Owner required", "unauthorized", 401);
-    return { ...(await verifyChain()), recent: await recentAudit(50) };
+    return { ...(await verifyChain()), recent: await recentAudit(50, m.id) };
   }));
-  r.get("/dashboard/guard/kills.json", json(async () => ({ kills: await listKills(), global: await isKilled("global") })));
+  r.get("/dashboard/guard/kills.json", json(async (req) => {
+    const m = await ownerOf(req);
+    if (!m && !isAdmin(req)) throw new KeptError("Owner required", "unauthorized", 401);
+    return { kills: m ? await killsFor(m.id) : await listKills(), global: await isKilled("global") };
+  }));
 
   // Passkeys: registration and countersign over the approval's payload hash.
   r.post("/dashboard/guard/passkey/register/start", json(async (req) => {

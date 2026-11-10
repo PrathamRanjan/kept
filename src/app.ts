@@ -18,6 +18,7 @@ import { installChannelHandlers } from "./channels/handlers.js";
 import { uiApi } from "./web/ui-api.js";
 import { spaRouter } from "./web/spa.js";
 import { adminRouter } from "./web/admin.js";
+import { demoRouter } from "./web/demo.js";
 import { KeptError } from "./store.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -69,6 +70,7 @@ export function createApp() {
   app.post("/webhooks/paypal", (req, res, next) => receiveWebhook(req, res).catch(next));
   installChannelHandlers();
   app.use(adminRouter());
+  app.use(demoRouter());
   app.use(uiApi());
   app.use(spaRouter());
   app.use("/api/v1", runsApi());

@@ -22,12 +22,13 @@ export function rowHash(prev: string, kind: string, entity: string, entityId: st
   return createHash("sha256").update(prev).update("|").update(kind).update("|").update(entity).update("|").update(entityId).update("|").update(canonical(payload)).digest("hex");
 }
 
-export async function appendAudit(kind: string, entity: string, entityId: string, payload: unknown, q?: Queryable): Promise<{ seq: number; hash: string }> {
+/** `merchantId` is stored beside the row (outside the hash) so each shop sees only its own entries. */
+export async function appendAudit(kind: string, entity: string, entityId: string, payload: unknown, q?: Queryable, merchantId?: string | null): Promise<{ seq: number; hash: string }> {
   const db = q ?? (await getDb());
   const last = (await db.query<{ hash: string }>("SELECT hash FROM audit_chain ORDER BY seq DESC LIMIT 1")).rows[0];
   const prev = last?.hash ?? GENESIS;
   const hash = rowHash(prev, kind, entity, entityId, payload);
-  const r = await db.query<{ seq: number }>("INSERT INTO audit_chain (kind, entity, entity_id, payload, prev_hash, hash) VALUES ($1,$2,$3,$4,$5,$6) RETURNING seq", [kind, entity, entityId, JSON.stringify(payload), prev, hash]);
+  const r = await db.query<{ seq: number }>("INSERT INTO audit_chain (kind, entity, entity_id, payload, prev_hash, hash, merchant_id) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING seq", [kind, entity, entityId, JSON.stringify(payload), prev, hash, merchantId ?? (entity === "merchant" ? entityId : (payload as any)?.merchantId ?? null)]);
   return { seq: Number(r.rows[0].seq), hash };
 }
 
@@ -44,7 +45,9 @@ export async function verifyChain(q?: Queryable): Promise<{ ok: boolean; rows: n
   return { ok: true, rows: rows.length, broken_at: null, head: prev };
 }
 
-export async function recentAudit(limit = 100) {
+/** A shop's own audit rows (the chain itself is verified whole, across shops). */
+export async function recentAudit(limit = 100, merchantId?: string) {
   const db = await getDb();
+  if (merchantId) return (await db.query("SELECT * FROM audit_chain WHERE merchant_id = $2 ORDER BY seq DESC LIMIT $1", [limit, merchantId])).rows as any[];
   return (await db.query("SELECT * FROM audit_chain ORDER BY seq DESC LIMIT $1", [limit])).rows as any[];
 }

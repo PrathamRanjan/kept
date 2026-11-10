@@ -296,20 +296,56 @@ UPDATE channel_messages SET channel = 'inapp' WHERE channel = 'simulator';
 UPDATE channel_messages SET status = CASE WHEN channel = 'inapp' THEN 'sent' ELSE 'not_sent' END WHERE status = 'simulated';
 DELETE FROM party_links WHERE channel = 'simulator';
 DROP TABLE IF EXISTS subscription_history;
--- Sample members are gone: every member on the dashboard is a real PayPal sandbox subscription.
-DELETE FROM offers WHERE subscriber_id IN (SELECT id FROM subscribers WHERE is_sample);
-DELETE FROM feedback WHERE subscriber_id IN (SELECT id FROM subscribers WHERE is_sample);
-DELETE FROM payments WHERE is_sample OR subscriber_id IN (SELECT id FROM subscribers WHERE is_sample);
-DELETE FROM invoices WHERE subscriber_id IN (SELECT id FROM subscribers WHERE is_sample);
-DELETE FROM event_log WHERE is_sample OR subscriber_id IN (SELECT id FROM subscribers WHERE is_sample);
-DELETE FROM subscribers WHERE is_sample;
+-- (Wave 1, 11 Nov 2026) The old boot-time purge of sample rows is now a one-time migration, recorded in
+-- settings, so labelled samples seeded into demo workspaces survive restarts.
+CREATE TABLE IF NOT EXISTS migrations (id TEXT PRIMARY KEY, at TIMESTAMPTZ NOT NULL DEFAULT now());
+-- ---------- Wave 1 A1/A2.2: private demo workspaces and the approval pool ----------
+CREATE TABLE IF NOT EXISTS workspaces (
+  id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL UNIQUE, kind TEXT NOT NULL CHECK (kind IN ('visitor','showcase')),
+  ip_hash TEXT, seed_version INTEGER NOT NULL DEFAULT 1, seed_state TEXT NOT NULL DEFAULT 'seeding' CHECK (seed_state IN ('seeding','ready','failed')),
+  seed_error TEXT, checklist JSONB NOT NULL DEFAULT '{}', created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  last_seen_at TIMESTAMPTZ NOT NULL DEFAULT now(), expires_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS workspaces_kind ON workspaces(kind, last_seen_at);
+CREATE TABLE IF NOT EXISTS approval_pool (
+  id TEXT PRIMARY KEY, kind TEXT NOT NULL DEFAULT 'subscription', paypal_id TEXT UNIQUE NOT NULL, plan_id TEXT, approve_url TEXT,
+  status TEXT NOT NULL CHECK (status IN ('awaiting_approval','ready','claimed','spent')), claimed_by_ws TEXT, note TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS paypal_refs (resource_id TEXT PRIMARY KEY, ws_id TEXT, merchant_id TEXT NOT NULL, kind TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS usage_counters (scope TEXT NOT NULL, day TEXT NOT NULL, kind TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (scope, day, kind));
+ALTER TABLE offers ADD COLUMN IF NOT EXISTS is_sample BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE audit_chain ADD COLUMN IF NOT EXISTS merchant_id TEXT;
+-- Every workspace clones the showcase's PayPal plans, so a PayPal plan id is unique per shop, not globally.
+ALTER TABLE plans DROP CONSTRAINT IF EXISTS plans_paypal_plan_id_key;
+CREATE UNIQUE INDEX IF NOT EXISTS plans_merchant_paypal ON plans(merchant_id, paypal_plan_id);
+CREATE INDEX IF NOT EXISTS offers_merchant ON offers(merchant_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS feedback_merchant ON feedback(merchant_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS payments_merchant ON payments(merchant_id, paid_at DESC);
+CREATE INDEX IF NOT EXISTS approvals_merchant ON approvals(merchant_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS agent_runs_merchant ON agent_runs(merchant_id, started_at DESC);
 `;
+
+/** Runs a migration once; its id is recorded in the migrations table. */
+async function runOnce(db: Db, id: string, sql: string) {
+  const done = (await db.query("SELECT 1 FROM migrations WHERE id = $1", [id])).rows.length > 0;
+  if (done) return;
+  await db.exec(sql);
+  await db.query("INSERT INTO migrations (id) VALUES ($1) ON CONFLICT DO NOTHING", [id]);
+}
 
 let shared: Db | null = null;
 
 export async function openDb(opts: { memory?: boolean } = {}): Promise<Db> {
   const db = opts.memory ? await openPglite(null) : config.databaseUrl ? await openPostgres(config.databaseUrl) : await openPglite(config.pglitePath);
   await db.exec(SCHEMA);
+  await runOnce(db, "2026-11-10-purge-old-samples", `
+    DELETE FROM offers WHERE subscriber_id IN (SELECT id FROM subscribers WHERE is_sample);
+    DELETE FROM feedback WHERE subscriber_id IN (SELECT id FROM subscribers WHERE is_sample);
+    DELETE FROM payments WHERE is_sample OR subscriber_id IN (SELECT id FROM subscribers WHERE is_sample);
+    DELETE FROM invoices WHERE subscriber_id IN (SELECT id FROM subscribers WHERE is_sample);
+    DELETE FROM event_log WHERE is_sample OR subscriber_id IN (SELECT id FROM subscribers WHERE is_sample);
+    DELETE FROM subscribers WHERE is_sample;`);
   return db;
 }
 

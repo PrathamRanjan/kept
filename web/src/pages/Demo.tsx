@@ -1,35 +1,67 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { ArrowRight, Bot, Compass, KeyRound, Store, User } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { ArrowRight, Bot, Compass, KeyRound, RotateCcw, Store, User } from "lucide-react";
 import { toast } from "sonner";
 import { PublicFooter, PublicHeader } from "@/components/Shell";
 import { Button } from "@/components/ui/button";
 import { api, ApiError } from "@/lib/api";
-import { useSession } from "@/lib/session";
+import { getSession } from "@/lib/session";
+import type { Session } from "@/lib/types";
+import { resetDemo, useDemoStatus } from "@/components/WorkspaceBar";
 import { startTour } from "@/tours";
 
 export default function Demo({ judge = false }: { judge?: boolean }) {
-  const s = useSession();
+  const [s, setS] = useState<Session | null>(null);
   const nav = useNavigate();
   const [busy, setBusy] = useState(false);
+  const { st, reload } = useDemoStatus();
+  useEffect(() => {
+    getSession().then(setS, () => setS(null));
+  }, []);
+
+  /** Every persona works inside the visitor's own copy of the demo shop, created on first use. */
+  async function ensure(): Promise<Session | null> {
+    if (s?.workspace) return s;
+    setBusy(true);
+    try {
+      await api.post("/demo/start");
+      const fresh = await getSession(true);
+      setS(fresh);
+      reload();
+      return fresh;
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Couldn't start your demo shop.");
+      return null;
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function owner() {
     setBusy(true);
     try {
       await api.post("/ui/demo/owner");
+      await getSession(true);
       nav("/dashboard");
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Couldn't sign in as the demo owner.");
+      toast.error(e instanceof ApiError ? e.message : "Couldn't open your demo shop.");
     } finally {
       setBusy(false);
     }
+  }
+  async function go(kind: "member" | "shop") {
+    const fresh = await ensure();
+    if (!fresh) return;
+    if (kind === "shop") nav(`/s/${fresh.demoShop}`);
+    else if (fresh.demoMemberRef) nav(`/manage/${fresh.demoMemberRef}`);
+    else toast.error("Your demo shop has no member yet.");
   }
 
   const personas = [
     {
       icon: Store,
       who: "The shop owner",
-      what: "Ember & Oak Coffee Club. See what needs you, approve held offers, read why people leave.",
+      what: "Your own copy of Ember & Oak Coffee Club. See what needs you, approve held offers, read why people leave.",
       action: (
         <Button onClick={owner} disabled={busy || s?.demoMode === false}>
           Continue as the owner
@@ -41,13 +73,9 @@ export default function Demo({ judge = false }: { judge?: boolean }) {
       icon: User,
       who: "A member",
       what: "A coffee subscriber's own page: their stamp card, skip, pause, switch, and one-step cancel.",
-      action: s?.demoMemberRef ? (
-        <Button variant="outline" asChild>
-          <Link to={`/manage/${s.demoMemberRef}`}>Open a member's page</Link>
-        </Button>
-      ) : (
-        <Button variant="outline" disabled>
-          No member yet
+      action: (
+        <Button variant="outline" onClick={() => go("member")} disabled={busy}>
+          {s?.workspace && s.demoMemberIsSample === false ? "Open a real member's page" : "Open a member's page"}
         </Button>
       ),
     },
@@ -56,8 +84,8 @@ export default function Demo({ judge = false }: { judge?: boolean }) {
       who: "A new subscriber",
       what: "Subscribe with a PayPal sandbox personal account. The $1 daily plan renews within a day.",
       action: (
-        <Button variant="outline" asChild>
-          <Link to={`/s/${s?.demoShop ?? "ember-oak-coffee-club"}`}>Open the shop</Link>
+        <Button variant="outline" onClick={() => go("shop")} disabled={busy}>
+          Open the shop
         </Button>
       ),
     },
@@ -94,6 +122,36 @@ export default function Demo({ judge = false }: { judge?: boolean }) {
             </Button>
           )}
         </div>
+        <section aria-label="Your private demo shop" className="mt-8 rounded-xl border border-rule bg-card p-5">
+          {st?.workspace ? (
+            <>
+              <h2 className="m-0 text-xl font-semibold">Your private demo shop is ready</h2>
+              <p className="m-0 mt-2 text-ink-2">Nobody else sees what you do in it. It is removed {st.workspace.idleHours} hours after your last visit. {st.pool?.line}</p>
+              {st.sampleNote && <p className="m-0 mt-2 text-sm text-ink-2">{st.sampleNote}</p>}
+              <div className="mt-4 flex flex-wrap items-start gap-4">
+                <Button variant="outline" disabled={busy} onClick={async () => { setBusy(true); if (await resetDemo()) { setS(await getSession(true)); reload(); } setBusy(false); }}>
+                  <RotateCcw aria-hidden="true" />
+                  Reset my demo
+                </Button>
+                {st.joinQr && (
+                  <div className="flex items-start gap-3">
+                    <div className="w-[120px] shrink-0 rounded bg-white p-1" role="img" aria-label="QR code that opens your demo shop on your phone" dangerouslySetInnerHTML={{ __html: st.joinQr }} />
+                    <p className="m-0 max-w-[36ch] text-sm text-ink-2">Scan to open the same shop on your phone, for example a member's page.</p>
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              <h2 className="m-0 text-xl font-semibold">Start your own private demo shop</h2>
+              <p className="m-0 mt-2 text-ink-2">A copy of the demo shop just for you, on the same PayPal sandbox plans: labelled sample members, plus real sandbox subscriptions when the pre-approved pool has them. It is removed {48} hours after your last visit.</p>
+              <Button className="mt-4" onClick={ensure} disabled={busy || s?.demoMode === false}>
+                Start my demo shop
+                <ArrowRight aria-hidden="true" />
+              </Button>
+            </>
+          )}
+        </section>
         <ul className="mt-10 grid list-none gap-4 p-0 sm:grid-cols-2">
           {personas.map((p) => (
             <li key={p.who} className="flex flex-col rounded-xl border border-rule bg-card p-6">

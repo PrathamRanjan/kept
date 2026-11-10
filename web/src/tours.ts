@@ -44,11 +44,18 @@ export function setTourContext(s: Partial<typeof session>) {
   session = { ...session, ...s };
 }
 
-/** Each tour page is a fresh page load, so read the demo shop and member from the server when moving on. */
+/**
+ * Each tour page is a fresh page load, so read the demo shop and member from the server when moving on. Judge
+ * Mode runs in the visitor's own private demo shop, started here on first use.
+ */
 async function ctx() {
   if (!session.demoMemberRef) {
     try {
-      const s = await (await fetch("/ui/session", { credentials: "same-origin" })).json();
+      let s = await (await fetch("/ui/session", { credentials: "same-origin" })).json();
+      if (!s.workspace && s.demoMode !== false) {
+        await fetch("/demo/start", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json", accept: "application/json" }, body: "{}" });
+        s = await (await fetch("/ui/session", { credentials: "same-origin" })).json();
+      }
       setTourContext({ demoShop: s.demoShop ?? session.demoShop, demoMemberRef: s.demoMemberRef ?? null });
     } catch {}
   }

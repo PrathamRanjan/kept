@@ -4,7 +4,7 @@ import { getDb } from "./db.js";
 import { describeRules } from "./policy/rules.js";
 import { money } from "./policy/eligibility.js";
 import * as svc from "./service.js";
-import { currentPolicy, intervalWords, KeptError, listMerchants, Merchant, merchantBySlug, merchantByToken, plansFor } from "./store.js";
+import { currentPolicy, intervalWords, KeptError, listMerchants, listPublicMerchants, Merchant, merchantBySlug, merchantByToken, plansFor } from "./store.js";
 
 type Handler = (req: Request, res: Response) => Promise<unknown>;
 
@@ -39,7 +39,7 @@ export function apiRouter(): Router {
   const r = Router();
 
   r.get("/shops", h(async () => {
-    const all = await listMerchants(await getDb());
+    const all = await listPublicMerchants(await getDb());
     return { shops: await Promise.all(all.map(async (m) => ({ shop: m.slug, name: m.name, tagline: m.tagline, currency: m.currency, page: `${config.appUrl}/s/${m.slug}`, mcp_url: `${config.appUrl}/s/${m.slug}/mcp`, plans: await plansJson(m) }))) };
   }));
 

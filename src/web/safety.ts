@@ -64,7 +64,11 @@ export function safetyRouter(): Router {
     const m = await requireOwner(req, res);
     if (!m) return;
     const db = await getDb();
-    const inbound = (await db.query<any>("SELECT * FROM channel_messages WHERE direction = 'in' ORDER BY created_at DESC LIMIT 20")).rows;
+    const inbound = (await db.query<any>(`SELECT c.* FROM channel_messages c WHERE c.direction = 'in' AND (
+        (c.entity = 'subscriber' AND c.entity_id IN (SELECT id FROM subscribers WHERE merchant_id = $1))
+        OR (c.entity = 'merchant' AND c.entity_id = $1)
+        OR c.address IN (SELECT address FROM party_links WHERE (party = 'owner' AND party_id = $1) OR (party = 'subscriber' AND party_id IN (SELECT id FROM subscribers WHERE merchant_id = $1))))
+      ORDER BY c.created_at DESC LIMIT 20`, [m.id])).rows;
     const holds = await safetyHolds(m.id, db);
     const prot = await protectedMode(m.id, db);
     res.send(layout({ title: "Scam and fraud protection", nav: "dashboard", owner: { name: m.name, slug: m.slug }, scripts: SCRIPTS }, html`<h1>Scam and fraud protection</h1>${flash(req)}

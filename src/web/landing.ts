@@ -2,7 +2,7 @@
 import type { Request, Response } from "express";
 import { config } from "../config.js";
 import { getDb } from "../db.js";
-import { listMerchants } from "../store.js";
+import { listPublicMerchants } from "../store.js";
 import { html, layout, raw } from "./html.js";
 import { icon } from "./icons.js";
 
@@ -10,7 +10,7 @@ const ic = (n: string) => raw(icon(n));
 
 export async function landing(req: Request, res: Response) {
   const db = await getDb();
-  const shops = await listMerchants(db);
+  const shops = await listPublicMerchants(db);
   const slug = process.env.KEPT_DEMO_SHOP || "ember-oak-coffee-club";
   const shop = shops.find((s) => s.slug === slug) ?? shops[0];
   // A live sandbox subscription (not a labelled sample row) that a visitor can skip, pause or cancel for real.

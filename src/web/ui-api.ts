@@ -12,6 +12,8 @@ import { money } from "../policy/eligibility.js";
 import * as svc from "../service.js";
 import { currentPolicy, intervalWords, KeptError, listMerchants, Merchant, merchantById, merchantBySlug, openOfferFor, plansFor, subscriberByRef, subscribersFor, toOffer, type Plan } from "../store.js";
 import { decideApproval, guardSettings, pendingApprovals } from "../guard/dryrun.js";
+import { isShowcase, workspaceOf } from "../demo/workspaces.js";
+import { ensureWorkspace } from "./demo.js";
 import { isKilled } from "../guard/kill.js";
 import { loadRun, runsFor, recentRuns } from "../trace.js";
 import { hasOpenAI, providerLabel } from "../ai/provider.js";
@@ -103,19 +105,28 @@ export function uiApi(): Router {
   r.get("/ui/session", j(async (req) => {
     const m = await ownerOf(req);
     const db = await getDb();
-    const demo = await merchantBySlug(db, DEMO_SLUG());
-    // The member Judge Mode shows: the newest live (non-sample) member of the demo shop, else a labelled sample.
-    const member = demo ? (await db.query<{ ref: string }>("SELECT ref FROM subscribers WHERE merchant_id = $1 AND status IN ('ACTIVE','SUSPENDED') ORDER BY is_sample, created_at DESC LIMIT 1", [demo.id])).rows[0] : undefined;
-    return { owner: m ? { name: m.name, slug: m.slug } : null, demoMode: config.demoMode, demoShop: DEMO_SLUG(), demoMemberRef: member?.ref ?? null, ai: hasOpenAI() ? "model" : "rules", paypalEnv: config.paypal.env };
+    // The visitor's own private workspace, when they have one; otherwise the read-only showcase.
+    const ws = await workspaceOf(req);
+    const shop = ws ? await merchantById(db, ws.tenant_id) : await merchantBySlug(db, DEMO_SLUG());
+    // The member Judge Mode shows: the newest real member of the visitor's shop, else a labelled sample.
+    const member = ws && shop ? (await db.query<{ ref: string; is_sample: boolean }>("SELECT ref, is_sample FROM subscribers WHERE merchant_id = $1 AND status IN ('ACTIVE','SUSPENDED') ORDER BY is_sample, created_at DESC LIMIT 1", [shop.id])).rows[0] : undefined;
+    return {
+      owner: m ? { name: m.name, slug: m.slug } : null,
+      demoMode: config.demoMode,
+      demoShop: shop?.slug ?? DEMO_SLUG(),
+      demoMemberRef: member?.ref ?? null,
+      demoMemberIsSample: member?.is_sample ?? null,
+      workspace: ws ? { id: ws.id, expiresAt: ws.expires_at, mine: m?.id === ws.tenant_id } : null,
+      ai: hasOpenAI() ? "model" : "rules",
+      paypalEnv: config.paypal.env,
+    };
   }));
 
-  r.post("/ui/demo/owner", j(async (_req, res) => {
+  /** "Continue as the owner": the visitor's own private copy of the demo shop, created on first use. */
+  r.post("/ui/demo/owner", j(async (req, res) => {
     if (!config.demoMode) throw new KeptError("Demo mode is off.", "not_allowed", 403);
-    const db = await getDb();
-    const m = (await merchantBySlug(db, DEMO_SLUG())) ?? (await listMerchants(db))[0];
-    if (!m) throw new KeptError("No demo shop yet. Run npm run seed.", "not_found", 404);
-    setOwner(res, m);
-    return { ok: true, owner: { name: m.name, slug: m.slug } };
+    const out = await ensureWorkspace(req, res);
+    return { ok: true, created: out.created, owner: { name: out.merchant.name, slug: out.merchant.slug } };
   }));
 
   /** The landing page's live preview: the demo shop's real plans and approved rules. */
@@ -145,6 +156,8 @@ export function uiApi(): Router {
     const policy = await currentPolicy(db, m.id);
     return {
       shop: { name: m.name, slug: m.slug, tagline: m.tagline, currency: m.currency },
+      // The showcase is read-only: a visitor subscribes in their own private copy (/demo).
+      showcase: await isShowcase(m.id, db),
       plans: plans.map((p) => planJson(p, m.currency)),
       promise: policy ? describeRules(policy.rules) : ["Cancelling always works in one step."],
       mcp: `${config.appUrl}/s/${m.slug}/mcp`,
