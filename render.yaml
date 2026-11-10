@@ -8,6 +8,12 @@ envVarGroups:
     envVars:
       - key: NODE_VERSION
         value: "22"
+      # Production refuses to start without the model key, PayPal app and Postgres (spec A11), so nothing
+      # quietly stands in. The build installs dev dependencies explicitly because NODE_ENV=production skips them.
+      - key: NODE_ENV
+        value: production
+      - key: AI_PROVIDER
+        value: openai
       - key: PAYPAL_ENV
         value: sandbox
       - key: PAYPAL_CLIENT_ID

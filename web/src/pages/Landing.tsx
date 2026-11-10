@@ -23,7 +23,7 @@ interface Preview {
 /** Illustrative only: shown so the business model is concrete, clearly marked as not on sale. */
 const PRICING = [
   { name: "Starter", price: "Free", note: "up to 50 members", items: ["One-step cancel and member page", "Plain-words rules", "MCP endpoint for AI assistants"] },
-  { name: "Shop", price: "$19 / month", note: "up to 1,000 members", items: ["Everything in Starter", "One fair offer, failed-payment recovery", "Telegram alerts and approvals"] },
+  { name: "Shop", price: "$19 / month", note: "up to 1,000 members", items: ["Everything in Starter", "One fair offer, failed-payment recovery", "Text reminders and browser approvals"] },
   { name: "Growing", price: "$49 / month", note: "unlimited members", items: ["Everything in Shop", "Backtests and earned autonomy", "Compliance scorecard by state"] },
 ];
 
@@ -33,7 +33,7 @@ const FAQ: [string, string][] = [
   ["Can I make cancelling harder?", "No, and Kept tells you why. Cancelling is one step for every member and every AI assistant. Rules like \"three offers before cancel\" or \"must call to cancel\" are refused, with the law cited (for example California's automatic renewal law)."],
   ["What about my members' AI assistants?", "Your shop gets an MCP endpoint. Assistants such as Claude can find your plans, subscribe a person (who approves on PayPal), skip, pause, switch or cancel, with the same rules a person gets."],
   ["What happens when a renewal fails?", "PayPal tells Kept through a signature-verified webhook. The member's page explains how to fix it, never by a \"pay here\" link in a text, and Kept collects the balance once they do."],
-  ["Is this live?", "This is a hackathon build running on the PayPal sandbox: every PayPal call is real, no real money moves. Nothing is simulated; the demo notice at the top lists what is not live yet."],
+  ["Is this live?", "This is a hackathon build running on the PayPal sandbox: every PayPal call is real, no real money moves. Sample members are labelled Sample and never counted in PayPal-confirmed figures; the demo notice at the top lists what is not live yet."],
 ];
 
 const SHOPS = ["Coffee clubs", "Bakery boxes", "Farm boxes", "Meal kits", "Flower subscriptions", "Tea of the month", "Newsletters", "Climbing gyms", "Pet food deliveries", "Wine clubs", "Comic shops", "Sourdough starters"];

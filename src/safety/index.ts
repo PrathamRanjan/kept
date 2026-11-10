@@ -9,7 +9,7 @@
  */
 import type { Queryable } from "../db.js";
 import { getDb } from "../db.js";
-import { maxLevel, payeeRules, scanText, TACTIC_WORDS, type Level, type RuleResult, type Tactic } from "./rules.js";
+import { maxLevel, payeeRules, scanText, TACTIC_WORDS, type Level, type PayeeContext, type RuleResult, type Tactic } from "./rules.js";
 import { riskLevel, riskScore } from "./risk.js";
 
 export interface Assessment {
@@ -30,9 +30,8 @@ export async function assessMove(m: { action: string; merchantId: string; entity
   const inbound = subId ? (await db.query<{ body: string }>("SELECT cm.body FROM channel_messages cm JOIN party_links pl ON pl.channel = cm.channel AND pl.address = cm.address WHERE cm.direction = 'in' AND pl.party = 'subscriber' AND pl.party_id = $1 ORDER BY cm.created_at DESC LIMIT 20", [subId])).rows.map((r) => r.body) : [];
   const feedback = subId ? (await db.query<{ text: string }>("SELECT text FROM feedback WHERE subscriber_id = $1 ORDER BY created_at DESC LIMIT 10", [subId]).catch(() => ({ rows: [] as { text: string }[] }))).rows.map((r) => r.text) : [];
   const text = [...inbound, ...feedback].join("\n");
-  const history = (await db.query<{ c: string }>("SELECT amount_cents AS c FROM payments WHERE merchant_id = $1 AND kind = $2 AND status = 'succeeded'", [m.merchantId, m.action]).catch(() => ({ rows: [] as { c: string }[] }))).rows.map((r) => Number(r.c));
-  const med = history.length ? history.slice().sort((a, b) => a - b)[Math.floor(history.length / 2)] : null;
-  const res = payeeRules({ payeeAgeDays: null, detailsChangedDaysAgo: null, detailsChangeSource: null, amountCents: Math.max(1, m.cents), historyMedianCents: med, velocity10m: 0, velocity24hSumRatio: 1, requestChannelUntrusted: false, hourLocal: 12, text: text || null });
+  const ctx = await moveContext(db, m, subId);
+  const res = payeeRules({ ...ctx, amountCents: Math.max(1, m.cents), text: text || null });
   const out = combine(res);
   // A subscriber's words carry tactics only as cautions; asking for the refund to go elsewhere holds the refund.
   if (out.level === "hold" && (out.rule?.startsWith("tactic_") || out.rule === "amount_vs_history")) out.level = "caution";
@@ -51,15 +50,58 @@ export async function assessMove(m: { action: string; merchantId: string; entity
   return out;
 }
 
+const MONEY_GATES = ["gate.refund", "gate.capture", "gate.invoice"];
+
+/**
+ * The payment-context inputs for the scam rules and the risk model, all read from this shop's own records:
+ * - payee age: days since this member joined (refunds, captures and invoices all go to or from the member);
+ * - history: the median of the shop's real (non-sample) completed payments;
+ * - velocity: money moves this shop's gate saw in the last 10 minutes, and the last 24 h against its 30-day daily mean;
+ * - hour: the hour now in the shop's time zone (merchants.time_zone, UTC unless the owner set one).
+ * Kept stores no payout details, so "details changed" is always null: a refund can only go back to the PayPal
+ * payment it came from. Moves reach the gate from the owner, the worker or a signed-in agent, never from a
+ * pasted message, so the request channel is trusted here; message text is scanned separately.
+ */
+export async function moveContext(db: Queryable, m: { merchantId: string; cents: number }, subId: string | null): Promise<Omit<PayeeContext, "amountCents" | "text">> {
+  const sub = subId ? (await db.query<{ started_at: Date | null; created_at: Date }>("SELECT started_at, created_at FROM subscribers WHERE id = $1", [subId])).rows[0] : undefined;
+  const since = sub ? new Date(sub.started_at ?? sub.created_at).getTime() : null;
+  const payeeAgeDays = since === null ? null : Math.max(0, (Date.now() - since) / 864e5);
+  const history = (await db.query<{ a: string }>("SELECT amount AS a FROM payments WHERE merchant_id = $1 AND NOT is_sample AND upper(status) IN ('COMPLETED','SUCCEEDED') ORDER BY paid_at DESC LIMIT 200", [m.merchantId])).rows.map((r) => Math.round(Number(r.a) * 100)).sort((a, b) => a - b);
+  const historyMedianCents = history.length ? history[Math.floor(history.length / 2)] : null;
+  const v = (await db.query<{ m10: number; d1: number; d30: number }>(
+    `SELECT count(*) FILTER (WHERE t.at > now() - interval '10 minutes')::int AS m10,
+            count(*) FILTER (WHERE t.at > now() - interval '1 day')::int AS d1,
+            count(*) FILTER (WHERE t.at > now() - interval '31 days' AND t.at <= now() - interval '1 day')::int AS d30
+       FROM agent_trace t JOIN agent_runs r ON r.id = t.run_id
+      WHERE r.merchant_id = $1 AND t.tool = ANY($2) AND t.at > now() - interval '31 days'`,
+    [m.merchantId, MONEY_GATES],
+  )).rows[0] ?? { m10: 0, d1: 0, d30: 0 };
+  const dailyMean = Number(v.d30) / 30;
+  const velocity24hSumRatio = dailyMean > 0 ? Number(v.d1) / dailyMean : Number(v.d1) > 3 ? Number(v.d1) : 1;
+  const tz = (await db.query<{ time_zone: string }>("SELECT time_zone FROM merchants WHERE id = $1", [m.merchantId])).rows[0]?.time_zone || "UTC";
+  return { payeeAgeDays, detailsChangedDaysAgo: null, detailsChangeSource: null, historyMedianCents, velocity10m: Number(v.m10), velocity24hSumRatio, requestChannelUntrusted: false, hourLocal: hourIn(tz) };
+}
+
+export function hourIn(tz: string, at = new Date()): number {
+  try {
+    return Number(new Intl.DateTimeFormat("en-GB", { hour: "numeric", hourCycle: "h23", timeZone: tz }).format(at));
+  } catch {
+    return at.getUTCHours();
+  }
+}
+
 function combine(res: RuleResult): Assessment {
   let risk = 0;
+  let modelOk = true;
   try {
     risk = riskScore(res.features);
   } catch {
-    risk = 0;
+    modelOk = false;
   }
-  const level = maxLevel(res.level, riskLevel(risk));
+  // If the risk model can't score, the rules still decide, and the reasons say the model gave no score.
+  const level = modelOk ? maxLevel(res.level, riskLevel(risk)) : res.level;
   const reasons = res.reasons.slice();
+  if (!modelOk) reasons.push("The payment-risk model gave no score this time; only the rules decided.");
   const rule = res.rule ?? (level !== "clear" ? "risk_model" : null);
   if (res.level === "clear" && level !== "clear") reasons.push(`The payment-risk model scores this ${(risk * 100).toFixed(0)}% (synthetic training data; a ranking signal, not a fraud rate).`);
   const summary = level === "clear" ? `no scam signals; risk ${(risk * 100).toFixed(0)}%` : `${level}: ${reasons[0]} (risk ${(risk * 100).toFixed(0)}%)`;
@@ -68,10 +110,14 @@ function combine(res: RuleResult): Assessment {
 
 const FAKE_FAILED = /\b(subscription|membership|payment|renewal|direct debit|card)\b[\s\S]{0,80}\b(failed|declined|unsuccessful|could not be (taken|processed)|was not successful|has been suspended|will be cancelled)\b[\s\S]{0,200}\b(pay (here|now)|update your (card|payment|details)|re-?enter your card|click|tap|http|www\.|link)/i;
 
+const MESSAGE_ONLY: Omit<PayeeContext, "text"> = { payeeAgeDays: null, detailsChangedDaysAgo: null, detailsChangeSource: null, amountCents: 1, historyMedianCents: null, velocity10m: 0, velocity24hSumRatio: 1, requestChannelUntrusted: true, hourLocal: 12 };
+
 /** A message a subscriber or owner received or pasted. Rules only on the server; the browser adds the text model. */
 export function assessMessage(text: string): Assessment & { words: string[] } {
   const scan = scanText(text);
-  const res = payeeRules({ payeeAgeDays: null, detailsChangedDaysAgo: null, detailsChangeSource: null, amountCents: 1, historyMedianCents: null, velocity10m: 0, velocity24hSumRatio: 1, requestChannelUntrusted: true, hourLocal: 12, text });
+  // A pasted message has no payment behind it, so the payment-context signals are switched off on purpose
+  // (no payee, no amount, no velocity; hour set to midday so the odd-hour rule cannot fire). Only the words count.
+  const res = payeeRules({ ...MESSAGE_ONLY, text });
   const out = combine(res);
   out.reasons = out.reasons.filter((r) => !r.startsWith("The request to pay arrived"));
   if (FAKE_FAILED.test(text)) {

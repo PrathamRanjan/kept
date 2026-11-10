@@ -39,7 +39,7 @@ interface ManageData {
   switchTo: PlanJson[];
   pauseMax: number;
   promise: string[];
-  offer: { id: string; message: string; label: string | null; type: string; expires_at: string } | null;
+  offer: { id: string; message: string; label: string | null; type: string; expires_at: string; worded_by?: "code" | "model" } | null;
   telegram: { linked: boolean; ready: boolean };
   sms: { ready: boolean; linked: string[]; pending?: string | null };
   card: CycleCardData;
@@ -305,6 +305,7 @@ export default function Manage() {
           <section className="mt-8 rounded-2xl border-2 border-stamp/50 bg-stamp-wash p-6" aria-labelledby="offer">
             <h2 id="offer" className="m-0 text-2xl font-bold">One offer before you go</h2>
             <p className="mt-2 text-lg">{data.offer.message}</p>
+            {data.offer.worded_by === "code" && <p className="m-0 text-xs text-ink-2">Worded by Kept's own template; the model did not answer. The offer itself was chosen by the shop's rules.</p>}
             <p className="m-0 text-sm text-ink-2">
               Open until {fmtDate(data.offer.expires_at, { time: true })}. If you don't answer, your subscription is cancelled as you asked. No timer, no second offer.
             </p>
@@ -365,8 +366,10 @@ export default function Manage() {
               <MessageCircle className="size-5 text-stamp" aria-hidden="true" />
               Reminders on your phone
             </h2>
-            <p className="mt-1 text-sm text-ink-2">A note before each payment: in Telegram with Skip and Keep buttons, or by text with a link back here. {data.telegram.linked ? "Connected." : ""}</p>
-            {!data.member.sample && (
+            <p className="mt-1 text-sm text-ink-2">
+              {data.telegram.ready ? "A note before each payment: in Telegram with Skip and Keep buttons, or by text with a link back here." : "A text before each payment, with a link back here."} {data.telegram.ready && data.telegram.linked ? "Telegram connected." : ""}
+            </p>
+            {!data.member.sample && data.telegram.ready && (
               <form method="post" action={`/manage/${ref}/connect/telegram`} target="_blank">
                 <Button type="submit" variant={data.telegram.linked ? "outline" : "default"}>
                   {data.telegram.linked ? "Connect another chat" : "Get reminders on Telegram"}

@@ -4,10 +4,11 @@ Three arms over 16 labelled cancel reasons (heldout; held-out ids frozen 2026-11
 
 | Arm | Cases | Correct | Traps | Traps caught | $ a naive tool wrongly gives away | $ Kept wrongly gives away | Cost (est.) | p50 | p95 |
 |---|---|---|---|---|---|---|---|---|---|
+| model | 16 | 15 | 4 | 3 | 57.60 | 14.40 | $0.0004 | 1802 ms | 2402 ms |
 | oracle | 16 | 16 | 4 | 4 | 57.60 | 0.00 | $0.0000 | 0 ms | 0 ms |
 | rules | 16 | 11 | 4 | 1 | 57.60 | 43.20 | $0.0000 | 0 ms | 1 ms |
 
-The model arm did not run: no OPENAI_API_KEY. Run `npm run eval:reasons` with the key set to fill it.
+
 
 ## How the dollars column works
 

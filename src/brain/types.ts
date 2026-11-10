@@ -58,6 +58,7 @@ export interface Brain {
   wordOffer(offer: EligibleOffer, ctx: { merchantName: string; currency: string; category: ReasonCategory; subscriberName?: string | null }): Promise<string>;
   explainPaymentFailure(ctx: { merchantName: string; amount: number; currency: string; attempts: number; manageUrl: string }): Promise<string>;
   answer(question: string, stats: ShopStats): Promise<string>;
-  /** Which chain step answered the last call: "model", "fallback", "replay" or "rules". For the trace and the evidence page. */
+  /** Who produced the last output: "model" (primary), "backup" (second model), "code" (code's own template for a decision code made), "failed", or "rules" (the offline test brain). */
   lastVia(): string;
+  lastModel?(): string | null;
 }

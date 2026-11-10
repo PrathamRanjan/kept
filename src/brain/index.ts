@@ -13,6 +13,7 @@ let brain: Brain | null = null;
  */
 export function getBrain(): Brain {
   if (brain) return brain;
+  if (config.production && !(config.brain === "openai" && hasOpenAI())) throw new Error("Kept will not run its rules brain in production; set KEPT_BRAIN=openai and OPENAI_API_KEY.");
   brain = config.brain === "openai" && hasOpenAI() ? new OpenAIBrain() : new LocalBrain();
   if (config.brain === "openai" && !hasOpenAI()) console.warn("[kept] KEPT_BRAIN=openai but AI_PROVIDER/OPENAI_API_KEY are not set; using the local brain.");
   return brain;

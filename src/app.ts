@@ -96,8 +96,18 @@ export function createApp() {
   app.use(foundationRouter());
   app.use(webRouter());
 
-  app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-    if (err instanceof KeptError) return res.status(err.status).send(err.message);
+  app.use((err: unknown, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    if (err instanceof KeptError) {
+      if ((err as any).detail) console.warn(`[kept] ${err.code}: ${(err as any).detail}`);
+      // The honest failure state: a plain sentence and a way to try again, never a raw error string.
+      if (req.accepts(["html", "json"]) === "html") {
+        const back = String(req.get("referer") ?? "/");
+        const safeBack = back.startsWith(config.appUrl) || back.startsWith("/") ? back : "/";
+        const esc = (t: string) => t.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+        return res.status(err.status).send(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Kept</title><link rel="stylesheet" href="/static/app.css"></head><body><main id="main" class="wrap" style="max-width:640px;margin:48px auto;padding:0 16px"><h1>That didn't work</h1><p role="alert">${esc(err.message)}</p><p><a class="btn primary" href="${esc(safeBack)}">Go back and try again</a></p></main></body></html>`);
+      }
+      return res.status(err.status).json({ error: err.code, message: err.message });
+    }
     console.error("[kept]", err);
     res.status(500).send("Something went wrong.");
   });

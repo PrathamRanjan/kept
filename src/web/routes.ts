@@ -21,6 +21,7 @@ import { pendingApprovals } from "../guard/dryrun.js";
 import type { DraftPlan } from "../brain/types.js";
 
 import { ensureWorkspace } from "./demo.js";
+import { telegramReady } from "../channels/index.js";
 const COOKIE = "kept_owner";
 
 type Page = (req: Request, res: Response) => Promise<unknown>;
@@ -301,7 +302,7 @@ export function webRouter(): Router {
     const events = (await db.query("SELECT * FROM event_log WHERE merchant_id = $1 ORDER BY id DESC LIMIT 40", [m.id])).rows;
     const planName = (id: string | null) => plans.find((p) => p.id === id)?.name ?? "—";
     const q = typeof req.query.q === "string" ? req.query.q : "";
-    const answer = q ? await svc.askOwner(m, q) : "";
+    const answer = q ? await svc.askOwner(m, q).catch((e) => (e instanceof KeptError ? `${e.message}` : Promise.reject(e))) : "";
     const reasonTotal = stats.reasons.reduce((a, r) => a + r.count, 0);
     const label: Record<string, string> = { price: "Cost", too_much: "Too much product", away: "Away / travelling", quality: "Quality", competitor: "Switching elsewhere", no_need: "No longer needed", payment: "Payment problems", other: "Other / none given" };
     const webhookOk = Boolean(m.paypal_webhook_id || (!m.paypal_credentials && config.paypal.webhookId));
@@ -552,8 +553,8 @@ export function webRouter(): Router {
           <p class="muted" style="margin:0">${v.status === "CANCELLED" ? "Cancelled. You won't be charged again." : html`Next payment ${fmtDate(v.next_billing_time)}${v.resumes_at ? html` · resumes ${fmtDate(v.resumes_at, true)}` : ""}`}</p>
           ${v.approval_url ? html`<p><a class="btn primary" href="${v.approval_url}">Approve on PayPal</a></p>` : ""}
         </div>
-        <div class="card"><h2 style="font-size:1.2rem">Reminders on your phone</h2><p class="small muted">A note before each renewal, with Skip and Keep buttons, in Telegram. ${tg ? "Connected." : ""}</p>
-          ${s.is_sample ? "" : html`<form method="post" action="/manage/${s.ref}/connect/telegram" target="_blank" class="inline"><button class="btn ${tg ? "" : "primary"}" type="submit">${raw(icon("message"))}${tg ? "Connect another chat" : "Get reminders on Telegram"}</button></form>`}
+        <div class="card">${telegramReady() ? html`<h2 style="font-size:1.2rem">Reminders on your phone</h2><p class="small muted">A note before each renewal, with Skip and Keep buttons, in Telegram. ${tg ? "Connected." : ""}</p>` : html`<h2 style="font-size:1.2rem">Got a message about this?</h2>`}
+          ${s.is_sample || !telegramReady() ? "" : html`<form method="post" action="/manage/${s.ref}/connect/telegram" target="_blank" class="inline"><button class="btn ${tg ? "" : "primary"}" type="submit">${raw(icon("message"))}${tg ? "Connect another chat" : "Get reminders on Telegram"}</button></form>`}
           <p class="small muted" style="margin-top:0.8rem">Got a text about this subscription? <a href="/manage/${s.ref}/check">Check it for scam signs</a>.</p></div>
       </div>
       ${can("skip_next") || can("pause") || can("resume") || can("switch_plan") ? html`<div class="section-title"><h2>Change it</h2><p>Within ${m.name}'s rules. Nothing here charges you extra.</p></div>

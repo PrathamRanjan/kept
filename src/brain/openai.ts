@@ -1,42 +1,63 @@
 /**
- * The model brain (roadmap K1, B.1). Every method asks the provider for a strict-schema answer and falls back to
- * the deterministic local brain when no model is configured or every model fails. What the model may do:
+ * The model brain (roadmap K1, B.1; spec A11). Every method asks the provider for a strict-schema answer, primary
+ * model then backup model. There is no rules stand-in for a model reading: when both models fail, drafting, reason
+ * reading and answers throw `ModelUnavailable` and the caller shows the honest failure state. Only wording that
+ * code already decided (an offer's message, a failed-renewal notice) falls back to code's own template, and is
+ * labelled "code" wherever it appears. What the model may do:
  * draft plans and rules from the owner's words (the owner approves the exact version), label a cancel reason,
  * word an offer the code already chose, explain a failed renewal, answer the owner's questions over stats.
  * What it may not do: pick among offers, set a price PayPal sees, or move money. Those are code.
  */
 import { ground, quarantine } from "../ai/grounding.js";
-import { NoModelError, structured } from "../ai/provider.js";
+import { structured } from "../ai/provider.js";
+import { KeptError } from "../store.js";
 import type { EligibleOffer } from "../policy/eligibility.js";
 import { DEFAULT_RULES, RulesSchema, type Rules } from "../policy/rules.js";
 import { FORBIDDEN_PHRASES } from "../policy/compliance.js";
 import { LocalBrain } from "./local.js";
 import type { Brain, Draft, DraftPlan, OfferChoice, ReasonCategory, ShopStats } from "./types.js";
 
+/** Both models failed on a job no code may stand in for. `message` is what the person sees; `detail` is logged. */
+export class ModelUnavailable extends KeptError {
+  constructor(message: string, readonly detail: string) {
+    super(message, "model_unavailable", 503);
+  }
+}
+
 const CATEGORIES: ReasonCategory[] = ["price", "too_much", "away", "quality", "competitor", "no_need", "payment", "other"];
 
 export class OpenAIBrain implements Brain {
   readonly name = "openai (model drafts and labels; code decides)";
   private via = "rules";
+  private model: string | null = null;
   constructor(private readonly local = new LocalBrain()) {}
   lastVia() {
     return this.via;
   }
+  /** The model id that produced the last output, or null when code wrote it or nothing answered. */
+  lastModel() {
+    return this.model;
+  }
 
-  private async tryModel<T>(fn: () => Promise<{ output: T; via: string }>, fallback: () => T, onError?: (e: Error) => void): Promise<T> {
+  /** `fallback` is only for wording of a decision code already made; it is labelled "code". */
+  private async tryModel<T>(fn: () => Promise<{ output: T; via: string; model?: string }>, fallback?: () => T, failMessage = "I couldn't read that just now. Try again in a moment."): Promise<T> {
     try {
       const r = await fn();
-      this.via = r.via === "primary" ? "model" : r.via;
+      this.via = r.via === "primary" ? "model" : "backup";
+      this.model = r.model ?? null;
       return r.output;
     } catch (e) {
-      if (!(e instanceof NoModelError) && onError) onError(e as Error);
-      this.via = "rules";
-      return fallback();
+      this.model = null;
+      if (fallback) {
+        this.via = "code";
+        return fallback();
+      }
+      this.via = "failed";
+      throw new ModelUnavailable(failMessage, (e as Error).message);
     }
   }
 
   async draftPlans(text: string, currency: string): Promise<Draft<DraftPlan[]>> {
-    const localDraft = this.local.draftPlansSync(text, currency);
     return this.tryModel(
       async () => {
         const r = await structured<{ plans: { name: string; description: string; price_quote: string; interval_unit: "DAY" | "WEEK" | "MONTH" | "YEAR"; interval_count: number; lighter: boolean }[]; understood: string[]; warnings: string[] }>({
@@ -68,14 +89,14 @@ export class OpenAIBrain implements Brain {
           plans.push({ name: p.name.slice(0, 60), description: p.description.slice(0, 120), price: Math.round(num * 100) / 100, intervalUnit: p.interval_unit, intervalCount: Math.max(1, Math.min(12, Math.round(p.interval_count || 1))), kind: p.lighter ? "lite" : "regular" });
         }
         if (!plans.length) throw new Error("model returned no grounded plans");
-        return { output: { value: plans, understood: r.output.understood.slice(0, 12), warnings }, via: r.via };
+        return { output: { value: plans, understood: r.output.understood.slice(0, 12), warnings }, via: r.via, model: r.model };
       },
-      () => localDraft,
+      undefined,
+      "I couldn't read those plans just now. Try again, or write each plan on its own line with its price, for example \"Signature bag $24 monthly\".",
     );
   }
 
   async draftRules(text: string): Promise<Draft<Rules>> {
-    const localDraft = this.local.draftRulesSync(text);
     return this.tryModel(
       async () => {
         const r = await structured<{ skip_enabled: boolean; skip_max_per_period: number; skip_period_days: number; pause_enabled: boolean; pause_max_cycles: number; switch_to_lite: boolean; discount_enabled: boolean; discount_percent: number; discount_cycles: number; min_tenure_days: number; offer_cooldown_days: number; renewal_reminder_days: number; jurisdiction: Rules["jurisdiction"]; understood: string[]; could_not_express: string[] }>({
@@ -118,19 +139,26 @@ export class OpenAIBrain implements Brain {
         const warnings = [...o.could_not_express];
         for (const f of FORBIDDEN_PHRASES) if (f.re.test(text)) warnings.push(`[${f.ruleId}] ${f.message}`);
         if (!candidate.skip.enabled && !candidate.pause.enabled && !candidate.switchToLite.enabled && !candidate.discount.enabled) warnings.push("No retention options found, so cancels go through with no offer.");
-        return { output: { value: parsed.data, understood: [...o.understood.slice(0, 12), "Cancelling always works in one step; hearing an offer is optional."], warnings }, via: r.via };
+        return { output: { value: parsed.data, understood: [...o.understood.slice(0, 12), "Cancelling always works in one step; hearing an offer is optional."], warnings }, via: r.via, model: r.model };
       },
-      () => localDraft,
+      undefined,
+      "I couldn't read those rules just now. Nothing was changed. Try again in a moment.",
     );
   }
 
   async classifyReason(text: string): Promise<ReasonCategory> {
-    const rules = this.local.classifyReasonSync(text);
-    if (!text || !text.trim()) return "other";
+    // No reason given is not a reading: code files it under "other".
+    if (!text || !text.trim()) {
+      this.via = "code";
+      return "other";
+    }
     const { clean, quarantined } = quarantine(text);
     // Instruction-shaped text never reaches the model as a reason; the clean remainder is labelled (or "other").
     const input = clean || (quarantined.length ? "" : text);
-    if (!input) return "other";
+    if (!input) {
+      this.via = "code";
+      return "other";
+    }
     return this.tryModel(
       async () => {
         const r = await structured<{ category: ReasonCategory; confidence: number }>({
@@ -140,12 +168,13 @@ export class OpenAIBrain implements Brain {
           parts: [{ type: "text", text: input.slice(0, 500) }],
           schemaName: "cancel_reason",
           schema: { type: "object", properties: { category: { type: "string", enum: CATEGORIES }, confidence: { type: "number" } } },
-          maxOutputTokens: 60,
+          maxOutputTokens: 1000,
         });
         const c = CATEGORIES.includes(r.output.category) ? r.output.category : "other";
-        return { output: c, via: r.via };
+        return { output: c, via: r.via, model: r.model };
       },
-      () => rules,
+      undefined,
+      "Kept couldn't read the reason just now.",
     );
   }
 
@@ -168,14 +197,14 @@ export class OpenAIBrain implements Brain {
           parts: [{ type: "text", text: `Shop: ${ctx.merchantName}\nReason category: ${ctx.category}\nSubscriber first name: ${ctx.subscriberName?.split(" ")[0] ?? "(none)"}\nOffer: ${offer.label}\nTerms: ${JSON.stringify(offer.terms)}\nCurrency: ${ctx.currency}` }],
           schemaName: "offer_message",
           schema: { type: "object", properties: { message: { type: "string" } } },
-          maxOutputTokens: 160,
+          maxOutputTokens: 1000,
         });
         const msg = r.output.message.trim();
         // Code check: every number in the message must be one of the offer's own numbers, or the wording is dropped.
         const nums = msg.match(/\d+(?:\.\d+)?/g) ?? [];
         if (nums.some((n) => !allowedNumbers.has(n) && !allowedNumbers.has(Number(n).toFixed(2)))) throw new Error("model wording stated a number not in the offer");
         if (!/cancel/i.test(msg)) throw new Error("model wording omitted the cancel path");
-        return { output: msg.slice(0, 400), via: r.via };
+        return { output: msg.slice(0, 400), via: r.via, model: r.model };
       },
       () => fallback,
     );
@@ -191,18 +220,17 @@ export class OpenAIBrain implements Brain {
           parts: [{ type: "text", text: `Shop: ${ctx.merchantName}\nAmount: ${ctx.amount.toFixed(2)} ${ctx.currency}\nAttempt: ${ctx.attempts}\nLink: ${ctx.manageUrl}` }],
           schemaName: "failure_message",
           schema: { type: "object", properties: { message: { type: "string" } } },
-          maxOutputTokens: 160,
+          maxOutputTokens: 1000,
         });
         const msg = r.output.message.trim();
         if (!msg.includes(ctx.manageUrl) || !msg.includes(ctx.amount.toFixed(2))) throw new Error("model omitted the amount or link");
-        return { output: msg.slice(0, 500), via: r.via };
+        return { output: msg.slice(0, 500), via: r.via, model: r.model };
       },
       () => this.local.explainPaymentFailureSync(ctx),
     );
   }
 
   async answer(question: string, stats: ShopStats): Promise<string> {
-    const fallback = this.local.answerSync(question, stats);
     return this.tryModel(
       async () => {
         const r = await structured<{ answer: string }>({
@@ -212,11 +240,12 @@ export class OpenAIBrain implements Brain {
           parts: [{ type: "text", text: `Statistics: ${JSON.stringify(stats)}\n\nQuestion: ${question.slice(0, 500)}` }],
           schemaName: "owner_answer",
           schema: { type: "object", properties: { answer: { type: "string" } } },
-          maxOutputTokens: 220,
+          maxOutputTokens: 1500,
         });
-        return { output: r.output.answer.trim().slice(0, 800), via: r.via };
+        return { output: r.output.answer.trim().slice(0, 800), via: r.via, model: r.model };
       },
-      () => fallback,
+      undefined,
+      "I couldn't answer that just now. Try again in a moment.",
     );
   }
 }

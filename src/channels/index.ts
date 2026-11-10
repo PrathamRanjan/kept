@@ -24,7 +24,7 @@ export function setChannelFetch(f: typeof fetch | null) {
 }
 export const channelFetch = () => fetchImpl;
 
-export const telegramReady = () => Boolean(config.channels.telegramToken);
+export const telegramReady = () => config.channels.telegramOn && Boolean(config.channels.telegramToken);
 export const whatsappReady = () => Boolean(config.channels.whatsappToken && config.channels.whatsappPhoneId);
 
 /** Queue a message to an address; delivered by the send_channel_message job. */

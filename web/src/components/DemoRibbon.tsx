@@ -26,9 +26,9 @@ export function DemoRibbon() {
             <ul className="m-0 mb-3 list-disc space-y-1 pl-5 text-ink-2">
               <li>Plans, subscriptions, skip, pause, switch, cancel</li>
               <li>Signature-verified webhooks, transaction search</li>
-              <li>AI drafting and reason labels (OpenAI), with a rules fallback</li>
+              <li>AI drafting, reason labels and answers (OpenAI, with a backup model). If neither answers, the page says so; no rules stand in</li>
               <li>MCP endpoints for AI assistants</li>
-              <li>Reminders by Telegram or text (Twilio) once you connect a chat or number</li>
+              <li>Reminders by text (Twilio) once a member confirms their number</li>
             </ul>
             <p className="m-0 mb-2 font-semibold">Not live yet</p>
             <ul className="m-0 mb-3 list-disc space-y-1 pl-5 text-ink-2">
@@ -36,10 +36,10 @@ export function DemoRibbon() {
               <li>Log in with PayPal (turned off on the sandbox app)</li>
               <li>Balance capture and invoices run only when PayPal reports a real failed renewal</li>
             </ul>
-            <p className="m-0 mb-3 text-ink-2">No sample members and nothing simulated: every member is a real sandbox subscription.</p>
+            <p className="m-0 mb-3 text-ink-2">Your demo shop is your own copy. Members marked Sample are labelled history: view-only, and never counted in any figure PayPal confirms. Members without the chip are real sandbox subscriptions.</p>
             <div className="flex flex-wrap gap-3">
               <a className="font-medium text-stamp underline" href="/dashboard/evidence">Evidence page</a>
-              <a className="font-medium text-stamp underline" href="/judge/reset">Reset judge session</a>
+              <a className="font-medium text-stamp underline" href="/demo">Start over with a fresh shop</a>
             </div>
           </PopoverContent>
         </Popover>

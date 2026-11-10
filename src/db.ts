@@ -287,6 +287,7 @@ CREATE TABLE IF NOT EXISTS invoices (
   id TEXT PRIMARY KEY, merchant_id TEXT NOT NULL, subscriber_id TEXT NOT NULL, paypal_invoice_id TEXT, amount NUMERIC(12,2) NOT NULL, currency TEXT NOT NULL,
   status TEXT NOT NULL, run_id TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+ALTER TABLE merchants ADD COLUMN IF NOT EXISTS time_zone TEXT NOT NULL DEFAULT 'UTC';
 ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS run_id TEXT;
 ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS jurisdiction TEXT;
 ALTER TABLE offers ADD COLUMN IF NOT EXISTS run_id TEXT;

@@ -39,14 +39,24 @@ export const config = {
     provider: (process.env.AI_PROVIDER || (process.env.OPENAI_API_KEY ? "openai" : "rules")) as "openai" | "rules",
     openaiKey: process.env.OPENAI_API_KEY || "",
     openaiBaseUrl: (process.env.OPENAI_BASE_URL || "https://api.openai.com").replace(/\/$/, ""),
+    // Spec A5.1 (10 Nov 2026): reading and drafting on gpt-6.1-sol with gpt-6-sol as the backup, small wording and
+    // label jobs on gpt-6-luna, images on gpt-6.1-sol. The backup for a failed call is a second real model.
     models: {
-      read: process.env.AI_MODEL_READ || "gpt-5.5",
-      classify: process.env.AI_MODEL_CLASSIFY || "gpt-5.4-mini",
-      vision: process.env.AI_MODEL_VISION || "gpt-5.6-luna",
+      read: process.env.AI_MODEL_READ || "gpt-6.1-sol",
+      backup: process.env.AI_MODEL_BACKUP || "gpt-6-sol",
+      classify: process.env.AI_MODEL_CLASSIFY || "gpt-6-luna",
+      vision: process.env.AI_MODEL_VISION || "gpt-6.1-sol",
     },
+    /** Reasoning effort for structured jobs (spec A5.4: low for extraction). */
+    effort: (process.env.AI_REASONING_EFFORT || "low") as "minimal" | "low" | "medium" | "high",
+    /** Floor for max_output_tokens: reasoning tokens count against it, and a cut-off breaks the JSON. */
+    minOutputTokens: Number(process.env.AI_MIN_OUTPUT_TOKENS || 4000),
   },
   channels: {
     telegramToken: process.env.TELEGRAM_BOT_TOKEN || "",
+    /** Kept has no Telegram bot of its own; the shared bot's webhook belongs to another app. Telegram shows only
+     * when the owner gives Kept its own bot and sets KEPT_TELEGRAM=on. */
+    telegramOn: process.env.KEPT_TELEGRAM === "on",
     telegramSecret: process.env.TELEGRAM_WEBHOOK_SECRET || "",
     telegramBot: process.env.TELEGRAM_BOT_USERNAME || "paypalhackathonbot",
     whatsappToken: process.env.WHATSAPP_TOKEN || "",

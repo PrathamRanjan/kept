@@ -189,7 +189,7 @@ function RenewalCalendar() {
 /* ------------------------------------------------------------------ Today */
 function TodayPage({ d, reload }: { d: Today; reload: () => void }) {
   const [q, setQ] = useState("");
-  const [answer, setAnswer] = useState<string | null>(null);
+  const [answer, setAnswer] = useState<{ text: string; by: string | null; model: string | null; failed: boolean } | null>(null);
   const [asking, setAsking] = useState(false);
   const [syncing, setSyncing] = useState(false);
   useTour(true, "owner");
@@ -199,15 +199,16 @@ function TodayPage({ d, reload }: { d: Today; reload: () => void }) {
   const reasons = [...(s.reasons ?? [])].sort((a: any, b: any) => b.count - a.count);
   const reasonTotal = reasons.reduce((a: number, r: any) => a + r.count, 0) || 1;
 
-  async function ask(e: React.FormEvent) {
-    e.preventDefault();
+  async function ask(e?: React.FormEvent) {
+    e?.preventDefault();
     if (!q.trim()) return;
     setAsking(true);
     setAnswer(null);
     try {
-      setAnswer((await api.post<{ answer: string }>("/ui/owner/ask", { question: q })).answer);
+      const r = await api.post<{ answer: string; by: string; model: string | null }>("/ui/owner/ask", { question: q });
+      setAnswer({ text: r.answer, by: r.by, model: r.model, failed: false });
     } catch (err) {
-      setAnswer(err instanceof ApiError ? err.message : "Couldn't answer that right now.");
+      setAnswer({ text: err instanceof ApiError ? err.message : "Couldn't answer that right now. Nothing was changed.", by: null, model: null, failed: true });
     } finally {
       setAsking(false);
     }
@@ -323,11 +324,22 @@ function TodayPage({ d, reload }: { d: Today; reload: () => void }) {
           ))}
         </div>
         <div aria-live="polite">
-          {answer && (
+          {answer && !answer.failed && (
             <div className="mt-4 rounded-lg bg-stamp-wash p-4">
               <WhoChip who="AI" />
-              <p className="mt-2 mb-0">{answer}</p>
-              <p className="mt-2 mb-0 text-xs text-ink-2">Answered from your shop's live numbers. The AI can read; it can't act.</p>
+              <p className="mt-2 mb-0">{answer.text}</p>
+              <p className="mt-2 mb-0 text-xs text-ink-2">
+                Answered by {answer.model ?? "the model"}{answer.by === "backup" ? " (the backup model; the main one did not answer)" : ""}, from your shop's live numbers. The AI can read; it can't act.
+              </p>
+            </div>
+          )}
+          {answer && answer.failed && (
+            <div role="alert" className="mt-4 rounded-lg border border-rule bg-card p-4">
+              <p className="m-0 font-semibold">No answer this time</p>
+              <p className="mt-1 mb-0">{answer.text}</p>
+              <Button type="button" variant="outline" className="mt-3" onClick={() => ask()} disabled={asking}>
+                {asking ? "Trying…" : "Try again"}
+              </Button>
             </div>
           )}
         </div>

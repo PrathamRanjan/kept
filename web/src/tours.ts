@@ -149,7 +149,7 @@ const judgePages: PageSteps[] = [
     match: (p) => p === "/dashboard/members",
     steps: [
       { element: "[data-tour='grid']", popover: { title: "Every member at a glance · 6 of 6", description: "AG Grid with the cycle card as a column: filter by status, sort by next payment, open anyone's page." } },
-      { popover: { title: "That's Kept", description: "Try a rule the law forbids on Retention rules (\"three offers before cancel\") to see it refused with a citation, or read What's real for the live-versus-simulated list. Thanks for judging." } },
+      { popover: { title: "That's Kept", description: "Try a rule the law forbids on Retention rules (\"three offers before cancel\") to see it refused with a citation, or read What's real for what is live and what is not. Thanks for judging." } },
     ],
   },
 ];

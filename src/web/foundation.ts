@@ -227,9 +227,9 @@ export function foundationRouter(): Router {
     const codeSent = typeof req.query.code === "string" ? req.query.code : "";
     res.send(layout({ title: "Messages", nav: "dashboard", owner: nav(m) }, html`
       <div class="page-head"><div><h1>Messages and alerts</h1><p>What reaches you and your members on their phones: renewal reminders with Skip and Keep buttons, and approvals for you.</p></div></div>${flash(req)}
-      <section class="card" id="phone"><h2>Approvals on your phone</h2><p class="sub">Held offers and large collections arrive on Telegram with Approve and Decline buttons.</p>
+      ${telegramReady() ? html`<section class="card" id="phone"><h2>Approvals on your phone</h2><p class="sub">Held offers and large collections arrive on Telegram with Approve and Decline buttons.</p>
         <div class="row">${tg ? html`<span class="pill good">Telegram connected</span>` : html`<span class="pill">Telegram not connected</span>`}<form method="post" action="/connect/telegram" class="inline" target="_blank"><button class="btn primary" type="submit">${raw(icon("message"))}${tg ? "Connect another chat" : "Connect Telegram"}</button></form><button class="btn" type="button" id="push-sub">${raw(icon("zap"))}Turn on notifications in this browser</button></div>
-        <p class="small muted">Telegram opens with a one-time code that lasts 15 minutes: press Start and you're done. Members connect from their own member page.${telegramReady() ? "" : " The bot token isn't set on this server, so Telegram messages are logged below as not sent."}${pushReady() ? "" : " Browser notifications need VAPID keys on the server."}</p></section>
+        <p class="small muted">Telegram opens with a one-time code that lasts 15 minutes: press Start and you're done. Members connect from their own member page.${telegramReady() ? "" : " The bot token isn't set on this server, so Telegram messages are logged below as not sent."}${pushReady() ? "" : " Browser notifications need VAPID keys on the server."}</p></section>` : html`<section class="card" id="phone"><h2>Approvals on your phone</h2><p class="sub">Held offers and large collections can reach this browser as notifications.</p><div class="row"><button class="btn primary" type="button" id="push-sub">${raw(icon("zap"))}Turn on notifications in this browser</button></div><p class="small muted">Telegram is off: Kept has no bot of its own yet.${pushReady() ? "" : " Browser notifications need VAPID keys on the server."}</p></section>`}
       <section class="card" id="sms"><h2>Texts (SMS)</h2><p class="sub">The same approvals by text message, each with a link to approve or decline. Sent from Kept's Twilio number.</p>
         ${!smsReady() ? html`<p class="small muted">Texts aren't set up on this server (no Twilio keys).</p>` : phones.length ? html`<div class="row"><span class="pill good">Texts on: ${phones.join(", ")}</span><form method="post" action="/dashboard/channels/sms/stop" class="inline"><button class="btn" type="submit">Stop texts</button></form></div>` : codeSent ? html`<form method="post" action="/dashboard/channels/sms/verify" class="row"><label>Code sent to ${codeSent} <input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" required style="width:8rem"></label><button class="btn primary" type="submit">Confirm</button></form>` : html`<form method="post" action="/dashboard/channels/sms/start" class="row"><label>Mobile number <input name="phone" type="tel" autocomplete="tel" placeholder="+65 8123 4567" required></label><label class="small"><input type="checkbox" name="consent" value="1" required> Text me about held offers and collections. Reply STOP to opt out.</label><button class="btn primary" type="submit">Send code</button></form>`}
       </section>
@@ -248,11 +248,13 @@ export function foundationRouter(): Router {
   r.post("/connect/telegram", page(async (req, res) => {
     const m = await requireOwner(req, res);
     if (!m) return;
+    if (!telegramReady()) return res.status(404).send("Telegram is off for Kept: it has no bot of its own yet.");
     res.redirect(303, await tgCode("owner", m.id));
   }));
   r.post("/manage/:ref/connect/telegram", page(async (req, res) => {
     const s = await subscriberByRef(await getDb(), req.params.ref);
     if (!s || s.is_sample) return res.status(404).send("Subscription not found");
+    if (!telegramReady()) return res.status(404).send("Telegram is off for Kept: it has no bot of its own yet.");
     res.redirect(303, await tgCode("subscriber", s.id));
   }));
   r.post("/webhooks/telegram", json(async (req, res) => {
@@ -343,7 +345,7 @@ export function foundationRouter(): Router {
       ["Failed renewals", "real only", "shown only when PayPal reports a failed payment by verified webhook or read-back; no test switch exists"],
       ["Log in with PayPal", config.paypal.loginEnabled ? "on" : "off (PAYPAL_LOGIN_ENABLED)", "needs Log in with PayPal enabled on the sandbox app"],
       ["Model brain", hasOpenAI() ? "live (OpenAI)" : "rules only", providerLabel()],
-      ["Telegram", telegramReady() ? `bot connected · ${nLinked("telegram")} chats linked` : "not configured", "renewal reminders and owner approvals with buttons"],
+      ["Telegram", telegramReady() ? `bot connected · ${nLinked("telegram")} chats linked` : "off: Kept has no bot of its own (KEPT_TELEGRAM is not on)", "renewal reminders and owner approvals with buttons"],
       ["WhatsApp", whatsappReady() ? `connected · ${nLinked("whatsapp")} linked` : "not configured (no WhatsApp Cloud API token)", "same messages as Telegram when configured"],
       ["SMS (Twilio)", smsReady() ? `configured · ${nLinked("sms")} numbers linked` : "not configured", "renewal reminders, payment notices and owner approvals by text, with a link; numbers are confirmed by a texted code"],
       ["Web push", pushReady() ? "configured (VAPID)" : "not configured", "to browsers that turn on notifications"],

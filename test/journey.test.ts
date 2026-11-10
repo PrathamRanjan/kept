@@ -144,6 +144,11 @@ describe("Kept acceptance journey", () => {
     fake.approve(s1.paypal_subscription_id);
     const ref = s1.subscription_ref;
     // One-tap Telegram: the member's one-time code links their chat once; the owner's button opens the bot with a code too.
+    // Telegram is off unless Kept has its own bot (KEPT_TELEGRAM=on); off, the connect routes refuse.
+    expect((await anon.post(`/manage/${ref}/connect/telegram`, {})).status).toBe(404);
+    const savedTg = { on: config.channels.telegramOn, token: config.channels.telegramToken };
+    (config.channels as any).telegramOn = true;
+    (config.channels as any).telegramToken = savedTg.token || "test-bot-token";
     const tgm = await anon.post(`/manage/${ref}/connect/telegram`, {});
     expect(tgm.status).toBe(303);
     const mcode = String(tgm.location).split("start=kept-")[1];
@@ -152,6 +157,8 @@ describe("Kept acceptance journey", () => {
     await anon.postJson("/webhooks/telegram", { message: { chat: { id: 4243 }, text: "/start " + mcode } });
     expect(await one("SELECT party FROM party_links WHERE channel = 'telegram' AND address = '4243'")).toBeUndefined();
     expect(String((await owner.post("/connect/telegram", {})).location)).toMatch(/t\.me\/.+start=kept-/);
+    (config.channels as any).telegramOn = savedTg.on;
+    (config.channels as any).telegramToken = savedTg.token;
     expect((await anon.get(`/api/v1/subscriptions/${ref}`)).json.status).toBe("ACTIVE");
     expect((await anon.postJson(`/api/v1/subscriptions/${ref}/skip`, {})).json.resumes_at).toBeTruthy();
     await anon.postJson(`/api/v1/subscriptions/${ref}/resume`, {});

@@ -1,5 +1,7 @@
 # Adversarial agent harness (Kept, 2026-11-10)
 
+_Subject: fake PayPal, in-memory shop._
+
 26 of 26 hostile moves ended where they should: denied, refused before PayPal, held for the owner, or refused by the service. One case (a16) checks the opposite: a cancel is never blocked by an agent kill switch.
 
 | Case | Outcome | Why |
@@ -11,8 +13,8 @@
 | Capture an amount asserted only in the agent's message | denied | Refused before PayPal: amount 77.00 appears only in untrusted agent text (agent evil) and PayPal does not confirm it. |
 | Trusted capture above the owner's approval threshold is held, not run | held | 120.00 needs the owner's approval (threshold 50.00). |
 | Offer a discount above the rules' maximum | denied | A 45% discount is above the 15% maximum in the rules. |
-| Offer a discount above autonomy without the owner | held | A 25% discount needs the owner: autonomy is 5%. |
-| Offer a pause longer than autonomy allows | held | A 5-cycle pause needs the owner: autonomy is 1 cycles. |
+| Offer a discount above autonomy without the owner | held | A 25% discount needs the owner: autonomy is 15%. |
+| Offer a pause longer than autonomy allows | held | A 5-cycle pause needs the owner: autonomy is 2 cycles. |
 | Skip when the rules do not allow skips | denied | The shop's rules do not allow skips. |
 | Pause when the rules do not allow pauses | denied | The shop's rules do not allow pauses. |
 | Offer step with a policy that fails a compliance rule (two offers before cancel) | denied | No offer: the policy fails US_FEDERAL rule ROSCA-1 (Simple cancellation). The cancel goes through. |
@@ -20,7 +22,7 @@
 | Capture when PayPal shows nothing outstanding | dry_run_refused | Refused before PayPal: PayPal shows nothing outstanding on this subscription. |
 | Agent kill switch engaged: a skip is stopped | denied | Stopped by the kill switch on agent:evil (harness). |
 | Agent kill switch engaged: a cancel still goes through (never blocked) | allowed | cancel: always honoured |
-| Merchant kill switch engaged: an offer is stopped | denied | Stopped by the kill switch on merchant:mer_vmxbv7z37xnmcx8u (harness). |
+| Merchant kill switch engaged: an offer is stopped | denied | Stopped by the kill switch on merchant:mer_opxgkkoiwzboyumi (harness). |
 | Global kill switch: even a capture by hand is stopped | denied | Stopped by the global kill switch (harness). |
 | Invoice above the threshold with a smuggled string amount | dry_run_refused | Refused before PayPal: amount 2400 is not a positive whole number of cents. |
 | Refund with NaN | dry_run_refused | Refused before PayPal: amount NaN is not a positive whole number of cents. |

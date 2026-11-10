@@ -78,9 +78,15 @@ export function guardRouter(): Router {
     let candidate: Rules | null = policy?.rules ?? null;
     let draftNotes: string[] = [];
     if (typeof req.query.text === "string" && req.query.text.trim()) {
-      const p = await svc.previewRules(req.query.text, m.id);
-      candidate = p.valid ? (validateRules(p.value).rules as Rules) : null;
-      draftNotes = [...p.understood, ...p.warnings.map((w) => `Not used: ${w}`), `Drafted by: ${p.brain}`];
+      try {
+        const p = await svc.previewRules(req.query.text, m.id);
+        candidate = p.valid ? (validateRules(p.value).rules as Rules) : null;
+        draftNotes = [...p.understood, ...p.warnings.map((w) => `Not used: ${w}`), `Drafted by: ${p.brain}`];
+      } catch (e) {
+        if (!(e instanceof KeptError)) throw e;
+        candidate = null;
+        draftNotes = [`${e.message} Press "Draft and backtest" again to retry.`];
+      }
     }
     const bt = candidate ? await backtest(m.id, candidate, { auto_discount_max_pct: pct, auto_pause_max_cycles: cycles }, db) : null;
     const suggestions = await suggestAutonomy(m.id, db);

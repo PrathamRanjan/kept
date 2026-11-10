@@ -63,7 +63,10 @@ function actorWord(actor: string): "AI" | "Rule" | "PayPal" | "Person" | "Agent"
 function stepWords(s: any): string {
   const r = s.result ?? {};
   switch (s.tool) {
-    case "classify_reason": return `Read the reason as "${String(r.category ?? "other").replace(/_/g, " ")}"${r.via === "rules" ? " (rules, no model)" : ""}`;
+    case "classify_reason":
+      if (r.via === "unread") return "Couldn't read the reason (the model did not answer), so no offer was made";
+      return `Read the reason as "${String(r.category ?? "other").replace(/_/g, " ")}"${r.via === "code" || r.via === "rules" ? " (code: nothing to read)" : r.via === "backup" ? " (backup model)" : ""}`;
+    case "word_offer": return r.by === "code" ? "Wrote the offer with Kept's own template (the model did not answer)" : `Worded the offer${r.by === "backup" ? " (backup model)" : ""}`;
     case "eligibility": return r.chosen ? `Rules allow: ${(r.eligible ?? []).join(", ").replace(/_/g, " ")}. Chose ${String(r.chosen).replace(/_/g, " ")}.` : "No offer the rules allow fits, so no offer.";
     case "quarantine": return "Kept instruction-like text out of the offer step";
     default:
@@ -194,7 +197,7 @@ export function uiApi(): Router {
       switchTo: all.filter((p) => p.active && p.kind !== "promo" && p.id !== s.plan_id).map((p) => planJson(p, m.currency)),
       pauseMax: policy?.rules.pause.enabled ? policy.rules.pause.maxCycles : 0,
       promise: policy ? describeRules(policy.rules) : ["Cancelling always works in one step."],
-      offer: offer ? { id: offer.id, message: offer.message, label: toOffer(offer).terms?.label ?? null, type: offer.type, terms: offer.terms, expires_at: offer.expires_at } : null,
+      offer: offer ? { id: offer.id, message: offer.message, label: toOffer(offer).terms?.label ?? null, type: offer.type, terms: offer.terms, expires_at: offer.expires_at, worded_by: (toOffer(offer).terms as any)?.wordedBy === "code" ? "code" : "model" } : null,
       telegram: { linked: tg, ready: telegramReady() },
       sms: { ready: smsReady(), linked: await smsLinks("subscriber", s.id), pending: await smsPending("subscriber", s.id) },
       card: await cycleCard(db, s, all),
@@ -303,7 +306,7 @@ export function uiApi(): Router {
     const m = await needOwner(req);
     const q = String(req.body?.question ?? "").trim().slice(0, 500);
     if (!q) throw new KeptError("Ask a question first.", "empty", 422);
-    return { answer: await svc.askOwner(m, q) };
+    return await svc.askOwnerWithSource(m, q);
   }));
 
   r.post("/ui/owner/approvals/:id/:choice(approve|decline)", j(async (req) => {

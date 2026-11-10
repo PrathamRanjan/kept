@@ -27,7 +27,7 @@ ${msg ? html`<div class="wrap flash-wrap"><div class="banner bad" role="alert">$
     <div class="lp-cta">${ownerBtn("Try it as the shop")}<a class="btn lg" href="#how">How it works</a></div>
     <div class="lp-trust" style="margin-top:1.5rem"><span>${ic("checkCircle")}PayPal sandbox, no real money</span><span>${ic("checkCircle")}Cancel always works in one step</span><span>${ic("checkCircle")}At most one offer, never a maze</span></div>
   </div>
-  <div class="mock" aria-hidden="true"><div class="mock-bar"><i></i><i></i><i></i><span>${shop?.name ?? "Ember & Oak Coffee Club"} · member page</span></div><div class="mock-body">
+  <p class="small muted" style="margin:0 0 4px">Illustration of a member page</p><div class="mock" aria-hidden="true"><div class="mock-bar"><i></i><i></i><i></i><span>${shop?.name ?? "Ember & Oak Coffee Club"} · member page</span></div><div class="mock-body">
     <div class="mock-row"><span><b>Signature bag</b> · $24 monthly</span><span class="pill good">active</span></div>
     <div class="mock-row"><span>Away for a month? <b>Skip next delivery</b></span><span class="pill">one tap</span></div>
     <div class="offer-card card" style="margin:0;padding:0.9rem 1rem"><b style="font-family:var(--font-display);font-style:italic;font-size:1.15rem">One offer before you go</b><p class="small muted" style="margin:0.3rem 0 0.6rem">Half bag at $12 for three months, then back to normal. Or cancel now, no questions.</p><div class="row"><span class="btn small primary">Take the offer</span><span class="btn small">No thanks, cancel</span></div></div>
@@ -41,7 +41,7 @@ ${msg ? html`<div class="wrap flash-wrap"><div class="banner bad" role="alert">$
   <ol class="lp-steps">
     <li><h3>Write your plans and rules</h3><p>“Signature bag $24 monthly. One skip a quarter, pause up to two months, at most 15% off for three months.” Kept creates the PayPal plans.</p></li>
     <li><h3>Members subscribe</h3><p>On your shop page, or through their AI assistant. They approve on PayPal's own page; Kept never sees card details.</p></li>
-    <li><h3>Changes take one step</h3><p>Skip, pause, resume or switch plan from the member page, a Telegram button, or an assistant's single call.</p></li>
+    <li><h3>Changes take one step</h3><p>Skip, pause, resume or switch plan from the member page, a text reply, or an assistant's single call.</p></li>
     <li><h3>Cancel fairly, recover politely</h3><p>One optional offer, then the cancel goes through. Failed renewals are chased gently and collected once fixed.</p></li>
   </ol>
 </div></section>

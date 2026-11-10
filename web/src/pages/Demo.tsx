@@ -61,7 +61,7 @@ export default function Demo({ judge = false }: { judge?: boolean }) {
     {
       icon: Store,
       who: "The shop owner",
-      what: "Your own copy of Ember & Oak Coffee Club. See what needs you, approve held offers, read why people leave.",
+      what: "Your own private copy of the demo coffee shop. See what needs you, approve held offers, read why people leave.",
       action: (
         <Button onClick={owner} disabled={busy || s?.demoMode === false}>
           Continue as the owner
@@ -82,7 +82,7 @@ export default function Demo({ judge = false }: { judge?: boolean }) {
     {
       icon: KeyRound,
       who: "A new subscriber",
-      what: "Subscribe with a PayPal sandbox personal account. The $1 daily plan renews within a day.",
+      what: "Subscribe with a PayPal sandbox personal account. The shop's daily plan renews within a day, so you see a real renewal.",
       action: (
         <Button variant="outline" onClick={() => go("shop")} disabled={busy}>
           Open the shop

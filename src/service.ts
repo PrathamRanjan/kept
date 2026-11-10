@@ -1,6 +1,7 @@
 import { getDb } from "./db.js";
 import { spendAllowance } from "./demo/allowance.js";
 import { config } from "./config.js";
+import { ModelUnavailable } from "./brain/openai.js";
 import { getBrain } from "./brain/index.js";
 import type { DraftPlan, ReasonCategory, ShopStats } from "./brain/types.js";
 import * as exec from "./executor.js";
@@ -523,8 +524,17 @@ export async function requestCancel(ref: string, opts: { reason?: string; hearOf
     if (rawReason) await registerProvenance(actor.kind === "agent" ? `agent ${actor.agentId}` : "subscriber", actor.kind === "agent" ? "agent" : "message", rawReason, "subscriber", s.id, db);
     if (quarantined.length) await run.step({ actor: "guard", tool: "quarantine", args: { lines: quarantined }, gate: "n/a", result: { note: "instruction-shaped text kept out of the offer step and the model" } });
     const reason = clean;
-    const category = await brain.classifyReason(reason);
-    await run.step({ actor: brain.lastVia() === "rules" ? "code" : "model", tool: "classify_reason", args: { reason: reason.slice(0, 120) }, result: { category, via: brain.lastVia() }, gate: "n/a" });
+    // An unreadable reason gets no offer: when both models fail, the cancel goes ahead and says why.
+    let category: ReasonCategory = "other";
+    let unread = false;
+    try {
+      category = await brain.classifyReason(reason);
+    } catch (e) {
+      if (!(e instanceof ModelUnavailable)) throw e;
+      unread = true;
+    }
+    const via = unread ? "unread" : brain.lastVia();
+    await run.step({ actor: via === "model" || via === "backup" ? "model" : "code", tool: "classify_reason", args: { reason: reason.slice(0, 120) }, result: { category: unread ? null : category, via }, gate: "n/a" });
     if (rawReason) {
       await db.query("INSERT INTO feedback (id, merchant_id, subscriber_id, text, category) VALUES ($1,$2,$3,$4,$5)", [newId("fb"), m.id, s.id, rawReason, category]);
     }
@@ -537,7 +547,10 @@ export async function requestCancel(ref: string, opts: { reason?: string; hearOf
       await logEvent(db, { merchantId: m.id, subscriberId: s.id, source: actor.kind, type: "offer.declined", summary: `${actorLabel(actor)} asked to cancel directly; the open offer was closed` });
     }
 
-    if (opts.hearOffer) {
+    if (opts.hearOffer && unread) {
+      await logEvent(db, { merchantId: m.id, subscriberId: s.id, source: "system", type: "offer.none", summary: "No offer made: Kept couldn't read the reason just now (the model did not answer), so it made no offer and cancelled as asked." });
+    }
+    if (opts.hearOffer && !unread) {
       // Anything that goes wrong while preparing an offer falls through to the cancel. Cancelling is never blocked.
       try {
         const policy = await rulesFor(m);
@@ -560,6 +573,8 @@ export async function requestCancel(ref: string, opts: { reason?: string; hearOf
             try {
               await gate(await moveFor(m, s, actor, "offer", { entity: "subscriber", entityId: s.id, offer: { type: chosen.type, percent: chosen.terms.percent, cycles: chosen.terms.cycles }, cents: Math.round(chosen.perCycleValue * 100), customerInitiated: false }), run);
               const offer = await createOffer(m, s, chosen, category, policy.version, policy.rules.offerExpiryMinutes, choice.rationale, run.id);
+              const by = String((offer.terms as any)?.wordedBy ?? "");
+              await run.step({ actor: by === "model" || by === "backup" ? "model" : "code", tool: "word_offer", args: { offer: chosen.key }, result: { by }, gate: "n/a" });
               return { status: "offer_open" as const, subscription: s, offer: offerView(offer), note: "Accept with respond_to_offer(accept=true). Decline, or let it expire, and the subscription is cancelled straight away." };
             } catch (e) {
               if (e instanceof HeldForApproval) await logEvent(db, { merchantId: m.id, subscriberId: s.id, source: "guard", type: "offer.held", summary: `No offer made: ${e.message} The owner can approve it on the guard page to raise autonomy.`, payload: { approvalId: e.approvalId, key: chosen.key } });
@@ -603,6 +618,7 @@ export function offerView(o: ReturnType<typeof toOffer>) {
     terms: { cycles: o.terms.cycles, percent: o.terms.percent, new_price: o.terms.newPrice, to_plan: o.terms.toPlanName },
     expires_at: new Date(o.expires_at).toISOString(),
     status: o.status,
+    worded_by: (o.terms as any).wordedBy === "code" ? "code" : (o.terms as any).wordedBy ? "model" : null,
     if_declined: "The subscription is cancelled immediately.",
   };
 }
@@ -950,6 +966,13 @@ export async function askOwner(m: Merchant, question: string) {
   await spendAllowance(m.id);
   const stats = await computeStats(m);
   return getBrain().answer(question.slice(0, 500), stats);
+}
+
+/** The answer plus who wrote it, for the owner's Ask box. */
+export async function askOwnerWithSource(m: Merchant, question: string) {
+  const answer = await askOwner(m, question);
+  const b = getBrain();
+  return { answer, by: b.lastVia(), model: b.lastModel?.() ?? null };
 }
 
 /* ----------------------------------------------------------------------------------------------
