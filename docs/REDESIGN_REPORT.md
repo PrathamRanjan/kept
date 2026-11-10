@@ -100,9 +100,17 @@ Live site: https://pph-kept.onrender.com · Source: https://github.com/PrathamRa
 
 **Single best change:** record a 2–3 minute demo video that follows Judge Mode, including the live sandbox subscription and a one-step cancel read back from PayPal, and link it at the top of the README. It lifts Presentation and Best Demo Delivery, and helps every other track.
 
-## 8. Live sandbox run on the new UI
+## 8. Live sandbox run on the new UI (10 Nov 2026, https://pph-kept.onrender.com, fresh data)
 
-On the live site, the new shop page created the $1 daily subscription for "QC Redesign Run". PayPal's sandbox approval page opened, and is waiting for the sandbox buyer to sign in. Kept's assistant may not type sandbox credentials. The ids, amounts and the match with buyer activity get recorded here once approval is done.
+| Step (new UI) | Kept shows | PayPal reads back |
+|---|---|---|
+| Shop page → "Daily demo bag" $1.00/day, new subscriber "QC Redesign Run" → "Or continue on PayPal's page" → sandbox buyer approves | Member page: Active, $1.00 per day, one paid stamp (10 Nov), next payment 11 Nov | Subscription **I-5BRL6CY4FTUP** on plan P-18N2640841511520ANLYZ62Q, last payment **1.00 USD** |
+| Skip next payment | Paused, starts again 11 Nov 11:00 UTC; skipped stamp; trace "Rule: allowed → PayPal: suspend → SUSPENDED" | SUSPENDED |
+| Resume now | Active, next payment 11 Nov; trace "PayPal: activate → ACTIVE" | ACTIVE |
+| Cancel, ticking "show me one offer" | One offer: pause for 2 billing cycles, open 60 minutes; trace "Rules allow: pause 2. Chose pause 2." (the audit's P0 fix working live: before it, this cancel got no offer) | ACTIVE (nothing moves while the offer is open) |
+| "No thanks, cancel now" | Cancelled; the card ends with a closed "ended" stamp; run `run_8t6tcvtixfg3kr4r` | **CANCELLED at 2026-11-10T01:35:32Z** (`scripts/pp-sub-check.mts`) |
+
+Amounts match: one $1.00 payment and no further charge. The buyer's activity page needs a full sandbox account sign-in, which the assistant doesn't do, so this run is matched against PayPal's subscription API rather than the activity page. The earlier audit run (I-0KYH3B8BGX18, −$18.25) was matched against buyer activity.
 
 ## 9. Top 3 changes left
 
