@@ -91,6 +91,13 @@ export async function verifySmsLink(party: Party, partyId: string, code: string)
   return { phone: maskPhone(v.phone) };
 }
 
+/** The masked number a still-valid code was sent to, so a reloaded page can ask for it. */
+export async function smsPending(party: Party, partyId: string): Promise<string | null> {
+  const row = (await (await getDb()).query<{ value: string }>("SELECT value FROM settings WHERE key = $1", [key(party, partyId)])).rows[0];
+  const v = row ? (JSON.parse(row.value) as Pending) : null;
+  return v && v.code && v.exp > Date.now() && v.tries < 5 ? maskPhone(v.phone) : null;
+}
+
 export async function smsLinks(party: Party, partyId: string): Promise<string[]> {
   const db = await getDb();
   return (await db.query<{ address: string }>("SELECT address FROM party_links WHERE channel = 'sms' AND party = $1 AND party_id = $2", [party, partyId])).rows.map((r) => maskPhone(r.address));

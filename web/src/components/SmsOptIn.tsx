@@ -7,10 +7,10 @@ import { Label } from "@/components/ui/label";
 import { api, ApiError } from "@/lib/api";
 
 /** Texts before each renewal: number → texted 6-digit code → on. Nothing is sent until the code comes back. */
-export function SmsOptIn({ memberRef, sms, onChange }: { memberRef: string; sms: { ready: boolean; linked: string[] }; onChange: () => void | Promise<void> }) {
+export function SmsOptIn({ memberRef, sms, onChange }: { memberRef: string; sms: { ready: boolean; linked: string[]; pending?: string | null }; onChange: () => void | Promise<void> }) {
   const [phone, setPhone] = useState("");
   const [consent, setConsent] = useState(false);
-  const [sentTo, setSentTo] = useState<string | null>(null);
+  const [sentTo, setSentTo] = useState<string | null>(sms.pending ?? null);
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");

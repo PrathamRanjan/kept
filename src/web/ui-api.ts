@@ -16,7 +16,7 @@ import { isKilled } from "../guard/kill.js";
 import { loadRun, runsFor, recentRuns } from "../trace.js";
 import { hasOpenAI, providerLabel } from "../ai/provider.js";
 import { telegramReady } from "../channels/index.js";
-import { smsLinks, smsReady, startSmsLink, stopSms, verifySmsLink } from "../channels/sms.js";
+import { smsLinks, smsPending, smsReady, startSmsLink, stopSms, verifySmsLink } from "../channels/sms.js";
 import { cycleCard } from "./cycles.js";
 
 const COOKIE = "kept_owner";
@@ -183,7 +183,7 @@ export function uiApi(): Router {
       promise: policy ? describeRules(policy.rules) : ["Cancelling always works in one step."],
       offer: offer ? { id: offer.id, message: offer.message, label: toOffer(offer).terms?.label ?? null, type: offer.type, terms: offer.terms, expires_at: offer.expires_at } : null,
       telegram: { linked: tg, ready: telegramReady() },
-      sms: { ready: smsReady(), linked: await smsLinks("subscriber", s.id) },
+      sms: { ready: smsReady(), linked: await smsLinks("subscriber", s.id), pending: await smsPending("subscriber", s.id) },
       card: await cycleCard(db, s, all),
       timeline: await timelineFor(s.id),
       mcp: `${config.appUrl}/s/${m.slug}/mcp`,

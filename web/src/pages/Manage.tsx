@@ -41,7 +41,7 @@ interface ManageData {
   promise: string[];
   offer: { id: string; message: string; label: string | null; type: string; expires_at: string } | null;
   telegram: { linked: boolean; ready: boolean };
-  sms: { ready: boolean; linked: string[] };
+  sms: { ready: boolean; linked: string[]; pending?: string | null };
   card: CycleCardData;
   timeline: TimelineRun[];
   mcp: string;

@@ -80,13 +80,14 @@ describe("SMS (Twilio)", () => {
   it("member: consent, texted code, wrong code refused, right code links; reminders arrive by text with the member link", async () => {
     const c = new Client(srv.base);
     const ada = await member("Ada");
-    expect((await c.get(`/ui/manage/${ada.ref}`)).json.sms).toEqual({ ready: true, linked: [] });
+    expect((await c.get(`/ui/manage/${ada.ref}`)).json.sms).toEqual({ ready: true, linked: [], pending: null });
     expect((await c.postJson(`/ui/manage/${ada.ref}/sms/start`, { phone: "+65 8148 0996", consent: false })).status).toBe(422);
     expect((await c.postJson(`/ui/manage/${ada.ref}/sms/start`, { phone: "8148", consent: true })).status).toBe(422);
     const st = (await c.postJson(`/ui/manage/${ada.ref}/sms/start`, { phone: "+65 8148 0996", consent: true })).json;
     expect(st.to).toBe("+65••••996");
     expect(sent.at(-1)).toMatchObject({ to: "+6581480996", from: "+15550000000" });
     expect(sent.at(-1)!.body).toMatch(/Reply STOP/);
+    expect((await c.get(`/ui/manage/${ada.ref}`)).json.sms.pending).toBe("+65••••996"); // a reload still asks for the code
     // Nothing is linked until the code comes back.
     expect(await one("SELECT * FROM party_links WHERE channel = 'sms'")).toBeUndefined();
     const code = lastCode();
@@ -94,7 +95,7 @@ describe("SMS (Twilio)", () => {
     expect((await c.postJson(`/ui/manage/${ada.ref}/sms/verify`, { code })).json.message).toMatch(/Texts are on/);
     expect((await c.postJson(`/ui/manage/${ada.ref}/sms/verify`, { code })).status).toBe(410); // one use only
     expect(await one("SELECT party, party_id FROM party_links WHERE channel = 'sms' AND address = '+6581480996'")).toEqual({ party: "subscriber", party_id: ada.id });
-    expect((await c.get(`/ui/manage/${ada.ref}`)).json.sms.linked).toEqual(["+65••••996"]);
+    expect((await c.get(`/ui/manage/${ada.ref}`)).json.sms).toMatchObject({ linked: ["+65••••996"], pending: null });
 
     // A renewal three days out: the reminder goes by text, with the member page link and no buttons.
     await db.query("UPDATE subscribers SET next_billing_time = now() + interval '3 days' WHERE id = $1", [ada.id]);
