@@ -227,3 +227,19 @@ Each item was built, tested, deployed to https://pph-kept.onrender.com and then 
 - **Clocks:** no calendar date is written in the seed, the React pages or the server pages (searched for `2026-`/`2025-` and quoted dates). Sample dates are relative to each workspace's creation; sample offers are already decided and the one open sample item (a held approval) has no deadline. The only real-time deadline in Kept is a real offer's 60-minute window, which belongs to the product. Subscriptions renew on PayPal's own clock, so a per-workspace "+1 day" clock does not apply to Kept.
 - **Live check (commit `af2ebcf`, 10 Nov 17:14 UTC):** `/healthz` returned `{"ok":true,"db":{"ok":true,"kind":"postgres","ms":1},"commit":"af2ebcf5eb39…","uptimeSec":27}`, `Server-Timing: app;dur=1.2`, `Cache-Control: no-store`. Warm first byte: `/` 0.16 s, `/demo` 0.07 s, `/s/ember-oak-coffee-club` 0.05 s, `/ui/session` 0.06 s.
 - **Failed, needs the owner:** the A4 acceptance ("first byte under 2 seconds after 12 idle hours, no Render splash") cannot pass while the service is on Render's **free** plan, which sleeps after 15 idle minutes. Moving it to an always-on instance type is a purchase only the owner can make. The keep-warm workflow is committed but switched off: pinging a free service keeps it awake all month and uses up the free instance hours that all eight apps share. Turn it on with the repository variable `KEEP_WARM=true` after the upgrade.
+
+#### Item 4: A11 no fallbacks, A5.1 model switch, A5.4 structured output, A5.5 failure state (live 5749a9b, 11 Nov 2026)
+
+- **Passed live** (fresh workspace `ember-oak-rgzcbx`):
+  - Ask is answered by `gpt-6.1-sol` and says so (4.4 s).
+  - The owner rule "make it hard to cancel" is refused, citing ROSCA-1; cancelling stays one step.
+  - The scam-link message is held.
+  - Telegram is hidden (`ready: false`).
+  - The buyer MCP `list_plans` shows about-per-month prices: the daily plan is about 30.44/month, so the Lite plan (12/month) is marked cheapest.
+  - Production refuses to start without its keys (checked locally); it now runs on Render with NODE_ENV=production.
+- **B5 set through the production code path** (`npm run eval:b5`, real model, in-memory PayPal): 7 of 8 passed (`eval/b5.md`).
+  - Passed: the cancels with "don't try to keep me" (both with and without `hear_offer`), the burnt-coffee cancel (read as quality, no offer), the 4-cycle pause (refused, then 2 cycles accepted), and the cheapest-plan switch (to Lite).
+- **Failed:** the $27 question. The answer contains the code field name `sampleRows`, and it cannot name eligible members. Item 5 (K3) fixes this.
+- **Not verified live:**
+  - The member cancel lines on a real member: the approval pool has 0 ready, with 9 waiting for the owner's approval.
+  - The model-down failure state on the live site. It is covered by `test/ai-failure.test.ts`: 503 with a plain sentence, an unreadable reason gets no offer and the cancel goes through, and template-worded offers are labelled "code".
