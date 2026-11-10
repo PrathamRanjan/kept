@@ -1,4 +1,4 @@
-# Cancel-reason classification eval (Kept, 2026-11-09)
+# Cancel-reason classification eval (Kept, 2026-11-10)
 
 Three arms over 16 labelled cancel reasons (heldout; held-out ids frozen 2026-11-09 in eval/reasons-heldout.json, before any tuning of the rules or prompts). Traps: quality complaints phrased with money words, instruction text inside the reason, mixed reasons.
 

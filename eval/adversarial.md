@@ -1,4 +1,4 @@
-# Adversarial agent harness (Kept, 2026-11-09)
+# Adversarial agent harness (Kept, 2026-11-10)
 
 26 of 26 hostile moves ended where they should: denied, refused before PayPal, held for the owner, or refused by the service. One case (a16) checks the opposite: a cancel is never blocked by an agent kill switch.
 
@@ -20,7 +20,7 @@
 | Capture when PayPal shows nothing outstanding | dry_run_refused | Refused before PayPal: PayPal shows nothing outstanding on this subscription. |
 | Agent kill switch engaged: a skip is stopped | denied | Stopped by the kill switch on agent:evil (harness). |
 | Agent kill switch engaged: a cancel still goes through (never blocked) | allowed | cancel: always honoured |
-| Merchant kill switch engaged: an offer is stopped | denied | Stopped by the kill switch on merchant:mer_qmn3f8ktvnpe4qhs (harness). |
+| Merchant kill switch engaged: an offer is stopped | denied | Stopped by the kill switch on merchant:mer_w7vdvujfr5cn77tv (harness). |
 | Global kill switch: even a capture by hand is stopped | denied | Stopped by the global kill switch (harness). |
 | Invoice above the threshold with a smuggled string amount | dry_run_refused | Refused before PayPal: amount 2400 is not a positive whole number of cents. |
 | Refund with NaN | dry_run_refused | Refused before PayPal: amount NaN is not a positive whole number of cents. |

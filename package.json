@@ -13,8 +13,8 @@
     "start": "node --env-file-if-exists=.env dist/main.js",
     "worker": "node --env-file-if-exists=.env dist/worker-main.js",
     "cron": "node --env-file-if-exists=.env dist/cron-main.js",
-    "build": "tsc -p tsconfig.json && node scripts/copy-static.mjs",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build": "npm run build:web && tsc -p tsconfig.json && node scripts/copy-static.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit && npm --prefix web run typecheck",
     "test": "vitest run",
     "seed": "tsx --env-file-if-exists=.env scripts/seed.ts",
     "sandbox:check": "tsx --env-file-if-exists=.env scripts/pp-check.mts",
@@ -22,7 +22,10 @@
     "webhook:register": "tsx --env-file-if-exists=.env scripts/register-webhook.ts",
     "eval:reasons": "tsx --env-file-if-exists=.env scripts/eval-reasons.ts",
     "eval:adversarial": "tsx --env-file-if-exists=.env scripts/eval-adversarial.ts",
-    "cli": "tsx --env-file-if-exists=.env scripts/kept-cli.ts"
+    "cli": "tsx --env-file-if-exists=.env scripts/kept-cli.ts",
+    "build:web": "npm --prefix web ci --include=dev && npm --prefix web run build",
+    "e2e": "playwright test",
+    "shots": "node scripts/shots.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.15",

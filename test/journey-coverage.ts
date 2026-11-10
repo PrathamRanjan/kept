@@ -69,3 +69,7 @@ export async function serveTracked(app: any) {
 /** Routes added by the foundation work (guard, compliance, traces, evals, money desk, channels, PWA, judge). */
 export const FOUNDATION_ROUTE = /\/(skill\.md|manage\/:ref\/check|dashboard\/(guard|safety|compliance|traces|eval|money|channels|evidence)|trace\/|channels\/link|webhooks\/(telegram|whatsapp)|manifest\.webmanifest|sw\.js|push\/|judge|api\/v1\/runs|api\/v1\/subscriptions\/:ref\/(runs|invoice))/;
 export const isFoundationRoute = (r: string) => FOUNDATION_ROUTE.test(r);
+
+/** Routes of the React UI's JSON API and page shell; walked in ui.test.ts. */
+export const UI_ROUTE = /^(GET|POST) \/(ui\/|demo$|dashboard\/(members|approvals)$|favicon\.svg$|robots\.txt$|og\.png$)/;
+export const isUiRoute = (r: string) => UI_ROUTE.test(r);

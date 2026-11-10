@@ -8,7 +8,7 @@ import { setPayPalFactory } from "../src/paypal/index.js";
 import { FakePayPal } from "../src/paypal/fake.js";
 import { tick } from "../src/worker.js";
 import { Client } from "./client.js";
-import { isFoundationRoute, serveTracked } from "./journey-coverage.js";
+import { isFoundationRoute, isUiRoute, serveTracked } from "./journey-coverage.js";
 
 // Acceptance journey: a shop owner onboards from nothing (plans and rules from plain words, replayed
 // before approval), subscribers use every action on the web and over REST, a cancellation survives a
@@ -205,6 +205,6 @@ describe("Kept acceptance journey", () => {
     expect((await one("SELECT status FROM subscribers WHERE ref = $1", [ref])).status).toBe("CANCELLED");
 
     expect(srv.failures).toEqual([]);
-    expect(srv.missed(isFoundationRoute)).toEqual([]); // foundation routes are walked in foundation.test.ts
+    expect(srv.missed((r) => isFoundationRoute(r) || isUiRoute(r))).toEqual([]); // foundation routes are walked in foundation.test.ts
   });
 });
