@@ -36,10 +36,10 @@ export interface LayoutOpts {
 
 export const BRAND: Brand = {
   name: "Kept",
-  mark: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><path d="M7 2v2"/><path d="M11 2v2"/></svg>`,
+  mark: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 12.5l4 4 8-9"/></svg>`,
   description: "Kept: PayPal subscriptions that customers and their AI agents can skip, pause or cancel in one step, with one fair offer within the shop's rules.",
-  themeColor: "#3e2417",
-  fonts: "family=Instrument+Serif:ital@0;1&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500",
+  themeColor: "#2443c4",
+  fonts: "family=Schibsted+Grotesk:wght@500;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500",
   layout: "topbar",
   testMode: "Test mode: subscriptions run on the PayPal sandbox, so no real money moves. Rows marked sample are example data.",
   siteLinks: [["/#how", "How it works"], ["/#fair", "Fair by design"], ["/agents", "For AI agents"], ["/#try", "Sign in"]],

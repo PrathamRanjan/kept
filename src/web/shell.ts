@@ -85,6 +85,7 @@ function head(b: Brand, title: string, extra = ""): string {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<script>try{var t=localStorage.getItem("kept-theme");if(t==="dark"||(t!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.classList.add("dark")}catch(e){}</script>
 <title>${e(title)}</title>
 <meta name="description" content="${e(b.description)}">
 <link rel="icon" href="data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='${b.themeColor}'/><g transform='translate(4 4)' color='white'>${b.mark.replace(/<svg[^>]*>/, "").replace("</svg>", "")}</g></svg>`)}">

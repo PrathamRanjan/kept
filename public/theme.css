@@ -1,56 +1,73 @@
-/* Kept: a neighbourhood coffee club. Crema paper, espresso ink, a roasted-copper accent; Instrument Serif headings. */
+/* Kept, "Stamp card": the same tokens as the React app (web/src/index.css) so server-rendered tool pages match it.
+   Paper and ink, one cobalt stamp colour; paid green, pause amber, fail red used only for status. Cancel is never red. */
 :root {
-  --ui-bg: #faf6f0; --ui-fg: #22160f; --ui-card: #fffdf9; --ui-card-fg: #22160f;
-  --ui-primary: #3e2417; --ui-primary-fg: #fbf3e8;
-  --ui-secondary: #f2e9dd; --ui-secondary-fg: #3e2417;
-  --ui-muted-bg: #f4ece2; --ui-muted-fg: #7b6758;
-  --ui-accent-bg: #f6e3cf; --ui-accent-fg: #8a4a1c;
-  --ui-border: #ebdfd1; --ui-input: #dfcfbd; --ui-ring: #b36a33;
-  --ui-sidebar: #f5eee5;
-  --ui-success: #2f6a45; --ui-success-bg: #eaf4ec;
-  --ui-warning: #8f5a0b; --ui-warning-bg: #fbf1de;
-  --ui-destructive: #a52a1f; --ui-destructive-bg: #fbecea;
-  --ui-info: #35597d; --ui-info-bg: #ecf2f8;
-  --radius: 0.85rem;
-  --font-sans: "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Instrument Serif", Georgia, serif;
-  --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
-  --crema: #b36a33;
+  --paper: #f6f3ec; --card-stock: #fffdf9; --k-ink: #16181b; --ink-2: #4b5058; --rule: #dcd4c4;
+  --stamp: #2443c4; --stamp-wash: #e7ebfa; --paid: #1d7348; --paid-wash: #e2f1e8;
+  --pause: #8f5a00; --pause-wash: #f6ead2; --fail: #b42318; --fail-wash: #f9e2df;
+  --ui-bg: var(--paper); --ui-fg: var(--k-ink); --ui-card: var(--card-stock); --ui-card-fg: var(--k-ink);
+  --ui-primary: var(--k-ink); --ui-primary-fg: var(--paper);
+  --ui-secondary: #ece6da; --ui-secondary-fg: var(--k-ink);
+  --ui-muted-bg: #ece6da; --ui-muted-fg: var(--ink-2);
+  --ui-accent-bg: var(--stamp-wash); --ui-accent-fg: var(--stamp);
+  --ui-border: var(--rule); --ui-input: #c9c0ae; --ui-ring: var(--stamp);
+  --ui-sidebar: #efeadf;
+  --ui-success: var(--paid); --ui-success-bg: var(--paid-wash);
+  --ui-warning: var(--pause); --ui-warning-bg: var(--pause-wash);
+  --ui-destructive: var(--fail); --ui-destructive-bg: var(--fail-wash);
+  --ui-info: var(--stamp); --ui-info-bg: var(--stamp-wash);
+  --radius: 0.75rem;
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Schibsted Grotesk", "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --content-max: 1080px; --top-bg: color-mix(in oklab, var(--paper) 94%, transparent);
+  --sb-mark-bg: var(--stamp); --sb-mark-fg: var(--card-stock);
+  --shadow-lg: 0 12px 32px rgb(22 24 27 / 0.18);
 }
-h1, h2, .lp-title, .lp-h2, .kpi .value, .tile .big, .price-big { font-family: var(--font-display); font-weight: 400; letter-spacing: -0.01em; }
-h1 { font-size: 2.35rem; } h2 { font-size: 1.45rem; }
-.lp-title { font-size: clamp(2.6rem, 6vw, 4.4rem); line-height: 1.02; }
-.lp-title em { font-style: italic; color: var(--crema); }
-.lp-hero { background: radial-gradient(48rem 26rem at 95% -5%, #f3dcc2 0%, transparent 60%), radial-gradient(28rem 18rem at -5% 105%, #efe2d2 0%, transparent 70%); }
-.kpi .value { font-size: 2rem; }
-.btn.primary { box-shadow: 0 1px 0 rgba(255,255,255,.18) inset, 0 8px 18px -10px rgba(62,36,23,.7); }
-.sidebar .sb-brand .mark, .site-nav .sb-brand .mark { background: var(--ui-primary); color: #f6e3cf; }
-.cup { display: inline-grid; place-items: center; width: 2.4rem; height: 2.4rem; border-radius: 999px; background: var(--ui-accent-bg); color: var(--ui-accent-fg); font-weight: 700; }
-.plan-card { display: flex; flex-direction: column; gap: 0.6rem; }
-.plan-card .price-big { font-size: 2.6rem; line-height: 1; }
-.plan-card .price-big small { font-family: var(--font-sans); font-size: 0.9rem; color: var(--ui-muted-fg); }
-.plan-card.current { border-color: color-mix(in oklab, var(--crema) 55%, var(--ui-border)); box-shadow: 0 0 0 3px color-mix(in oklab, var(--crema) 18%, transparent); }
-.sub-hero { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); align-items: start; }
-@media (max-width: 760px) { .sub-hero { grid-template-columns: 1fr; } }
-.choice-grid { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); }
-.choice { display: flex; flex-direction: column; gap: 0.45rem; padding: 1rem; border: 1px solid var(--ui-border); border-radius: var(--radius); background: var(--ui-card); }
-.choice h3 { margin: 0; font-size: 1rem; }
-.choice p { margin: 0; color: var(--ui-muted-fg); font-size: 0.875rem; }
-.choice form { margin-top: auto; }
-.offer-card { border: 1px solid color-mix(in oklab, var(--crema) 50%, var(--ui-border)); background: linear-gradient(180deg, #fbefe2, var(--ui-card)); }
-.offer-card h2 { font-style: italic; }
+html.dark {
+  --paper: #121417; --card-stock: #1a1d21; --k-ink: #ede8de; --ink-2: #a9adb5; --rule: #2d3137;
+  --stamp: #93a6ff; --stamp-wash: #20264a; --paid: #63c795; --paid-wash: #15301f;
+  --pause: #e6ae52; --pause-wash: #352710; --fail: #ff8f85; --fail-wash: #3a1714;
+  --ui-secondary: #24282d; --ui-muted-bg: #24282d; --ui-input: #3a3f46; --ui-sidebar: #16191c;
+  --shadow-lg: 0 12px 32px rgb(0 0 0 / 0.5);
+  color-scheme: dark;
+}
+body { font-size: 1rem; }
+h1, h2, .lp-title, .lp-h2 { font-family: var(--font-display); font-weight: 700; letter-spacing: -0.02em; }
+h1 { font-size: clamp(1.9rem, 1.4rem + 1.6vw, 2.6rem); } h2 { font-size: 1.35rem; }
+h3 { font-family: var(--font-sans); font-weight: 600; }
+.kpi .value, .tile .big, .price-big { font-family: var(--font-display); font-weight: 700; font-variant-numeric: lining-nums; letter-spacing: -0.01em; }
+td, .num, time, .money { font-variant-numeric: tabular-nums lining-nums; }
+code, pre, .mono { font-family: var(--font-mono); }
+.card, .kpi, .tile { border-radius: var(--radius); background: var(--ui-card); border-color: var(--rule); box-shadow: none; }
+.btn { min-height: 44px; border-radius: 0.5rem; }
+.btn.small { min-height: 40px; }
+.btn.primary { background: var(--k-ink); color: var(--paper); box-shadow: none; }
+/* Cancel is never red: a cancel or decline is ink on paper, the same weight as any other choice. */
+.btn.danger, .btn.destructive, .btn.bad { background: transparent; color: var(--k-ink); border: 1px solid var(--k-ink); }
+a { color: var(--stamp); text-underline-offset: 3px; }
+.banner.good { background: var(--paid-wash); color: var(--k-ink); border-color: var(--paid); }
+.banner.bad { background: var(--fail-wash); color: var(--k-ink); border-color: var(--fail); }
 .reason-bar { display: grid; grid-template-columns: 9rem 1fr 2rem; gap: 0.6rem; align-items: center; font-size: 0.875rem; margin-bottom: 0.5rem; }
 .reason-bar .bar { height: 8px; }
-.reason-bar .bar > span { background: var(--crema); }
-h3, .lp-steps h3, .lp-feature h3, .persona-card b { font-family: var(--font-sans); font-weight: 600; letter-spacing: -0.005em; }
-
-/* >>> layout identity */
-/* Kept: a coffee club ledger book. A centred top bar with pill tabs, a narrow reading column, serif headlines. */
-:root { --radius: 0.6rem; --content-max: 980px; --top-bg: rgba(250,246,240,.92); --sb-mark-bg: #3e2417; --sb-mark-fg: #fbf3e8; }
-@media (min-width: 961px) { .L-topbar .topnav { margin: 0 auto; } }
-.L-topbar .topnav > a { border-radius: 999px; }
-.L-topbar .topnav > a.active { background: var(--ui-primary); color: var(--ui-primary-fg); }
-.L-topbar .content h1, .L-topbar .page-head h1 { font-family: var(--font-display); font-weight: 400; font-size: clamp(2rem, 1.5rem + 1.8vw, 2.9rem); letter-spacing: -0.01em; }
-.card, .kpi, .tile { border-radius: 0.9rem; background: var(--ui-card); }
-.kpi .value { font-family: var(--font-display); font-weight: 400; font-size: 2.1rem; }
-/* <<< layout identity */
+.reason-bar .bar > span { background: var(--k-ink); }
+.choice-grid { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); }
+.choice { display: flex; flex-direction: column; gap: 0.45rem; padding: 1rem; border: 1px solid var(--rule); border-radius: var(--radius); background: var(--ui-card); }
+.choice h3 { margin: 0; font-size: 1rem; } .choice p { margin: 0; color: var(--ink-2); font-size: 0.875rem; } .choice form { margin-top: auto; }
+.offer-card { border: 1px solid var(--stamp); background: var(--card-stock); }
+.plan-card { display: flex; flex-direction: column; gap: 0.6rem; }
+.plan-card .price-big { font-size: 2.4rem; line-height: 1; }
+.plan-card .price-big small { font-family: var(--font-sans); font-size: 0.9rem; color: var(--ink-2); font-weight: 400; }
+.plan-card.current { border-color: var(--stamp); box-shadow: 0 0 0 3px var(--stamp-wash); }
+.sub-hero { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); align-items: start; }
+@media (max-width: 760px) { .sub-hero { grid-template-columns: 1fr; } }
+.cup { display: inline-grid; place-items: center; width: 2.4rem; height: 2.4rem; border-radius: 999px; background: var(--stamp-wash); color: var(--stamp); font-weight: 700; }
+.lp-hero { background: none; }
+/* Top bar: the React app's header, left-aligned brand, quiet tabs, the active tab underlined like a ruled card. */
+.L-topbar .topline { background: var(--top-bg); border-bottom: 1px solid var(--rule); backdrop-filter: blur(6px); }
+.L-topbar .topnav > a { border-radius: 0.5rem; min-height: 44px; }
+.L-topbar .topnav > a.active { background: transparent; color: var(--k-ink); box-shadow: inset 0 -2px 0 var(--stamp); border-radius: 0; }
+.tb-brand .name, .sb-brand .name, .sb-brand.plain { font-family: var(--font-display); font-weight: 700; font-size: 1.3rem; }
+.sb-brand .mark, .tb-brand .mark { border-radius: 999px; background: var(--stamp); color: var(--card-stock); }
+.testmode summary { background: var(--pause-wash); color: var(--k-ink); border: 1px dashed var(--pause); }
+.back-to-app { display: inline-flex; align-items: center; gap: 0.4rem; min-height: 44px; font-weight: 500; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; } }
