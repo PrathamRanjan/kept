@@ -15,7 +15,7 @@ import { backtest } from "../src/guard/backtest.js";
 import { tick } from "../src/worker.js";
 import { Client } from "./client.js";
 import { DEMO_FAKE_FAILED } from "../src/web/safety.js";
-import { isFoundationRoute, serveTracked } from "./journey-coverage.js";
+import { isFoundationRoute, isSmsRoute, serveTracked } from "./journey-coverage.js";
 
 // Foundation walk: every guard, compliance, trace, eval, money, channel, PWA and judge route is used by an
 // owner, a subscriber, an agent and a hostile caller; nothing returns a 5xx; money moves that should be
@@ -284,6 +284,6 @@ describe("Kept foundation", () => {
     await svc.sendRenewalReminders(new Date());
 
     expect(srv.failures).toEqual([]);
-    expect(srv.missed((r) => !isFoundationRoute(r))).toEqual([]);
+    expect(srv.missed((r) => !isFoundationRoute(r) || isSmsRoute(r))).toEqual([]); // SMS routes are walked in sms.test.ts
   });
 });

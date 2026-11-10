@@ -28,6 +28,7 @@ export function DemoRibbon() {
               <li>Signature-verified webhooks, transaction search</li>
               <li>AI drafting and reason labels (OpenAI), with a rules fallback</li>
               <li>MCP endpoints for AI assistants</li>
+              <li>Reminders by Telegram or text (Twilio) once you connect a chat or number</li>
             </ul>
             <p className="m-0 mb-2 font-semibold">Not live yet</p>
             <ul className="m-0 mb-3 list-disc space-y-1 pl-5 text-ink-2">

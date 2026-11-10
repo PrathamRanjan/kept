@@ -1,5 +1,5 @@
 /**
- * Channels (roadmap B.8, K6): Telegram and WhatsApp Cloud API adapters with reply buttons, an in-app message record
+ * Channels (roadmap B.8, K6): Telegram and WhatsApp Cloud API adapters with reply buttons, Twilio SMS (see sms.ts), an in-app message record
  * (every notice is also kept in Kept's own message log, which the owner and member pages show), and web push for the PWA. Outbound messages are queued in channel_messages
  * and sent by the worker; inbound messages are matched to a subscriber or the owner by party_links.
  * Subscribers are addressed by subscriber id (party "subscriber"); the shop owner by merchant id (party "owner").
@@ -9,9 +9,10 @@ import type { Queryable } from "../db.js";
 import { getDb } from "../db.js";
 import { enqueue } from "../jobs.js";
 import { newId } from "../lib/ids.js";
+import { sendSms, smsReady, TwilioError } from "./sms.js";
 
 export type Party = "subscriber" | "owner";
-export type Channel = "telegram" | "whatsapp" | "inapp";
+export type Channel = "telegram" | "whatsapp" | "sms" | "inapp";
 export interface Button {
   id: string;
   label: string;
@@ -21,6 +22,7 @@ let fetchImpl: typeof fetch = (i, init) => fetch(i, init);
 export function setChannelFetch(f: typeof fetch | null) {
   fetchImpl = f ?? ((i, init) => fetch(i, init));
 }
+export const channelFetch = () => fetchImpl;
 
 export const telegramReady = () => Boolean(config.channels.telegramToken);
 export const whatsappReady = () => Boolean(config.channels.whatsappToken && config.channels.whatsappPhoneId);
@@ -39,7 +41,13 @@ export async function notifyParty(party: Party, partyId: string, body: string, b
   const db = q ?? (await getDb());
   const links = (await db.query<{ channel: Channel; address: string }>("SELECT channel, address FROM party_links WHERE party = $1 AND party_id = $2", [party, partyId])).rows;
   const targets = [...links.filter((l) => l.channel !== "inapp"), { channel: "inapp" as Channel, address: `${party}:${partyId}` }];
-  for (const t of targets) await send({ channel: t.channel, address: t.address, body, buttons, entity, entityId }, db);
+  // A text has no buttons, so it carries the page where the buttons are.
+  let smsBody = body;
+  if (targets.some((t) => t.channel === "sms") && !/https?:\/\//.test(body)) {
+    const ref = party === "subscriber" ? (await db.query<{ ref: string }>("SELECT ref FROM subscribers WHERE id = $1", [partyId])).rows[0]?.ref : null;
+    smsBody = `${body} ${party === "owner" ? `Open: ${config.appUrl}/dashboard/approvals` : ref ? `Manage: ${config.appUrl}/manage/${ref}` : ""}`.trim();
+  }
+  for (const t of targets) await send({ channel: t.channel, address: t.address, body: t.channel === "sms" ? smsBody : body, buttons: t.channel === "sms" ? undefined : buttons, entity, entityId }, db);
 }
 
 export async function deliver(messageId: string): Promise<void> {
@@ -66,6 +74,18 @@ export async function deliver(messageId: string): Promise<void> {
       const data = (await res.json()) as any;
       if (!res.ok) throw new Error(`WhatsApp: ${data.error?.message ?? res.status}`);
       externalId = data.messages?.[0]?.id ?? null;
+    } else if (m.channel === "sms" && smsReady()) {
+      try {
+        externalId = await sendSms(m.address, m.body);
+      } catch (e) {
+        // 21610: the number replied STOP. Honour it: drop the link and don't retry.
+        if (e instanceof TwilioError && e.code === 21610) {
+          await db.query("DELETE FROM party_links WHERE channel = 'sms' AND address = $1", [m.address]);
+          await db.query("UPDATE channel_messages SET status = 'opted_out' WHERE id = $1", [messageId]);
+          return;
+        }
+        throw e;
+      }
     } else if (m.channel !== "inapp") {
       // A linked channel whose credentials are not configured on this server: nothing was sent, and the log says so.
       await db.query("UPDATE channel_messages SET status = 'not_sent' WHERE id = $1", [messageId]);
@@ -120,6 +140,20 @@ export async function telegramUpdate(update: any): Promise<void> {
   }
   const msg = update.message;
   if (msg?.text) await receive("telegram", String(msg.chat.id), msg.text, null, null);
+}
+
+/** Twilio inbound SMS (form fields From, Body) -> receive(). STOP words drop the link; Twilio blocks further texts itself. */
+export async function twilioInbound(p: Record<string, string>): Promise<string | null> {
+  const from = String(p.From ?? "");
+  const text = String(p.Body ?? "").trim();
+  if (!from) return null;
+  if (/^(stop|stopall|unsubscribe|cancel texts|end|quit|optout)$/i.test(text)) {
+    const db = await getDb();
+    await db.query("INSERT INTO channel_messages (id, channel, direction, address, body, status) VALUES ($1,'sms','in',$2,$3,'received')", [newId("msg"), from, text]);
+    await db.query("DELETE FROM party_links WHERE channel = 'sms' AND address = $1", [from]);
+    return null;
+  }
+  return receive("sms", from, text, null, null);
 }
 
 /** WhatsApp Cloud API webhook body -> receive(). */

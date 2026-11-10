@@ -1,5 +1,5 @@
 /**
- * What Kept does with an inbound channel message (Telegram or WhatsApp).
+ * What Kept does with an inbound channel message (Telegram, WhatsApp or SMS).
  *  - "link subscriber:<ref>" / "link owner:<owner key>" ties the chat to a party.
  *  - Buttons: approve:/decline:<approval id> (owner), skip:/keep:/cancel:/fixed:<ref> (subscriber).
  *  - Words: "status", "pending", "help".
@@ -34,6 +34,8 @@ export function installChannelHandlers() {
       return "Connected as the shop owner. Held offers and large collections will ask you here with Approve and Decline buttons. Send “pending” any time.";
     }
     const m = text.match(/^link\s+(subscriber|owner):(\S+)$/i);
+    // A phone number is linked only through the code Kept texts it, never by a typed reference.
+    if (m && msg.channel === "sms") return "To get texts from Kept, turn them on from your member page.";
     if (m) {
       if (m[1].toLowerCase() === "subscriber") {
         const s = await subscriberByRef(db, m[2]);
@@ -46,7 +48,7 @@ export function installChannelHandlers() {
       await link(msg.channel, msg.address, "owner", o.id);
       return `Linked as the owner of ${o.name}. Held offers and collections above your threshold will ask you here.`;
     }
-    if (!msg.party) return "Hi, this is Kept. This chat isn't connected yet: open your member page (or your shop's Messages page) and tap the Telegram button.";
+    if (!msg.party) return msg.channel === "sms" ? "Kept: this number isn't connected. Turn on texts from your member page." : "Hi, this is Kept. This chat isn't connected yet: open your member page (or your shop's Messages page) and tap the Telegram button.";
     // A button id ("skip:<ref>"), the same typed out, or a bare word ("skip", "cancel", "fixed") for the linked subscription.
     const button = msg.buttonId ?? (text.match(/^(approve|decline|skip|keep|cancel|fixed)(?::(\S+))?$/i)?.[0] ?? null);
     const [verbRaw, id] = (button ?? "").split(":");

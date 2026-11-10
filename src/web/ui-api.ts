@@ -16,6 +16,7 @@ import { isKilled } from "../guard/kill.js";
 import { loadRun, runsFor, recentRuns } from "../trace.js";
 import { hasOpenAI, providerLabel } from "../ai/provider.js";
 import { telegramReady } from "../channels/index.js";
+import { smsLinks, smsReady, startSmsLink, stopSms, verifySmsLink } from "../channels/sms.js";
 import { cycleCard } from "./cycles.js";
 
 const COOKIE = "kept_owner";
@@ -182,10 +183,27 @@ export function uiApi(): Router {
       promise: policy ? describeRules(policy.rules) : ["Cancelling always works in one step."],
       offer: offer ? { id: offer.id, message: offer.message, label: toOffer(offer).terms?.label ?? null, type: offer.type, terms: offer.terms, expires_at: offer.expires_at } : null,
       telegram: { linked: tg, ready: telegramReady() },
+      sms: { ready: smsReady(), linked: await smsLinks("subscriber", s.id) },
       card: await cycleCard(db, s, all),
       timeline: await timelineFor(s.id),
       mcp: `${config.appUrl}/s/${m.slug}/mcp`,
     };
+  }));
+
+  /* Texts: the number is linked only once the code Kept texts it comes back. */
+  const member = async (ref: string) => {
+    const s = await subscriberByRef(await getDb(), ref);
+    if (!s || s.is_sample) throw new KeptError("Subscription not found", "not_found", 404);
+    return s;
+  };
+  r.post("/ui/manage/:ref/sms/start", j(async (req) => ({ ok: true, ...(await startSmsLink("subscriber", (await member(req.params.ref)).id, String(req.body?.phone ?? ""), req.body?.consent === true)) })));
+  r.post("/ui/manage/:ref/sms/verify", j(async (req) => {
+    const out = await verifySmsLink("subscriber", (await member(req.params.ref)).id, String(req.body?.code ?? ""));
+    return { ok: true, message: `Texts are on for ${out.phone}.` };
+  }));
+  r.post("/ui/manage/:ref/sms/stop", j(async (req) => {
+    await stopSms("subscriber", (await member(req.params.ref)).id);
+    return { ok: true, message: "Texts are off." };
   }));
 
   const act = (path: string, fn: (ref: string, b: any) => Promise<Record<string, unknown>>) =>

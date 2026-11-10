@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { PublicFooter, PublicHeader } from "@/components/Shell";
 import { CycleCard, StampLegend } from "@/components/CycleCard";
 import { Timeline } from "@/components/Timeline";
+import { SmsOptIn } from "@/components/SmsOptIn";
 import { ErrorState, PageSkeleton } from "@/components/States";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -40,6 +41,7 @@ interface ManageData {
   promise: string[];
   offer: { id: string; message: string; label: string | null; type: string; expires_at: string } | null;
   telegram: { linked: boolean; ready: boolean };
+  sms: { ready: boolean; linked: string[] };
   card: CycleCardData;
   timeline: TimelineRun[];
   mcp: string;
@@ -334,8 +336,8 @@ export default function Manage() {
                 <Textarea id="reason" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} rows={2} placeholder="For example: too much coffee piling up" />
               </div>
               <label className="flex min-h-11 cursor-pointer items-center gap-3">
-                <Checkbox checked={hear} onCheckedChange={(c) => setHear(c === true)} className="size-5" />
-                <span>Show me one offer before cancelling (optional)</span>
+                <Checkbox checked={hear} onCheckedChange={(c) => setHear(c === true)} className="size-5" aria-labelledby="hear-offer" />
+                <span id="hear-offer">Show me one offer before cancelling (optional)</span>
               </label>
               <div>
                 <Button type="submit" variant="outline" disabled={!!busy}>
@@ -363,7 +365,7 @@ export default function Manage() {
               <MessageCircle className="size-5 text-stamp" aria-hidden="true" />
               Reminders on your phone
             </h2>
-            <p className="mt-1 text-sm text-ink-2">A note before each payment, with Skip and Keep buttons, in Telegram. {data.telegram.linked ? "Connected." : ""}</p>
+            <p className="mt-1 text-sm text-ink-2">A note before each payment: in Telegram with Skip and Keep buttons, or by text with a link back here. {data.telegram.linked ? "Connected." : ""}</p>
             {!data.member.sample && (
               <form method="post" action={`/manage/${ref}/connect/telegram`} target="_blank">
                 <Button type="submit" variant={data.telegram.linked ? "outline" : "default"}>
@@ -371,6 +373,7 @@ export default function Manage() {
                 </Button>
               </form>
             )}
+            {!data.member.sample && <SmsOptIn memberRef={ref!} sms={data.sms ?? { ready: false, linked: [] }} onChange={reload} />}
           </section>
           <section className="rounded-xl border border-rule bg-card p-6" aria-labelledby="scam">
             <h2 id="scam" className="m-0 flex items-center gap-2 text-xl font-semibold">

@@ -46,6 +46,14 @@ export const config = {
     whatsappVerifyToken: process.env.WHATSAPP_VERIFY_TOKEN || "kept-verify",
     vapidPublic: process.env.VAPID_PUBLIC_KEY || "",
     vapidPrivate: process.env.VAPID_PRIVATE_KEY || "",
+    twilio: {
+      accountSid: process.env.TWILIO_ACCOUNT_SID || "",
+      authToken: process.env.TWILIO_AUTH_TOKEN || "",
+      apiKeySid: process.env.TWILIO_API_KEY_SID || process.env.TWILIO_API_KEY || "",
+      apiKeySecret: process.env.TWILIO_API_KEY_SECRET || process.env.TWILIO_API_SECRET || "",
+      from: process.env.TWILIO_FROM_NUMBER || process.env.TWILIO_PHONE_NUMBER || "",
+      messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID || "",
+    },
   },
   guard: {
     /** Owner approvals of money moves above this need a passkey countersign when one is registered. */

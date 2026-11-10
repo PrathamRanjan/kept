@@ -130,7 +130,8 @@ Nothing in Kept is simulated and there are no sample members: every member is a 
 | Web push | Live when VAPID keys are set and a browser turns notifications on |
 | WhatsApp | Code present; not live without a WhatsApp Cloud API token |
 | Log in with PayPal | Code present; off until the feature is enabled on the sandbox app (`PAYPAL_LOGIN_ENABLED`) |
-| Phone calls / SMS | Not part of Kept |
+| SMS (Twilio) | Renewal reminders, payment notices and owner approvals by text, each with a link back to the page. A number is linked only after the person types back a 6-digit code Kept texts them; STOP is honoured. Live when `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` and `TWILIO_FROM_NUMBER` are set. Replies reach Kept only if the number's messaging webhook points at `/webhooks/twilio` (signature-checked) |
+| Phone calls | Not part of Kept |
 
 ## Licence
 

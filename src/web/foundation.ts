@@ -8,12 +8,13 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { aiUsageSummary, hasOpenAI, providerLabel } from "../ai/provider.js";
-import { recentMessages, telegramReady, telegramUpdate, whatsappReady, whatsappUpdate } from "../channels/index.js";
+import { recentMessages, telegramReady, telegramUpdate, twilioInbound, whatsappReady, whatsappUpdate } from "../channels/index.js";
 import { history } from "../guard/backtest.js";
 import { randomBytes } from "node:crypto";
 import { icon } from "./icons.js";
 import { messageFlag } from "./safetyui.js";
 import { pushReady, subscribe } from "../channels/push.js";
+import { smsLinks, smsReady, startSmsLink, stopSms, twilioSignatureValid, verifySmsLink } from "../channels/sms.js";
 import { config } from "../config.js";
 import { getDb } from "../db.js";
 import { adversarialRows, renderAdversarialReport, runAdversarial } from "../eval/adversarial.js";
@@ -219,11 +220,16 @@ export function foundationRouter(): Router {
     if (!m) return;
     const msgs = await recentMessages(80);
     const tg = Number((await (await getDb()).query<any>("SELECT count(*)::int AS n FROM party_links WHERE channel = 'telegram' AND party = 'owner' AND party_id = $1", [m.id])).rows[0]?.n ?? 0) > 0;
+    const phones = await smsLinks("owner", m.id);
+    const codeSent = typeof req.query.code === "string" ? req.query.code : "";
     res.send(layout({ title: "Messages", nav: "dashboard", owner: nav(m) }, html`
       <div class="page-head"><div><h1>Messages and alerts</h1><p>What reaches you and your members on their phones: renewal reminders with Skip and Keep buttons, and approvals for you.</p></div></div>${flash(req)}
       <section class="card" id="phone"><h2>Approvals on your phone</h2><p class="sub">Held offers and large collections arrive on Telegram with Approve and Decline buttons.</p>
         <div class="row">${tg ? html`<span class="pill good">Telegram connected</span>` : html`<span class="pill">Telegram not connected</span>`}<form method="post" action="/connect/telegram" class="inline" target="_blank"><button class="btn primary" type="submit">${raw(icon("message"))}${tg ? "Connect another chat" : "Connect Telegram"}</button></form><button class="btn" type="button" id="push-sub">${raw(icon("zap"))}Turn on notifications in this browser</button></div>
         <p class="small muted">Telegram opens with a one-time code that lasts 15 minutes: press Start and you're done. Members connect from their own member page.${telegramReady() ? "" : " The bot token isn't set on this server, so Telegram messages are logged below as not sent."}${pushReady() ? "" : " Browser notifications need VAPID keys on the server."}</p></section>
+      <section class="card" id="sms"><h2>Texts (SMS)</h2><p class="sub">The same approvals by text message, each with a link to approve or decline. Sent from Kept's Twilio number.</p>
+        ${!smsReady() ? html`<p class="small muted">Texts aren't set up on this server (no Twilio keys).</p>` : phones.length ? html`<div class="row"><span class="pill good">Texts on: ${phones.join(", ")}</span><form method="post" action="/dashboard/channels/sms/stop" class="inline"><button class="btn" type="submit">Stop texts</button></form></div>` : codeSent ? html`<form method="post" action="/dashboard/channels/sms/verify" class="row"><label>Code sent to ${codeSent} <input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" required style="width:8rem"></label><button class="btn primary" type="submit">Confirm</button></form>` : html`<form method="post" action="/dashboard/channels/sms/start" class="row"><label>Mobile number <input name="phone" type="tel" autocomplete="tel" placeholder="+65 8123 4567" required></label><label class="small"><input type="checkbox" name="consent" value="1" required> Text me about held offers and collections. Reply STOP to opt out.</label><button class="btn primary" type="submit">Send code</button></form>`}
+      </section>
       <div class="grid g2">
         <div class="card"><h2>All recent messages</h2>${msgs.slice(0, 30).map((x: any) => html`<div class="small" style="padding:0.3rem 0;border-bottom:1px solid var(--ui-border)"><span class="muted">${fmtDate(x.created_at, true)}</span> ${x.channel} · ${x.direction === "in" ? "received" : "sent"} · ${String(x.body).slice(0, 90)} <span class="pill">${x.status}</span></div>`)}</div>
       </div>
@@ -254,6 +260,44 @@ export function foundationRouter(): Router {
     await telegramUpdate(req.body);
     return { ok: true };
   }));
+  /* ---------------- SMS (Twilio) ---------------- */
+  r.post("/dashboard/channels/sms/start", page(async (req, res) => {
+    const m = await requireOwner(req, res);
+    if (!m) return;
+    try {
+      const out = await startSmsLink("owner", m.id, String(req.body?.phone ?? ""), req.body?.consent === "1");
+      res.redirect(303, `/dashboard/channels?code=${encodeURIComponent(out.to)}#sms`);
+    } catch (e) {
+      back(res, "/dashboard/channels", errMsg(e), true);
+    }
+  }));
+  r.post("/dashboard/channels/sms/verify", page(async (req, res) => {
+    const m = await requireOwner(req, res);
+    if (!m) return;
+    try {
+      const out = await verifySmsLink("owner", m.id, String(req.body?.code ?? ""));
+      back(res, "/dashboard/channels", `Texts are on for ${out.phone}.`);
+    } catch (e) {
+      back(res, "/dashboard/channels", errMsg(e), true);
+    }
+  }));
+  r.post("/dashboard/channels/sms/stop", page(async (req, res) => {
+    const m = await requireOwner(req, res);
+    if (!m) return;
+    await stopSms("owner", m.id);
+    back(res, "/dashboard/channels", "Texts are off.");
+  }));
+  r.post("/webhooks/twilio", async (req, res) => {
+    const params = Object.fromEntries(Object.entries(req.body ?? {}).map(([k, v]) => [k, String(v)]));
+    if (!twilioSignatureValid(`${config.appUrl}/webhooks/twilio`, params, req.header("x-twilio-signature"))) return res.status(403).type("text/plain").send("bad signature");
+    try {
+      await twilioInbound(params);
+    } catch (e) {
+      console.error("twilio inbound", e);
+    }
+    // Any reply is queued and sent through the API, so the TwiML answer stays empty.
+    res.type("text/xml").send("<Response></Response>");
+  });
   r.get("/webhooks/whatsapp", (req, res) => {
     if (req.query["hub.mode"] === "subscribe" && req.query["hub.verify_token"] === config.channels.whatsappVerifyToken) return res.type("text/plain").send(String(req.query["hub.challenge"] ?? ""));
     return res.status(403).send("verify token mismatch");
@@ -286,7 +330,7 @@ export function foundationRouter(): Router {
     const chain = await verifyChain();
     const fair = await fairness(m.id);
     const dbe = await getDb();
-    const linked = (await dbe.query<any>("SELECT channel, count(*)::int AS n FROM party_links WHERE channel IN ('telegram','whatsapp') GROUP BY channel")).rows;
+    const linked = (await dbe.query<any>("SELECT channel, count(*)::int AS n FROM party_links WHERE channel IN ('telegram','whatsapp','sms') GROUP BY channel")).rows;
     const nLinked = (c: string) => Number(linked.find((x: any) => x.channel === c)?.n ?? 0);
     const rows: [string, string, string][] = [
       ["Subscriptions: create, revise, suspend, activate, cancel, capture outstanding, transactions", "real (sandbox)", "every write behind the gate with a trace step and PayPal-Request-Id"],
@@ -298,6 +342,7 @@ export function foundationRouter(): Router {
       ["Model brain", hasOpenAI() ? "live (OpenAI)" : "rules only", providerLabel()],
       ["Telegram", telegramReady() ? `bot connected · ${nLinked("telegram")} chats linked` : "not configured", "renewal reminders and owner approvals with buttons"],
       ["WhatsApp", whatsappReady() ? `connected · ${nLinked("whatsapp")} linked` : "not configured (no WhatsApp Cloud API token)", "same messages as Telegram when configured"],
+      ["SMS (Twilio)", smsReady() ? `configured · ${nLinked("sms")} numbers linked` : "not configured", "renewal reminders, payment notices and owner approvals by text, with a link; numbers are confirmed by a texted code"],
       ["Web push", pushReady() ? "configured (VAPID)" : "not configured", "to browsers that turn on notifications"],
       ["Passkey countersign", "real WebAuthn, attestation not verified", "ES256/RS256 with Node crypto"],
       ["Backtest history", `real · ${(await history(m.id)).length} requests`, "this shop's own cancellation requests from the last 90 days"],

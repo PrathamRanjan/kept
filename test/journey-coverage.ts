@@ -73,3 +73,7 @@ export const isFoundationRoute = (r: string) => FOUNDATION_ROUTE.test(r);
 /** Routes of the React UI's JSON API and page shell; walked in ui.test.ts. */
 export const UI_ROUTE = /^(GET|POST) \/(ui\/|demo$|dashboard\/(members|approvals)$|favicon\.svg$|robots\.txt$|og\.png$)/;
 export const isUiRoute = (r: string) => UI_ROUTE.test(r);
+
+/** Text-message (Twilio) routes; walked in sms.test.ts. */
+export const SMS_ROUTE = /\/(dashboard\/channels\/sms\/|webhooks\/twilio|ui\/manage\/:ref\/sms\/)/;
+export const isSmsRoute = (r: string) => SMS_ROUTE.test(r);
