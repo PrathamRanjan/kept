@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { apiRouter } from "./api.js";
+import { config } from "./config.js";
 import { getDb } from "./db.js";
 import { agentIdOf, serveMcp } from "./mcp/http.js";
 import { buildBuyerServer, buildOwnerServer } from "./mcp/tools.js";
@@ -42,12 +43,27 @@ export function createApp() {
   });
   app.use("/static", express.static(join(root, "public"), { maxAge: 0, setHeaders: (res, file) => { if (/[\\/]safety[\\/]/.test(file)) res.setHeader("Cache-Control", "public, max-age=86400"); } }));
 
+  // Server timing on every API and page response, so slow first paint can be measured from the browser.
+  app.use((req, res, next) => {
+    const t0 = process.hrtime.bigint();
+    const write = res.writeHead;
+    res.writeHead = function (this: typeof res, ...args: any[]) {
+      if (!res.headersSent) res.setHeader("Server-Timing", `app;dur=${(Number(process.hrtime.bigint() - t0) / 1e6).toFixed(1)}`);
+      return (write as any).apply(this, args);
+    } as any;
+    next();
+  });
+
+  /** Health: the database answers, and which commit this build runs. Used by the keep-warm job and Render. */
   app.get("/healthz", async (_req, res) => {
+    const t0 = Date.now();
+    res.setHeader("Cache-Control", "no-store");
     try {
-      await (await getDb()).query("SELECT 1");
-      res.json({ ok: true });
+      const db = await getDb();
+      const r = (await db.query<{ now: Date }>("SELECT now() AS now")).rows[0];
+      res.json({ ok: true, db: { ok: true, kind: db.kind, ms: Date.now() - t0, now: r.now }, commit: config.commit || null, uptimeSec: Math.round(process.uptime()) });
     } catch (e) {
-      res.status(500).json({ ok: false, error: (e as Error).message });
+      res.status(503).json({ ok: false, db: { ok: false, error: (e as Error).message.slice(0, 200) }, commit: config.commit || null });
     }
   });
 

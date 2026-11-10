@@ -40,7 +40,9 @@ export interface Workspace {
 export const showcaseSlug = () => process.env.KEPT_DEMO_SHOP || "ember-oak-coffee-club";
 
 export function ipHash(req: Request): string {
-  const ip = String(req.headers["x-forwarded-for"] ?? req.socket.remoteAddress ?? "").split(",")[0].trim();
+  // req.ip honours "trust proxy" (Render's one proxy hop), so a client cannot pick its own address by sending
+  // its own X-Forwarded-For header.
+  const ip = String(req.ip ?? req.socket.remoteAddress ?? "");
   return createHash("sha256").update(`${config.sessionSecret}|${ip}`).digest("hex").slice(0, 24);
 }
 

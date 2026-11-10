@@ -283,6 +283,20 @@ describe("A1 private workspaces and A2.2 the approval pool", () => {
   });
 });
 
+describe("A4 hosting", () => {
+  it("/healthz checks the database and names the commit; every response carries server timing", async () => {
+    const saved = config.commit;
+    (config as any).commit = "abc1234";
+    const h = await new Client(srv.base).get("/healthz");
+    expect(h.status).toBe(200);
+    expect(h.json).toMatchObject({ ok: true, db: { ok: true }, commit: "abc1234" });
+    expect(h.headers.get("cache-control")).toBe("no-store");
+    expect(h.headers.get("server-timing")).toMatch(/^app;dur=\d/);
+    expect((await new Client(srv.base).get("/ui/session")).headers.get("server-timing")).toMatch(/app;dur=/);
+    (config as any).commit = saved;
+  });
+});
+
 describe("route coverage", () => {
   it("every Wave 1 route was reached and none failed", async () => {
     await new Client(srv.base).get("/healthz");

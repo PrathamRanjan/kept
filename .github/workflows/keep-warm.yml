@@ -1,0 +1,21 @@
+# Keep-warm (spec A4): requests /healthz every 10 minutes so the site never shows Render's wake-up page.
+# Off until the repository variable KEEP_WARM is "true". On Render's free plan, pinging keeps the service
+# running all month and uses up the account's shared free instance hours, so turn it on only after the
+# web service moves to an always-on (paid) instance type.
+name: keep-warm
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {}
+jobs:
+  ping:
+    if: ${{ vars.KEEP_WARM == 'true' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Request /healthz
+        run: |
+          url="${{ vars.KEEP_WARM_URL || 'https://pph-kept.onrender.com' }}/healthz"
+          out=$(curl -s -o /tmp/h.json -w '%{http_code} %{time_starttransfer}' --max-time 60 "$url")
+          echo "$out"; cat /tmp/h.json; echo
+          case "$out" in 200*) ;; *) exit 1 ;; esac
