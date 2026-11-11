@@ -299,7 +299,7 @@ export function buildOwnerServer(m: Merchant): McpServer {
     }
   };
   server.registerTool("shop_summary", { title: "Shop summary", description: "Subscribers, MRR, offers, cancels and channel mix.", annotations: { readOnlyHint: true } }, async () => wrap(() => svc.computeStats(m)));
-  server.registerTool("ask", { title: "Ask about the shop", description: "Ask a question such as 'why are people cancelling?' or 'who has a failed payment?'.", inputSchema: { question: z.string().max(500) }, annotations: { readOnlyHint: true } }, async ({ question }) => wrap(async () => ({ answer: await svc.askOwner(m, question) })));
+  server.registerTool("ask", { title: "Ask about the shop", description: "Ask a question such as 'why are people cancelling?' or 'who has a failed payment?'.", inputSchema: { question: z.string().max(500) }, annotations: { readOnlyHint: true } }, async ({ question }) => wrap(async () => { const { askOwnerAgent } = await import("../ask/agent-ask.js"); const r = await askOwnerAgent(m, question); return { answer: r.answer, sentences: r.sentences, facts: r.facts, tool_calls: r.steps.filter((x) => x.kind === "tool").map((x) => ({ tool: x.name, summary: x.summary, ms: x.ms })), model: r.model }; }));
   server.registerTool(
     "list_subscribers",
     { title: "List subscribers", description: "Subscribers with status and plan.", inputSchema: { status: z.enum(["ACTIVE", "SUSPENDED", "CANCELLED", "APPROVAL_PENDING"]).optional() }, annotations: { readOnlyHint: true } },

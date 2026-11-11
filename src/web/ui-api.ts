@@ -20,6 +20,8 @@ import { hasOpenAI, providerLabel } from "../ai/provider.js";
 import { telegramReady } from "../channels/index.js";
 import { smsLinks, smsPending, smsReady, startSmsLink, stopSms, verifySmsLink } from "../channels/sms.js";
 import { cycleCard } from "./cycles.js";
+import { askOwnerAgent } from "../ask/agent-ask.js";
+import { spendAllowance } from "../demo/allowance.js";
 
 const COOKIE = "kept_owner";
 const DEMO_SLUG = () => process.env.KEPT_DEMO_SHOP || "ember-oak-coffee-club";
@@ -313,8 +315,36 @@ export function uiApi(): Router {
     const m = await needOwner(req);
     const q = String(req.body?.question ?? "").trim().slice(0, 500);
     if (!q) throw new KeptError("Ask a question first.", "empty", 422);
-    return await svc.askOwnerWithSource(m, q);
+    await spendAllowance(m.id);
+    const r = await askOwnerAgent(m, q);
+    return { answer: r.answer, sentences: r.sentences, facts: r.facts, steps: r.steps, by: r.by, model: r.model, runId: r.runId, toolCalls: r.toolCalls, ms: r.ms };
   }));
+
+  // Spec A5.3: the same Ask, streamed. Each tool call reaches the browser as it happens (the AI work rail).
+  r.post("/ui/owner/ask/stream", async (req, res, next) => {
+    let m: Merchant;
+    try {
+      m = await needOwner(req);
+    } catch (e) {
+      return e instanceof KeptError ? res.status(e.status).json({ error: e.code, message: e.message }) : next(e);
+    }
+    const q = String(req.body?.question ?? "").trim().slice(0, 500);
+    if (!q) return res.status(422).json({ error: "empty", message: "Ask a question first." });
+    res.status(200).set({ "content-type": "text/event-stream; charset=utf-8", "cache-control": "no-store", "x-accel-buffering": "no", connection: "keep-alive" });
+    res.flushHeaders?.();
+    const send = (event: string, data: unknown) => {
+      res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+      (res as any).flush?.();
+    };
+    try {
+      await spendAllowance(m.id);
+      const r = await askOwnerAgent(m, q, (s) => send("step", s));
+      send("answer", { answer: r.answer, sentences: r.sentences, facts: r.facts, by: r.by, model: r.model, runId: r.runId, toolCalls: r.toolCalls, ms: r.ms });
+    } catch (e) {
+      send("failed", { error: e instanceof KeptError ? e.code : "internal_error", message: e instanceof KeptError ? e.message : "Something went wrong answering that. Nothing was changed." });
+    }
+    res.end();
+  });
 
   r.post("/ui/owner/approvals/:id/:choice(approve|decline)", j(async (req) => {
     const m = await needOwner(req);

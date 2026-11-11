@@ -8,6 +8,7 @@ import * as svc from "../src/service.js";
 import { plansFor, type Merchant } from "../src/store.js";
 import { cycleCard } from "../src/web/cycles.js";
 import { Client } from "./client.js";
+import { stubAgent } from "./agent-stub.js";
 import { isSmsRoute, isWave1Route, serveTracked } from "./journey-coverage.js";
 
 // The JSON API behind the React UI (src/web/ui-api.ts) and the page shell (src/web/spa.ts):
@@ -134,7 +135,13 @@ describe("UI JSON API", () => {
     expect(JSON.stringify(t)).not.toContain(k.key);
     expect((await anon.postJson("/ui/owner/key", {})).status).toBe(401);
     expect((await c.postJson("/ui/owner/ask", { question: "" })).status).toBe(422);
+    const unstub = stubAgent();
     expect((await c.postJson("/ui/owner/ask", { question: "Who has a failed payment?" })).json.answer).toBeTruthy();
+    const streamed = await fetch(`${c.base}/ui/owner/ask/stream`, { method: "POST", headers: { "content-type": "application/json", cookie: [...c.cookies].map(([k, v]) => `${k}=${v}`).join("; ") }, body: JSON.stringify({ question: "Who has a failed payment?" }) });
+    const sse = await streamed.text();
+    expect(sse).toMatch(/event: step/);
+    expect(sse).toMatch(/event: answer/);
+    unstub();
     expect((await c.postJson("/ui/owner/reconcile", {})).json.message).toMatch(/Checked \d+/);
     expect((await c.postJson(`/ui/owner/member/${ref}/sync`, {})).json.message).toMatch(/PayPal shows active/);
     expect((await c.get(`/ui/owner/member/${ref}`)).json).toBeTruthy();

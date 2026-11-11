@@ -1,3 +1,4 @@
+import { stubAgent } from "./agent-stub.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Server } from "node:http";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -346,8 +347,11 @@ describe("MCP agent endpoint", () => {
     expect(res.status).toBe(401);
     const client = new Client({ name: "owner", version: "1.0.0" });
     await client.connect(new StreamableHTTPClientTransport(new URL(`${base}/owner/mcp`), { requestInit: { headers: { Authorization: `Bearer ${m.owner_token}` } } }));
+    const unstub = stubAgent();
     const r: any = await client.callTool({ name: "ask", arguments: { question: "why are people cancelling?" } });
+    unstub();
     expect(JSON.parse(r.content[0].text).answer).toMatch(/reasons/i);
+    expect(JSON.parse(r.content[0].text).tool_calls[0].tool).toBe("shop_overview");
     await client.close();
   });
 });

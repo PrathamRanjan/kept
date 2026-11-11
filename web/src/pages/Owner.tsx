@@ -8,7 +8,8 @@ import { TrustStrip, WhoChip } from "@/components/Timeline";
 import { Empty, ErrorState, PageSkeleton } from "@/components/States";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, streamPost } from "@/lib/api";
+import { CitedAnswer, WorkRail, type Fact, type RailStep, type Sentence } from "@/components/WorkRail";
 import { fmtDate, fmtMoney, fmtRelative } from "@/lib/format";
 import { useData } from "@/lib/useData";
 import type { CycleCardData, PlanJson } from "@/lib/types";
@@ -217,7 +218,8 @@ function OwnerKey() {
 
 function TodayPage({ d, reload }: { d: Today; reload: () => void }) {
   const [q, setQ] = useState("");
-  const [answer, setAnswer] = useState<{ text: string; by: string | null; model: string | null; failed: boolean } | null>(null);
+  const [answer, setAnswer] = useState<{ text: string; by: string | null; model: string | null; failed: boolean; sentences?: Sentence[]; facts?: Fact[]; ms?: number } | null>(null);
+  const [steps, setSteps] = useState<RailStep[]>([]);
   const [asking, setAsking] = useState(false);
   const [syncing, setSyncing] = useState(false);
   useTour(true, "owner");
@@ -232,9 +234,21 @@ function TodayPage({ d, reload }: { d: Today; reload: () => void }) {
     if (!q.trim()) return;
     setAsking(true);
     setAnswer(null);
+    setSteps([]);
     try {
-      const r = await api.post<{ answer: string; by: string; model: string | null }>("/ui/owner/ask", { question: q });
-      setAnswer({ text: r.answer, by: r.by, model: r.model, failed: false });
+      let done = false;
+      await streamPost("/ui/owner/ask/stream", { question: q }, (ev, data) => {
+        if (ev === "step") setSteps((x) => [...x, data]);
+        if (ev === "answer") {
+          done = true;
+          setAnswer({ text: data.answer, by: data.by, model: data.model, failed: false, sentences: data.sentences, facts: data.facts, ms: data.ms });
+        }
+        if (ev === "failed") {
+          done = true;
+          setAnswer({ text: data.message, by: null, model: null, failed: true });
+        }
+      });
+      if (!done) setAnswer({ text: "The answer stopped part way. Nothing was changed; try again.", by: null, model: null, failed: true });
     } catch (err) {
       setAnswer({ text: err instanceof ApiError ? err.message : "Couldn't answer that right now. Nothing was changed.", by: null, model: null, failed: true });
     } finally {
@@ -351,25 +365,30 @@ function TodayPage({ d, reload }: { d: Today; reload: () => void }) {
             </button>
           ))}
         </div>
-        <div aria-live="polite">
-          {answer && !answer.failed && (
-            <div className="mt-4 rounded-lg bg-stamp-wash p-4">
-              <WhoChip who="AI" />
-              <p className="mt-2 mb-0">{answer.text}</p>
-              <p className="mt-2 mb-0 text-xs text-ink-2">
-                Answered by {answer.model ?? "the model"}{answer.by === "backup" ? " (the backup model; the main one did not answer)" : ""}, from your shop's live numbers. The AI can read; it can't act.
-              </p>
-            </div>
-          )}
-          {answer && answer.failed && (
-            <div role="alert" className="mt-4 rounded-lg border border-rule bg-card p-4">
-              <p className="m-0 font-semibold">No answer this time</p>
-              <p className="mt-1 mb-0">{answer.text}</p>
-              <Button type="button" variant="outline" className="mt-3" onClick={() => ask()} disabled={asking}>
-                {asking ? "Trying…" : "Try again"}
-              </Button>
-            </div>
-          )}
+        <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_minmax(280px,360px)]">
+          <div aria-live="polite">
+            {!answer && !asking && <p className="m-0 text-sm text-ink-2">The model reads your shop through read-only tools (and PayPal's own MCP server for a real member) and cites a fact for every sentence. It can read; it can't act.</p>}
+            {asking && !answer && <p className="m-0 text-sm text-ink-2">Working… each step shows in the AI work panel.</p>}
+            {answer && !answer.failed && (
+              <div className="rounded-lg bg-stamp-wash p-4">
+                <WhoChip who="AI" />
+                <div className="mt-2">{answer.sentences?.length ? <CitedAnswer sentences={answer.sentences} facts={answer.facts ?? []} /> : <p className="m-0">{answer.text}</p>}</div>
+                <p className="mt-2 mb-0 text-xs text-ink-2">
+                  Answered by {answer.model ?? "the model"}{answer.ms ? ` in ${(answer.ms / 1000).toFixed(1)} s` : ""}, using the tools listed alongside. Every number comes from a tool; code checked each citation. The AI can read; it can't act.
+                </p>
+              </div>
+            )}
+            {answer && answer.failed && (
+              <div role="alert" className="rounded-lg border border-rule bg-card p-4">
+                <p className="m-0 font-semibold">No answer this time</p>
+                <p className="mt-1 mb-0">{answer.text}</p>
+                <Button type="button" variant="outline" className="mt-3" onClick={() => ask()} disabled={asking}>
+                  {asking ? "Trying…" : "Try again"}
+                </Button>
+              </div>
+            )}
+          </div>
+          <WorkRail steps={steps} running={asking} />
         </div>
       </section>
 

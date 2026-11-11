@@ -34,3 +34,39 @@ export const api = {
 
 /** A per-click idempotency key so a double tap never acts twice. */
 export const newKey = () => (crypto?.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+
+/** POST and read a server-sent event stream; each event is handed to onEvent as it arrives. */
+export async function streamPost(url: string, body: unknown, onEvent: (event: string, data: any) => void): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch(url, { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json", accept: "text/event-stream" }, body: JSON.stringify(body) });
+  } catch {
+    throw new ApiError(0, "offline", "Kept didn't answer. Check your connection and try again.");
+  }
+  if (!res.ok || !res.body) {
+    const t = await res.text().catch(() => "");
+    let d: any = null;
+    try {
+      d = JSON.parse(t);
+    } catch {
+      /* not JSON */
+    }
+    throw new ApiError(res.status, d?.error ?? "error", d?.message ?? "That didn't work.");
+  }
+  const reader = res.body.getReader();
+  const dec = new TextDecoder();
+  let buf = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    let i: number;
+    while ((i = buf.indexOf("\n\n")) >= 0) {
+      const chunk = buf.slice(0, i);
+      buf = buf.slice(i + 2);
+      const ev = /^event: (.*)$/m.exec(chunk)?.[1] ?? "message";
+      const data = /^data: (.*)$/m.exec(chunk)?.[1];
+      if (data) onEvent(ev, JSON.parse(data));
+    }
+  }
+}
