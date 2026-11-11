@@ -79,7 +79,8 @@ export async function runAssistant(ref: string, message: string, onStep?: (s: Ra
   const s = await subscriberByRef(db, ref);
   if (!s) throw new KeptError("Subscription not found", "not_found", 404);
   const m = (await merchantById(db, s.merchant_id))!;
-  const agentId = `assistant-demo:${s.ref}`;
+  // The member's ref is a private link to their page, so it never goes into an agent id, a mandate or a log.
+  const agentId = `assistant-demo:${s.id}`;
   const { mcp, close } = await connect(m, agentId);
   let readBack: string | null = null;
   const key = () => newId("k");

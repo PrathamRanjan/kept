@@ -270,7 +270,9 @@ export function publicRouter(): Router {
     const m = await mandateById(String(req.params.id));
     if (!m) return { found: false };
     const uses = (await (await getDb()).query<{ type: string; summary: string; created_at: Date }>("SELECT type, summary, created_at FROM event_log WHERE payload->>'mandate' = $1 ORDER BY id", [m.mandate.id])).rows;
-    return { found: true, ...m, uses: uses.map((u) => ({ type: u.type, summary: u.summary, at: new Date(u.created_at).toISOString() })) };
+    // A member's ref is a private link to their page; scrub any that an older mandate carried.
+    const out = { found: true, ...m, uses: uses.map((u) => ({ type: u.type, summary: u.summary, at: new Date(u.created_at).toISOString() })) };
+    return JSON.parse(JSON.stringify(out).replace(/ref_[a-z0-9]{8,}/g, "ref_(private)"));
   }));
 
   r.get("/api/public/roles", j(async () => ({

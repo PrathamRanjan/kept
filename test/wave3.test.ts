@@ -290,6 +290,9 @@ describe("the signed mandate", () => {
       expect(r.steps.find((s) => s.name === "cancel_subscription")!.summary).toMatch(/refused by the mandate/);
       expect((await subscriberByRef(db, x.ref))!.status).toBe("ACTIVE");
       expect(r.mandate).toMatch(/^mdt_/);
+      const pub = await new Client(srv.base).get(`/api/public/mandate/${r.mandate}`);
+      expect(pub.json.found).toBe(true);
+      expect(pub.text).not.toContain(x.ref);
       expect(r.steps[0].name).toBe("mandate");
     } finally {
       undo();
