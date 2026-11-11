@@ -1,0 +1,341 @@
+{
+ "about": "Kept scam check labelled set (spec A5.2/A6): messages a member might receive. scam = should not be shown as clear. destination = names somewhere to send money. Split by case; the 10 Nov message is held out. Written by hand for this project on 11 Nov 2026; not real user data.",
+ "cases": [
+  {
+   "id": "nov10",
+   "text": "Hi, we've moved banks. Please send this month's payment to our new PayPal, accounts.emberoak@outlook.com. Thanks so much!",
+   "scam": true,
+   "destination": true,
+   "split": "held"
+  },
+  {
+   "id": "p01",
+   "text": "Our bank details have changed, please use the account below for this month's box: acct 40112233, sort code 20-00-00.",
+   "scam": true,
+   "destination": true,
+   "split": "held"
+  },
+  {
+   "id": "p02",
+   "text": "Please note our remittance details were updated last week. Pay the renewal to billing@ember-oak-payments.com.",
+   "scam": true,
+   "destination": true,
+   "split": "tune"
+  },
+  {
+   "id": "p03",
+   "text": "We switched to a new bank; pay the attached invoice to the new account, BSB 062-000 acct 1234 5678.",
+   "scam": true,
+   "destination": true,
+   "split": "held"
+  },
+  {
+   "id": "p04",
+   "text": "Kindly update our beneficiary information: new IBAN GB29NWBK60161331926819. Please pay today.",
+   "scam": true,
+   "destination": true,
+   "split": "tune"
+  },
+  {
+   "id": "p05",
+   "text": "The old account is being closed, so please send your subscription money to this PayPal from now on: emberoak.pay@gmail.com",
+   "scam": true,
+   "destination": true,
+   "split": "held"
+  },
+  {
+   "id": "p06",
+   "text": "Use this account instead for all future payments: 12345678 at Wise. Thank you for supporting a small roaster!",
+   "scam": true,
+   "destination": true,
+   "split": "tune"
+  },
+  {
+   "id": "p07",
+   "text": "Our PayPal has changed to billing.team@gmail.com, please send this month's 24 dollars there.",
+   "scam": true,
+   "destination": true,
+   "split": "held"
+  },
+  {
+   "id": "p08",
+   "text": "Hello from accounts, our account has been updated. Kindly transfer the balance to the details in the attached PDF.",
+   "scam": true,
+   "destination": true,
+   "split": "tune"
+  },
+  {
+   "id": "p09",
+   "text": "Can you pay into a different bank this time? The usual one is frozen. Details: account 99887766.",
+   "scam": true,
+   "destination": true,
+   "split": "held"
+  },
+  {
+   "id": "p10",
+   "text": "We have switched PayPal accounts. New one: emberoakpay@outlook.com. Please send the renewal there before Friday.",
+   "scam": true,
+   "destination": true,
+   "split": "tune"
+  },
+  {
+   "id": "f01",
+   "text": "Kept Billing: your subscription payment failed and your membership will be cancelled within 24 hours. Pay here to keep it: http://kept-billing-renew.co/pay",
+   "scam": true,
+   "destination": true,
+   "split": "held"
+  },
+  {
+   "id": "f02",
+   "text": "Your Ember & Oak payment was declined. Update your card at https://emberoak-billing.help/update within 12 hours to avoid losing your beans.",
+   "scam": true,
+   "destination": true,
+   "split": "tune"
+  },
+  {
+   "id": "f03",
+   "text": "PayPal Security: we suspended your subscription. Reply with the 6-digit code we just texted to restore it.",
+   "scam": true,
+   "destination": false,
+   "split": "held"
+  },
+  {
+   "id": "f04",
+   "text": "Your renewal could not be processed. Click here to re-enter your card details: bit.ly/kept-renew",
+   "scam": true,
+   "destination": true,
+   "split": "tune"
+  },
+  {
+   "id": "r01",
+   "text": "This is the shop. Please send my refund to my son's account instead, he will pass it on.",
+   "scam": true,
+   "destination": true,
+   "split": "held"
+  },
+  {
+   "id": "r02",
+   "text": "We refunded you twice by mistake. Please send the extra 24 USD back to refunds.emberoak@gmail.com.",
+   "scam": true,
+   "destination": true,
+   "split": "tune"
+  },
+  {
+   "id": "r03",
+   "text": "You overpaid this month. Refund the difference by gift card and send us the code.",
+   "scam": true,
+   "destination": false,
+   "split": "held"
+  },
+  {
+   "id": "g01",
+   "text": "Congratulations! You won a free year of coffee. Pay a 4.99 delivery fee to claim it: paypal.me/emberoakprizes",
+   "scam": true,
+   "destination": true,
+   "split": "tune"
+  },
+  {
+   "id": "g02",
+   "text": "To release your loyalty reward, pay a small processing fee of 9 USD via Bitcoin to the wallet below.",
+   "scam": true,
+   "destination": false,
+   "split": "held"
+  },
+  {
+   "id": "i01",
+   "text": "Ember & Oak owner here, I'm stuck abroad. Can you send this month's payment to my personal PayPal, keep it between us? mark.owner@hotmail.com",
+   "scam": true,
+   "destination": true,
+   "split": "tune"
+  },
+  {
+   "id": "i02",
+   "text": "Message from the bank: your direct debit to Ember & Oak is blocked. Call 1800 555 0199 now and pay the release fee.",
+   "scam": true,
+   "destination": true,
+   "split": "held"
+  },
+  {
+   "id": "w01",
+   "text": "Let's move this chat to WhatsApp and you can pay me directly, it's cheaper than PayPal for both of us.",
+   "scam": true,
+   "destination": false,
+   "split": "tune"
+  },
+  {
+   "id": "u01",
+   "text": "FINAL NOTICE: your coffee subscription will be cancelled today unless you transfer 24 USD to our new account 55667788.",
+   "scam": true,
+   "destination": true,
+   "split": "held"
+  },
+  {
+   "id": "k01",
+   "text": "Ember & Oak: your Signature bag renews on 2026-12-10 for 24.00 USD. Nothing to do to keep it. Manage: https://pph-kept.onrender.com/manage/sub_example",
+   "scam": false,
+   "destination": false,
+   "split": "tune"
+  },
+  {
+   "id": "k02",
+   "text": "Your Signature bag shipped today. Tracking will follow from the courier.",
+   "scam": false,
+   "destination": false,
+   "split": "held"
+  },
+  {
+   "id": "k03",
+   "text": "Thanks for pausing. Your subscription resumes on 1 January; nothing will be charged until then.",
+   "scam": false,
+   "destination": false,
+   "split": "tune"
+  },
+  {
+   "id": "k04",
+   "text": "Your skip is booked: no box and no charge this month. Your next renewal is 10 January.",
+   "scam": false,
+   "destination": false,
+   "split": "held"
+  },
+  {
+   "id": "k05",
+   "text": "A payment for your subscription didn't go through. Open your subscription page from your bookmark or our website to see what to do. We will never send a link to pay.",
+   "scam": false,
+   "destination": false,
+   "split": "tune"
+  },
+  {
+   "id": "k06",
+   "text": "We've changed our roast schedule: new beans arrive every Tuesday from next month.",
+   "scam": false,
+   "destination": false,
+   "split": "held"
+  },
+  {
+   "id": "k07",
+   "text": "Your cancellation is done. No more charges. Thanks for being a member.",
+   "scam": false,
+   "destination": false,
+   "split": "tune"
+  },
+  {
+   "id": "k08",
+   "text": "Price change notice: from 1 February the Signature bag will be 26 USD a month. You can switch plan or cancel any time from your subscription page.",
+   "scam": false,
+   "destination": false,
+   "split": "held"
+  },
+  {
+   "id": "k09",
+   "text": "Hi! We moved to a new roastery on Hill Street. Pop in for a free cup if you're nearby.",
+   "scam": false,
+   "destination": false,
+   "split": "tune"
+  },
+  {
+   "id": "k10",
+   "text": "Reminder: you can switch to the half bag any time on your subscription page.",
+   "scam": false,
+   "destination": false,
+   "split": "held"
+  },
+  {
+   "id": "m01",
+   "text": "I'm moving abroad next month, please cancel my subscription.",
+   "scam": false,
+   "destination": false,
+   "split": "tune"
+  },
+  {
+   "id": "m02",
+   "text": "Can I switch to the Lite plan on my account?",
+   "scam": false,
+   "destination": false,
+   "split": "held"
+  },
+  {
+   "id": "m03",
+   "text": "The new roast is lovely, thank you!",
+   "scam": false,
+   "destination": false,
+   "split": "tune"
+  },
+  {
+   "id": "m04",
+   "text": "I changed my mind, keep my subscription going.",
+   "scam": false,
+   "destination": false,
+   "split": "held"
+  },
+  {
+   "id": "m05",
+   "text": "Can I skip next month? I'm moving to a new flat.",
+   "scam": false,
+   "destination": false,
+   "split": "tune"
+  },
+  {
+   "id": "s01",
+   "text": "Our new website is live at emberoak.coffee, same beans, same team. Your subscription carries on as before.",
+   "scam": false,
+   "destination": false,
+   "split": "held"
+  },
+  {
+   "id": "s02",
+   "text": "Thanks for your order. Your PayPal receipt is in your PayPal account under Activity.",
+   "scam": false,
+   "destination": false,
+   "split": "tune"
+  },
+  {
+   "id": "s03",
+   "text": "Holiday hours: we're closed 24-26 December. Boxes ship as usual on the 27th.",
+   "scam": false,
+   "destination": false,
+   "split": "held"
+  },
+  {
+   "id": "s04",
+   "text": "Your renewal of 24.00 USD went through on PayPal today. Nothing to do.",
+   "scam": false,
+   "destination": false,
+   "split": "tune"
+  },
+  {
+   "id": "s05",
+   "text": "We've updated our privacy policy; you can read it on our website. No action needed.",
+   "scam": false,
+   "destination": false,
+   "split": "held"
+  },
+  {
+   "id": "h01",
+   "text": "Your PayPal subscription to Ember & Oak is due to renew on 10 December. To change it, open PayPal, go to Settings, then Automatic payments.",
+   "scam": false,
+   "destination": true,
+   "split": "tune"
+  },
+  {
+   "id": "h02",
+   "text": "If you'd like to pay for a gift box, you can buy one in our shop on the website with PayPal at checkout.",
+   "scam": false,
+   "destination": true,
+   "split": "held"
+  },
+  {
+   "id": "h03",
+   "text": "We emailed you a receipt from receipts@emberoak.coffee for this month's 24.00 USD renewal.",
+   "scam": false,
+   "destination": false,
+   "split": "tune"
+  },
+  {
+   "id": "h04",
+   "text": "Please don't reply to this email; contact us from the help page on our website.",
+   "scam": false,
+   "destination": false,
+   "split": "held"
+  }
+ ]
+}

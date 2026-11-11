@@ -6,6 +6,7 @@ import { CycleCard, StampLegend } from "@/components/CycleCard";
 import { TrustStrip } from "@/components/Timeline";
 import { Button } from "@/components/ui/button";
 import { Marquee } from "@/components/ui/marquee";
+import { TryScam } from "@/components/TryScam";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useData } from "@/lib/useData";
 import { fmtMoney } from "@/lib/format";
@@ -163,6 +164,9 @@ export default function Landing() {
             <p className="mt-3 max-w-[62ch] text-lg text-ink-2">Every step in Kept is labelled with who did it, so you can trust it with your members' money.</p>
             <div data-tour="trust" className="mt-8">
               <TrustStrip />
+            </div>
+            <div className="mt-8 max-w-3xl">
+              <TryScam />
             </div>
           </div>
         </section>

@@ -9,7 +9,10 @@ export const TACTICS = ["impersonation", "urgency_secrecy", "changed_details", "
 export type Tactic = (typeof TACTICS)[number];
 
 const SEEDS: Record<Tactic, RegExp> = {
-  changed_details: /\b(new|updated?|changed?)\b.{0,40}\b(bank|account|acct|iban|beneficiary|payout|payment details|paypal (email|address|account)|upi id)\b|\b(bank|account) (details|number) (has|have) changed/i,
+  // Spec A6.3: a change word and a payment-details word within 60 characters, in either order, plus the usual
+  // phrasings of a closed or replaced account. The 10 Nov message ("we've moved banks … send this month's
+  // payment to our new PayPal") is the regression case.
+  changed_details: /\b(new|updated|changed|different|replaced|alternative|change of)\b[^.!?\n]{0,60}?\b(banks?|banking|bank (?:account|details)|account (?:details|number)|acct|payment details|paypal|remittance|iban|beneficiary|payout|upi id|sort code|account|details)\b|\b(switch(?:ed|ing)?|mov(?:ed|ing)|transferr?(?:ed|ing))\b[^.!?\n]{0,60}?\b(banks?|banking|bank (?:account|details)|account (?:details|number)|acct|payment details|paypal|remittance|iban|beneficiary|payout|upi id|sort code)\b|\b(banks?|banking|bank (?:account|details)|account (?:details|number)|acct|payment details|paypal|remittance|iban|beneficiary|payout|upi id|sort code|account)\b[^.!?\n]{0,60}?\b(?:(?:has|have|is|are|was|were|got)\s+(?:been\s+)?)?(changed|updated|replaced|closed|switched)\b|\bold (one|account|bank|paypal)\b[^.!?\n]{0,40}\b(closed|closing|shut|no longer)|\buse (this|the following|our|my) (account|bank|paypal|details)\b[^.!?\n]{0,30}\binstead\b/i,
   off_platform: /\b(whatsapp|telegram|signal|outside (of )?(paypal|the app|platform)|pay (me )?directly|bank transfer instead|cash ?app|zelle|western union|moneygram)\b/i,
   gift_cards_crypto: /\b(gift ?cards?|itunes|google play card|steam card|bitcoin|btc|usdt|crypto|wallet address)\b/i,
   fee_to_release: /\b(processing|release|clearance|delivery|customs|handling|admin|unlock|activation) fee\b|pay .{0,20}\bto (release|claim|unlock|receive)\b/i,

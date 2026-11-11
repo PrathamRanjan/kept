@@ -26,7 +26,8 @@
     "cli": "tsx --env-file-if-exists=.env scripts/kept-cli.ts",
     "build:web": "npm --prefix web ci --include=dev && npm --prefix web run build",
     "e2e": "playwright test",
-    "shots": "node scripts/shots.mjs"
+    "shots": "node scripts/shots.mjs",
+    "calibrate": "tsx --env-file-if-exists=.env scripts/calibrate.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.15",

@@ -13,7 +13,7 @@ import { createHash } from "node:crypto";
 import { config } from "../config.js";
 import { getDb } from "../db.js";
 
-export type Purpose = "draft_plans" | "draft_rules" | "classify_reason" | "word_offer" | "explain_failure" | "owner_answer" | "eval";
+export type Purpose = "draft_plans" | "draft_rules" | "classify_reason" | "word_offer" | "explain_failure" | "owner_answer" | "eval" | "agent_ask" | "agent_assistant";
 
 export interface TextPart {
   type: "text";
@@ -62,6 +62,9 @@ let fetchImpl: typeof fetch = (i, init) => fetch(i, init);
 export function setProviderFetch(f: typeof fetch | null) {
   fetchImpl = f ?? ((i, init) => fetch(i, init));
 }
+
+/** The fetch the provider layer uses (tests stub it with setProviderFetch); shared by decisions.ts and agent.ts. */
+export const providerFetch = (): typeof fetch => fetchImpl;
 
 export const hasOpenAI = () => config.ai.provider === "openai" && Boolean(config.ai.openaiKey);
 export const providerLabel = () => (hasOpenAI() ? `openai (${config.ai.models.read} for reading and drafting, backup ${config.ai.models.backup}; ${config.ai.models.classify} for labels and wording)` : "no model key: AI features show their failure state");
@@ -210,13 +213,13 @@ async function openaiStructured(model: string, call: StructuredCall<unknown>, sc
   }
 }
 
-async function audit(row: { purpose: string; model: string; via: string; inputHash: string; outputHash: string; tokensIn: number; tokensOut: number; costUsd: number; latencyMs: number; ok: boolean; error: string | null; output: unknown; runId: string | null }): Promise<number | null> {
+export async function audit(row: { purpose: string; model: string; via: string; inputHash: string; outputHash: string; tokensIn: number; tokensOut: number; costUsd: number; latencyMs: number; ok: boolean; error: string | null; output: unknown; runId: string | null; inputSummary?: string | null }): Promise<number | null> {
   try {
     const db = await getDb();
     const r = await db.query<{ id: number }>(
-      `INSERT INTO ai_calls (purpose, model, via, input_hash, output_hash, tokens_in, tokens_out, cost_usd, latency_ms, ok, error, output, run_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id`,
-      [row.purpose, row.model, row.via, row.inputHash, row.outputHash, row.tokensIn, row.tokensOut, row.costUsd, row.latencyMs, row.ok, row.error, row.ok ? JSON.stringify(row.output) : null, row.runId],
+      `INSERT INTO ai_calls (purpose, model, via, input_hash, output_hash, tokens_in, tokens_out, cost_usd, latency_ms, ok, error, output, run_id, input_summary)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id`,
+      [row.purpose, row.model, row.via, row.inputHash, row.outputHash, row.tokensIn, row.tokensOut, row.costUsd, row.latencyMs, row.ok, row.error, row.ok ? JSON.stringify(row.output) : null, row.runId, row.inputSummary ? row.inputSummary.slice(0, 240) : null],
     );
     return r.rows[0]?.id ?? null;
   } catch {

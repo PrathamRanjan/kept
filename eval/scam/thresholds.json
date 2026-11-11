@@ -1,0 +1,24 @@
+{
+ "about": "Written by scripts/calibrate.ts. Loaded into decision_thresholds at boot.",
+ "model": "gpt-6-luna",
+ "thresholds": [
+  {
+   "name": "scam_tactic",
+   "clear_below": 0.75,
+   "hold_above": 0.75,
+   "calibrated_on": "eval/scam/cases.json tuning half, 2026-11-11",
+   "n": 23,
+   "precision_at_hold": 1,
+   "recall_at_hold": 1
+  },
+  {
+   "name": "names_a_payment_destination",
+   "clear_below": 0.05,
+   "hold_above": 0.05,
+   "calibrated_on": "eval/scam/cases.json tuning half, 2026-11-11",
+   "n": 23,
+   "precision_at_hold": 1,
+   "recall_at_hold": 0.75
+  }
+ ]
+}

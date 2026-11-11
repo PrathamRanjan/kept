@@ -7,6 +7,7 @@
 import { Router, type NextFunction, type Request, type Response } from "express";
 import { getDb } from "../db.js";
 import { assessMessage, protectedMode, safetyHolds, setProtectedMode } from "../safety/index.js";
+import { checkMessage } from "../safety/readers.js";
 import { TACTIC_WORDS, TACTICS } from "../safety/rules.js";
 import { KeptError, merchantById, subscriberByRef, type Merchant } from "../store.js";
 import { ownerOf } from "./guard.js";
@@ -51,10 +52,18 @@ const modelCard = (back: string) => html`<h1>How the scam check was tested</h1>
 <div class="card"><h2>Payment-risk model</h2><p>LightGBM, 300 trees, monotone: a scam signal can only raise the score. <b>Trained on synthetic data</b>; there is no real payment-fraud data in this project. Its score is a ranking signal shown with the rule reasons, never a fraud rate.</p></div>
 <div class="card"><h2>Tactics the model names</h2><ul>${TACTICS.map((t) => html`<li><b>${t.replace(/_/g, " ")}</b>: ${TACTIC_WORDS[t]}</li>`)}</ul></div>`;
 
+/** Spec A6.1: rules, Decisions and the code reader run here; the browser adds its on-device model. */
 async function scanBody(req: Request, res: Response) {
   const text = String(req.body?.text ?? "").slice(0, 4000);
   if (!text.trim()) return res.status(400).json({ error: "bad_request", message: "Paste a message first." });
-  res.json(assessMessage(text));
+  const db = await getDb();
+  let shop: Merchant | null = null;
+  if (req.params.ref) {
+    const s = await subscriberByRef(db, req.params.ref);
+    if (!s) throw new KeptError("Subscription not found", "not_found", 404);
+    shop = await merchantById(db, s.merchant_id);
+  } else shop = await ownerOf(req);
+  res.json(await checkMessage(text, { ws: shop?.id ?? null, shopEmail: shop?.owner_email ?? null, shopName: shop?.name ?? null }));
 }
 
 export function safetyRouter(): Router {

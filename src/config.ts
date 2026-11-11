@@ -46,6 +46,10 @@ export const config = {
       backup: process.env.AI_MODEL_BACKUP || "gpt-6-sol",
       classify: process.env.AI_MODEL_CLASSIFY || "gpt-6-luna",
       vision: process.env.AI_MODEL_VISION || "gpt-6.1-sol",
+      /** Spec A5.2: yes/no, choice and score questions on /v1/decisions. */
+      decide: process.env.AI_MODEL_DECIDE || "gpt-6-luna",
+      /** Spec A5.3: the agent loop (function tools, server-controlled). */
+      agent: process.env.AI_MODEL_AGENT || process.env.AI_MODEL_READ || "gpt-6.1-sol",
     },
     /** Reasoning effort for structured jobs (spec A5.4: low for extraction). */
     effort: (process.env.AI_REASONING_EFFORT || "low") as "minimal" | "low" | "medium" | "high",
