@@ -12,7 +12,7 @@ import type { Request, Response } from "express";
 import { config } from "../config.js";
 import { getDb, type Queryable } from "../db.js";
 import { sign, unsign } from "../lib/crypto.js";
-import { newId, requestKey } from "../lib/ids.js";
+import { newId } from "../lib/ids.js";
 import { paypalFor } from "../paypal/index.js";
 import { KeptError, logEvent, merchantById, merchantBySlug, type Merchant } from "../store.js";
 import { clearSamples, seedSamples, SEED_VERSION } from "./seed.js";
@@ -204,6 +204,8 @@ export interface ExpireResult {
   workspace: string;
   cancelled: { paypalId: string; status: string }[];
   kept: { paypalId: string; movedTo: string }[];
+  /** Still live at PayPal, so put back in the pool as ready for the next visitor. */
+  returned: { paypalId: string; status: string }[];
   failed: { paypalId: string; error: string }[];
 }
 
@@ -217,7 +219,7 @@ export async function expireWorkspace(wsId: string, why: string, moveTo?: Worksp
   if (!ws) throw new KeptError("No such workspace.", "not_found", 404);
   if (ws.kind !== "visitor") throw new KeptError("The showcase is rebuilt, never expired.", "not_allowed", 409);
   const m = await merchantById(db, ws.tenant_id);
-  const out: ExpireResult = { workspace: wsId, cancelled: [], kept: [], failed: [] };
+  const out: ExpireResult = { workspace: wsId, cancelled: [], kept: [], returned: [], failed: [] };
   if (m) {
     const real = (await db.query<any>("SELECT * FROM subscribers WHERE merchant_id = $1 AND NOT is_sample AND paypal_subscription_id IS NOT NULL", [m.id])).rows;
     const { adoptIntoWorkspace } = await import("./pool.js");
@@ -231,12 +233,24 @@ export async function expireWorkspace(wsId: string, why: string, moveTo?: Worksp
           out.kept.push({ paypalId: ppId, movedTo: moveTo.id });
           continue;
         }
+        // A pre-approved subscription is scarce (only the owner can approve more), so a still-live one goes back
+        // to the pool for the next visitor instead of being cancelled. It is re-tagged and read back first.
         const pp = paypalFor(m);
         const before = await pp.getSubscription(ppId);
-        if (!["CANCELLED", "EXPIRED"].includes(before.status)) await pp.cancelSubscription(ppId, "Demo workspace expired", requestKey("ws-expire", ws.id, ppId));
-        const after = await pp.getSubscription(ppId);
-        out.cancelled.push({ paypalId: ppId, status: after.status });
-        await db.query("UPDATE approval_pool SET status = 'spent', note = $2, updated_at = now() WHERE paypal_id = $1", [ppId, `cancelled when ${ws.id} expired (read back ${after.status})`]);
+        if (["ACTIVE", "SUSPENDED"].includes(before.status)) {
+          const poolId = (await db.query<{ id: string }>("SELECT id FROM approval_pool WHERE paypal_id = $1", [ppId])).rows[0]?.id ?? newId("pool");
+          await pp.setSubscriptionCustomId(ppId, `pool:${poolId}`);
+          await db.query("UPDATE subscribers SET paypal_subscription_id = NULL WHERE id = $1", [s.id]);
+          await db.query("DELETE FROM paypal_refs WHERE resource_id = $1", [ppId]);
+          await db.query(
+            "INSERT INTO approval_pool (id, paypal_id, plan_id, status, note) VALUES ($1,$2,$3,'ready',$4) ON CONFLICT (paypal_id) DO UPDATE SET status = 'ready', claimed_by_ws = NULL, plan_id = EXCLUDED.plan_id, note = EXCLUDED.note, updated_at = now()",
+            [poolId, ppId, before.plan_id ?? null, `returned when ${ws.id} expired (PayPal reads back ${before.status})`],
+          );
+          out.returned.push({ paypalId: ppId, status: before.status });
+          continue;
+        }
+        out.cancelled.push({ paypalId: ppId, status: before.status });
+        await db.query("UPDATE approval_pool SET status = 'spent', note = $2, updated_at = now() WHERE paypal_id = $1", [ppId, `ended before ${ws.id} expired (read back ${before.status})`]);
       } catch (e) {
         out.failed.push({ paypalId: ppId, error: (e as Error).message.slice(0, 200) });
       }
@@ -244,7 +258,7 @@ export async function expireWorkspace(wsId: string, why: string, moveTo?: Worksp
     await db.tx((q) => deleteTenantRows(q, m.id));
   }
   await db.query("DELETE FROM workspaces WHERE id = $1", [wsId]);
-  await logEvent(db, { source: "system", type: "workspace.expired", summary: `Workspace ${wsId} removed (${why}): ${out.cancelled.length} cancelled at PayPal, ${out.kept.length} moved, ${out.failed.length} failed`, payload: out });
+  await logEvent(db, { source: "system", type: "workspace.expired", summary: `Workspace ${wsId} removed (${why}): ${out.returned.length} returned to the pool, ${out.kept.length} moved, ${out.cancelled.length} already ended, ${out.failed.length} failed`, payload: out });
   return out;
 }
 

@@ -235,7 +235,7 @@ describe("A1 private workspaces and A2.2 the approval pool", () => {
     expect(fake.sub(ppId).status).toBe("ACTIVE"); // moved, not cancelled
   });
 
-  it("admin expiry and idle expiry cancel the workspace's subscriptions at PayPal (read back) and remove its rows", async () => {
+  it("admin expiry and idle expiry return live subscriptions to the pool (read back), end nothing, and remove the rows", async () => {
     const v = new Client(srv.base);
     const st = (await v.req("POST", "/demo/start", { json: {}, headers: ip(4) })).json;
     const shop = (await v.get(`/ui/shop/${st.shop.slug}`)).json;
@@ -244,8 +244,12 @@ describe("A1 private workspaces and A2.2 the approval pool", () => {
     fake.approve(ppId);
     expect((await new Client(srv.base).req("POST", `/admin/workspaces/${st.workspace.id}/expire`, { headers: { accept: "application/json" } })).status).toBe(401);
     const out = (await new Client(srv.base).req("POST", `/admin/workspaces/${st.workspace.id}/expire`, { headers: admin() })).json;
-    expect(out.cancelled).toEqual([{ paypalId: ppId, status: "CANCELLED" }]);
-    expect(fake.sub(ppId).status).toBe("CANCELLED");
+    expect(out.returned).toEqual([{ paypalId: ppId, status: "ACTIVE" }]);
+    expect(out.cancelled).toEqual([]);
+    expect(fake.sub(ppId).status).toBe("ACTIVE");
+    const back = (await db.query<any>("SELECT id, status, claimed_by_ws FROM approval_pool WHERE paypal_id = $1", [ppId])).rows[0];
+    expect(back).toMatchObject({ status: "ready", claimed_by_ws: null });
+    expect((fake.sub(ppId) as any).custom_id).toBe(`pool:${back.id}`);
     const tenant = (await db.query<any>("SELECT id FROM merchants WHERE slug = $1", [st.shop.slug])).rows;
     expect(tenant).toHaveLength(0);
     const wsShop = (await db.query<any>("SELECT DISTINCT merchant_id FROM paypal_refs WHERE resource_id = $1", [ppId])).rows;
@@ -253,6 +257,14 @@ describe("A1 private workspaces and A2.2 the approval pool", () => {
     expect((await db.query("SELECT 1 FROM subscribers WHERE ref = $1", [sub.ref])).rows).toHaveLength(0);
     expect((await v.get("/demo/status")).json.workspace).toBeNull();
     expect((await v.get(`/demo/join/${encodeURIComponent(st.joinUrl.split("/demo/join/")[1])}`)).status).toBe(404);
+
+    // The next visitor gets that same real subscription from the pool.
+    const next = new Client(srv.base);
+    const st3 = (await next.req("POST", "/demo/start", { json: {}, headers: ip(6) })).json;
+    await waitForClaims(st3.workspace.id);
+    const claimed = (await db.query<any>("SELECT s.merchant_id FROM subscribers s JOIN workspaces w ON w.tenant_id = s.merchant_id WHERE s.paypal_subscription_id = $1 AND w.id = $2", [ppId, st3.workspace.id])).rows;
+    expect(claimed).toHaveLength(1);
+    expect((fake.sub(ppId) as any).custom_id).toMatch(new RegExp(`^${claimed[0].merchant_id}:`));
 
     // Idle expiry: 48 hours after the last visit.
     const w = new Client(srv.base);
