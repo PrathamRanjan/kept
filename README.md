@@ -259,3 +259,24 @@ Each item was built, tested, deployed to https://pph-kept.onrender.com and then 
   - A code-like answer goes to the backup model; when every answer is code-like, the owner gets the failure sentence.
   - `npm run eval:b5` passes 8 of 8 with the real model.
 - **Also changed:** a shop with no time zone set no longer gets the odd-hour scam signal guessed from UTC; the signal is skipped until the owner sets one.
+
+#### Follow-up fixes after Wave 1 (live 85993fc, 11 Nov 2026)
+
+Each fix below closes a finding from `docs/STATE_OF_THE_UNION.md` (10 Nov) or a Wave 1 gap. Each was checked on the live site.
+
+- **Expiry no longer throws away approved subscriptions.** Expiring a demo shop now returns a still-live real subscription to the pool instead of cancelling it.
+  - Live: the workspace holding `I-69VG1KHRR1U7` was expired.
+  - PayPal read it back ACTIVE, and it went back to the pool as ready.
+  - A fresh visitor claimed it.
+  - Pause, then resume, on that real member each read back from PayPal (SUSPENDED, then ACTIVE).
+- **Old showcase owner key retired.** The key was replaced on the live site; the admin page confirms "the old key no longer signs in". The old key itself wasn't available, so it was not retried.
+- **Scam check.**
+  - Kept's own renewal reminder (a link to this shop's own member page) is now **clear**.
+  - The same text with a look-alike host still gets **caution**.
+  - "Send my refund to my son's account" is now **held**.
+- **Illegal rules get their citation when paraphrased.** "Show three retention offers before cancel" is refused with KEPT-OFFER (ROSCA §8403(3), Cal. §17602(d)).
+- **Accessibility.** axe (WCAG 2.2 AA) found **0 violations** on the Guard, Safety and Compliance pages at 800 px, with no sideways scroll. The member page at 200% text has no sideways scroll, and the scam-check button wraps.
+- **Compliance page.** No visible "[verify]" marks remain; they stay in `docs/compliance.md`.
+- **Owner MCP.** Connections shows the owner MCP URL and a "Show owner key" button: 200 for the shop's own owner, 401 anonymous, `no-store`.
+- **Judge Mode** marks the first-run tours seen, so they don't reopen afterwards.
+- **Observed once, not explained.** Right after the claim, Kept's copy showed the subscription SUSPENDED while PayPal was ACTIVE: the gate's live read allowed a pause, which needs ACTIVE. The next read-back corrected it.
