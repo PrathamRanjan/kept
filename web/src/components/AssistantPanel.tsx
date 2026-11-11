@@ -17,7 +17,7 @@ export function AssistantPanel({ memberRef, sample, initial, onChanged }: { memb
   const [msg, setMsg] = useState(initial ?? "");
   const [steps, setSteps] = useState<RailStep[]>([]);
   const [busy, setBusy] = useState(false);
-  const [out, setOut] = useState<{ sentences?: Sentence[]; facts?: Fact[]; text?: string; failed?: boolean; model?: string; ms?: number; mandate?: string } | null>(null);
+  const [out, setOut] = useState<{ sentences?: Sentence[]; facts?: Fact[]; text?: string; failed?: boolean; model?: string; ms?: number; mandate?: string; readBack?: string | null } | null>(null);
   const ref = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (initial) {
@@ -72,7 +72,7 @@ export function AssistantPanel({ memberRef, sample, initial, onChanged }: { memb
             <div className="rounded-lg bg-stamp-wash p-4">
               <p className="m-0 text-sm font-semibold">Your assistant</p>
               <div className="mt-1"><CitedAnswer sentences={out.sentences} facts={out.facts ?? []} idPrefix="afact" /></div>
-              <p className="mt-2 mb-0 text-xs text-ink-2">By {out.model}{out.ms ? ` in ${(out.ms / 1000).toFixed(1)} s` : ""}. The model chose the tools; Kept's rules and gate decided; PayPal made the change.</p>
+              <p className="mt-2 mb-0 text-xs text-ink-2">By {out.model}{out.ms ? ` in ${(out.ms / 1000).toFixed(1)} s` : ""}. {out.readBack ? <>The model chose the tools; Kept's rules and gate decided; PayPal made the change, and code read it back: {out.readBack}.</> : sample ? "A sample member: nothing was sent to PayPal." : "Nothing was changed."}</p>
               {out.mandate && <p className="mt-1 mb-0 text-xs text-ink-2">Allowed by signed mandate <a className="font-mono underline" href={`/api/public/mandate/${out.mandate}`} target="_blank" rel="noreferrer">{out.mandate}</a>: its scope came from your words, and code checked it before each change.</p>}
             </div>
           )}

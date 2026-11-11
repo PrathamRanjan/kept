@@ -297,3 +297,73 @@ Each fix below closes a finding from `docs/STATE_OF_THE_UNION.md` (10 Nov) or a 
 - **Owner MCP.** Connections shows the owner MCP URL and a "Show owner key" button: 200 for the shop's own owner, 401 anonymous, `no-store`.
 - **Judge Mode** marks the first-run tours seen, so they don't reopen afterwards.
 - **Observed once, not explained.** Right after the claim, Kept's copy showed the subscription SUSPENDED while PayPal was ACTIVE: the gate's live read allowed a pause, which needs ACTIVE. The next read-back corrected it.
+
+## Waves 2, 3 and 5 of the master improvement spec (11 Nov 2026): acceptance log
+
+Each item was built, tested (`npm test`: 167 of 167; `npm run e2e`: 28 of 28), pushed to `main`, deployed by Render, and checked on the live site. "Not verified" means exactly that.
+
+### Wave 2, items 6 and 7: Decisions scam check v2 and the agent loop (live 4576fdc, 6155d28)
+
+- Scam check: three readers (rules, Decisions questions, code that reads where money would go). Strictest wins, and a message that names somewhere to send money is never shown green. Live: the 10 Nov message is **held** by rules, code and Decisions.
+- The owner's Ask runs as an agent with read tools, one of them PayPal's own MCP server. Live: 3 tool calls including `paypal_mcp`, and every sentence cites a fact that code checked.
+- `/proof` scam set: 47 of 48 on the live server's result file.
+
+### Wave 2, items 8 and 9: the judge page and the public pages (live b12331d, 01c511b)
+
+- `/judge`: three paths whose steps tick themselves when the server sees them happen, in the visitor's own workspace only. No tour starts by itself.
+- `/proof`, `/ai`, `/paypal`, `/who-can-move-money` and `/accessibility` read real records. `/proof` lists every case of every suite, plus a daily showcase run at 04:30 UTC (`nightly_runs`).
+- Live:
+  - The member's assistant paused and resumed a real sandbox subscription, and code read PayPal back each time (SUSPENDED, then ACTIVE).
+  - The owner path ticked 4 of 4.
+  - The daily run passed 7 of 8.
+- **Not run live:** the cancel path. Saying no to the offer cancels the subscription on PayPal and uses up one of the owner's pre-approved pool subscriptions, so it is tested with the fake PayPal only (`test/wave2.test.ts`, `test/wave3.test.ts`).
+
+### Wave 3, item 11: Kept's differentiators (live dbabe74, f623bd6)
+
+| Spec B5 | What was built | Live check (11 Nov) |
+|---|---|---|
+| 1. Watch an assistant do it | The member page's assistant panel, streamed step by step | Pause: mandate, model, `pause`, read-back "status suspended, resumes 2026-12-10". Resume: read-back "status active". About 9 s each |
+| 2. App inside ChatGPT and Claude | `get_subscription` returns the stamp card as an MCP Apps resource (`ui://kept/stamp-card.html`, `text/html;profile=mcp-app`) and a ChatGPT copy (`text/html+skybridge`); results carry `structuredContent`. `/agents` explains how to add it | Both resources are listed on the live `/s/<slug>/mcp`; the tool's `_meta` points at them; the card has the host bridge. **Not verified:** rendering inside ChatGPT or Claude, which needs the owner's developer mode |
+| 3. One honest exchange at cancel | Decisions classifies the reason and asks `is_quality_complaint` and `sounds_pressured`; at 0.5 or more, code makes no offer. A quality complaint goes to the owner | `eval/exchange.json` on real Decisions calls: **17 of 17**, no offer where none should be. Calm reasons scored at most 0.11 pressured; pressured ones at least 0.88. **Not done:** the model asking one follow-up question |
+| 4. Win-back | On a verified PayPal cancel that Kept did not make: one message with a rejoin link, never a second, at most one per email per shop per year | Tests only. A live run would cancel one of the owner's pool subscriptions |
+| 5. Cancel widget | `/widget.js` (one script tag, opens the member page), with a copy button on the owner's dashboard | 200, JavaScript, `cross-origin-resource-policy: cross-origin`; no cookies, storage or fetch |
+| 6. Failed renewal end to end | Real code from earlier waves (webhook, notice, outstanding-balance capture) | **Not verified live:** it needs PayPal to fail a real renewal, and there is no switch to fake one |
+| 7. Partial-refund remedy | Rule "refund the unused part … up to $X"; on cancel, the unused share of the last payment, capped, refunded and read back from PayPal. A refund failure never undoes the cancel. Code reads the cap from the owner's words; the model only says that the rule is there | The real-model rules draft shows the refund line, up to 10.00. **Not run live:** the refund itself, which would cancel a pool subscription |
+| 8. Phone line | Not built | The Twilio number belongs to Callback |
+| 9. APIMatic portal | Not built | Needs the owner's APIMatic account |
+| 10. Signed mandate | Code issues an HMAC-signed mandate from the member's words before the model runs. Its scope includes cancel only if the member asked to cancel; it expires after 15 minutes; code refuses any move outside it. Public check: `/api/public/mandate/:id` | Live mandate `mdt_5sc5cfuzbnkxqb7h`: valid, scope without cancel, one recorded use. A forced refusal is tested only, since the live model did not try to overstep |
+| Also: what this loosens | Code compares new rules with the approved ones and lists every way members get more | Live on the guard page and the rules preview. It caught a loosening the owner did not write: the model's draft defaulted the offer cooldown from 365 to 180 days |
+
+**Fixed during the live checks:**
+
+- The rules-draft schema asked the model for `refund_unused_*` fields, which Kept's own money-field guard rejects. The model now answers yes or no, and code reads the amount.
+- The public mandate view showed the member's private link ref inside the agent id. The agent id now uses the internal id, and older mandates are scrubbed.
+
+### Wave 5
+
+- **18. A6.4 retraining the on-device scam model: not done.** It runs in the shared guard lab, outside this app.
+- **19. A7 accessibility (live dbabe74):**
+  - Switches are named and announced.
+  - Scrolling tables and code boxes can be reached by keyboard.
+  - The marquee is read once.
+  - Push-to-talk on the owner's Ask and the member's assistant. The live session is 120 s, `gpt-live-1`, with words by `gpt-4o-transcribe`; Kept's key never reaches the browser.
+  - New Playwright checks: keyboard-only cancel, 200% text, reduced motion, switch names, voice fallback.
+  - All of it, with dates, is on `/accessibility`. **Not verified:** dictation into a real microphone, and a screen reader in a person's hands.
+- **20. A12, the robot judge and the quality gate (live 229a75f, 97a11a6):**
+  - `npm run robot:judge` opens the live site in a browser and follows the `/judge` paths. It writes `eval/robot-judge.json`, which is also on `/proof`. It starts a shop with no pool subscriptions (`POST /demo/start {"pool": false}`) and never takes a visitor's demo slot.
+  - Live run: **15 of 15 steps, 40 s** (public pages with axe and 200% text 6 s, owner path 23 s, assistant read 7 s).
+  - Its first run found a real bug: an early click on "Check this message" reloaded the page instead of checking. The button now stays disabled until its handler is attached.
+  - `.github/workflows/robot-judge.yml` runs it daily once the repository variable `ROBOT_JUDGE` is `true`.
+  - Not covered by the robot: pause, resume and cancel on a real subscription (pool cost).
+
+### Quality gate for a change to Kept
+
+A change goes to `main` only when all of these pass. This is a checklist run by hand: there is no CI workflow that blocks a push.
+
+1. `npm test`: all suites (167 tests today), including route coverage.
+2. `cd web && npx tsc -b && npx vite build`.
+3. `npm run e2e`: all browser tests on phone and desktop, axe with no serious or critical issues (28 today).
+4. When AI behaviour changes, the eval sets on real models:
+   - `eval:b5` 8/8, `eval:fairness` 19/19, `eval:adversarial` 26/26 and `eval:exchange` 17/17, none worse than before.
+   - `eval:reasons` is at 32/36 today, with h10, r06, r14 and r18 missed.
+5. After the deploy, `npm run robot:judge` on the live site, every step passing.

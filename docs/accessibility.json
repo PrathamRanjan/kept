@@ -1,22 +1,100 @@
 {
-  "updated": "2026-11-11T12:00:00Z",
-  "checks": [
-    { "check": "axe, WCAG 2.2 AA", "how": "axe-core in the Playwright run (npm run e2e), on the real app with the fake PayPal", "where": "Landing, shop, member page, owner pages, not-found; phone 360 px and desktop 1440 px", "date": "2026-11-10", "result": "No serious or critical issues (16 of 16 browser tests)", "ok": true },
-    { "check": "axe, WCAG 2.2 AA, live", "how": "axe-core run in a browser against the live site", "where": "Guard, Safety and Compliance pages at 800 px", "date": "2026-11-11", "result": "0 violations", "ok": true },
-    { "check": "Text at 200%", "how": "Browser text zoom at 200% on the live site", "where": "Member page", "date": "2026-11-11", "result": "No sideways scroll; the scam-check button wraps", "ok": true },
-    { "check": "Narrow screens", "how": "Live pages at 800 px and 360 px wide", "where": "Guard, Safety, Compliance, member page", "date": "2026-11-11", "result": "No sideways scroll", "ok": true }
-  ],
-  "notTested": [
-    "A screen-reader walk-through by a person (VoiceOver or NVDA): only automated checks have run.",
-    "Voice control (Voice Control, Dragon).",
-    "Testing with disabled people: none has been done.",
-    "The pages added on 11 November (/judge, /proof, /ai, /paypal, /who-can-move-money, /accessibility) until the live axe run listed above includes them."
-  ],
-  "features": [
-    "A 'Display and help' panel in every header: larger text, more contrast, reduced motion, simpler words.",
-    "Skip link to the main content on every page; focus moves to the page heading on navigation.",
-    "Touch targets at least 44 px; every icon-only button has a name.",
-    "Status and errors are announced (role=status, role=alert); the AI work rail is a live region.",
-    "Nothing depends on colour alone: pass and fail carry words and icons."
-  ]
+ "updated": "2026-11-11T16:05:00Z",
+ "checks": [
+  {
+   "check": "axe, WCAG 2.2 AA",
+   "how": "axe-core in the Playwright run (npm run e2e), on the real app with the fake PayPal",
+   "where": "Landing, shop, member page, owner pages, judge, proof, agents, not-found; phone 360 px and desktop 1440 px",
+   "date": "2026-11-11",
+   "result": "No serious or critical issues (28 of 28 browser tests)",
+   "ok": true
+  },
+  {
+   "check": "axe, WCAG 2.2 AA, live",
+   "how": "The robot judge (npm run robot:judge): axe-core in a browser against the live site",
+   "where": "/, /judge, /proof, /ai, /paypal, /who-can-move-money, /accessibility, /agents at 1440 px",
+   "date": "2026-11-11",
+   "result": "0 serious or critical issues on all 8 pages",
+   "ok": true
+  },
+  {
+   "check": "axe, WCAG 2.2 AA, live",
+   "how": "axe-core run in a browser against the live site",
+   "where": "Guard, Safety and Compliance pages at 800 px",
+   "date": "2026-11-11",
+   "result": "0 violations",
+   "ok": true
+  },
+  {
+   "check": "Text at 200%",
+   "how": "Root font size 200% in Playwright (e2e/a11y.spec.ts) and on the live site by the robot judge",
+   "where": "/, /manage, /judge, /proof locally; the 8 public pages live",
+   "date": "2026-11-11",
+   "result": "No sideways scroll on any of them",
+   "ok": true
+  },
+  {
+   "check": "Keyboard only",
+   "how": "Playwright presses Tab and Enter only, no mouse (e2e/a11y.spec.ts)",
+   "where": "Member page: Tab to Cancel, press Enter, see the result (fake PayPal)",
+   "date": "2026-11-11",
+   "result": "Cancel is reached and completed from the keyboard; the focused Cancel button shows a focus ring; the result is in a live region",
+   "ok": true
+  },
+  {
+   "check": "Reduced motion",
+   "how": "prefers-reduced-motion: reduce in Playwright",
+   "where": "Landing page marquee",
+   "date": "2026-11-11",
+   "result": "The marquee stops; its repeated copies are hidden from screen readers",
+   "ok": true
+  },
+  {
+   "check": "Named switches",
+   "how": "Playwright reads the accessibility tree of the Display and help panel",
+   "where": "Display and help panel",
+   "date": "2026-11-11",
+   "result": "Every switch has role=switch, a name and a description, and its state is announced",
+   "ok": true
+  },
+  {
+   "check": "Voice input fallback",
+   "how": "Playwright with no microphone and no model key",
+   "where": "Owner Ask and the member's assistant",
+   "date": "2026-11-11",
+   "result": "The voice button says plainly why voice is off; typing works",
+   "ok": true
+  },
+  {
+   "check": "Voice session, live",
+   "how": "POST /ui/voice/session on the live site",
+   "where": "Member page",
+   "date": "2026-11-11",
+   "result": "A 120-second gpt-live-1 session secret is issued (Kept's own key never reaches the browser); 403 without a member or owner",
+   "ok": true
+  },
+  {
+   "check": "Narrow screens",
+   "how": "Live pages at 800 px and 360 px wide",
+   "where": "Guard, Safety, Compliance, member page",
+   "date": "2026-11-11",
+   "result": "No sideways scroll",
+   "ok": true
+  }
+ ],
+ "notTested": [
+  "A screen-reader walk-through by a person (VoiceOver or NVDA): only automated checks have run.",
+  "Speaking into a real microphone: the voice session is issued live, but no one has dictated into it from a browser yet.",
+  "Voice control software (Voice Control, Dragon).",
+  "Testing with disabled people: none has been done."
+ ],
+ "features": [
+  "A 'Display and help' panel in every header: larger text, more contrast, reduced motion, simpler words.",
+  "Skip link to the main content on every page; focus moves to the page heading on navigation.",
+  "Touch targets at least 44 px; every icon-only button has a name.",
+  "Status and errors are announced (role=status, role=alert); the AI work rail is a live region.",
+  "Nothing depends on colour alone: pass and fail carry words and icons.",
+  "Push-to-talk on the owner's Ask and the member's assistant (gpt-live-1 session, words by gpt-4o-transcribe); typing always works.",
+  "Scrolling tables and code boxes can be reached and scrolled with the keyboard."
+ ]
 }
