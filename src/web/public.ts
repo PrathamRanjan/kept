@@ -176,7 +176,7 @@ export function publicRouter(): Router {
     if (ws) await tick(ws.tenant_id, "proof_opened");
     const th = await thresholds();
     return {
-      suites: [readJson("eval/scam/results.json"), readJson("eval/b5.json"), readJson("eval/reasons.json"), readJson("eval/adversarial.json"), readJson("eval/fairness.json")].filter(Boolean),
+      suites: [readJson("eval/scam/results.json"), readJson("eval/b5.json"), readJson("eval/reasons.json"), readJson("eval/adversarial.json"), readJson("eval/fairness.json"), readJson("eval/exchange.json"), readJson("eval/robot-judge.json")].filter(Boolean),
       thresholds: Object.values(th),
       nightly: await latestNightly(),
       modelCard: {

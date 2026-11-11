@@ -54,10 +54,17 @@ export async function ensureWorkspace(req: Request, res: Response): Promise<{ ws
       return { ws: have, merchant: m, created: false };
     }
   }
-  const out = await startWorkspace(ipHash(req));
+  const robot = req.body?.pool === false;
+  const out = await startWorkspace(ipHash(req), new Date(), { evict: !robot });
   setWorkspaceCookie(res, out.ws);
   setOwnerCookie(res, out.merchant);
-  claimInBackground(out.ws.id);
+  // A caller may ask for no real subscriptions (the robot judge does, so a nightly check never uses up the scarce
+  // pre-approved pool). It can only ever give the caller less.
+  if (robot) {
+    const pool = { wanted: 0, claimed: 0, state: "skipped" };
+    await (await getDb()).query("UPDATE workspaces SET checklist = jsonb_set(COALESCE(checklist, '{}'::jsonb), '{pool}', $2::jsonb) WHERE id = $1", [out.ws.id, JSON.stringify(pool)]);
+    (out.ws as any).checklist = { ...((out.ws as any).checklist ?? {}), pool };
+  } else claimInBackground(out.ws.id);
   return { ws: out.ws, merchant: out.merchant, created: true };
 }
 
@@ -76,6 +83,8 @@ export async function workspaceStatus(ws: Workspace, req?: Request) {
   const realLine =
     pool.state === "claiming"
       ? "Claiming real sandbox subscriptions from the pre-approved pool…"
+      : pool.state === "skipped"
+        ? "This shop was started without real PayPal subscriptions, on request, so it holds sample members only."
       : counts.real_active > 0
         ? `${counts.real_active} of ${pool.wanted} real PayPal sandbox subscriptions are in your shop, read back from PayPal.`
         : `No real PayPal subscription is in your shop yet: the pre-approved pool is empty (${pc.awaiting} waiting for the sandbox buyer's approval). Subscribe on PayPal's own page from your shop with the sandbox buyer shown on the judge page.`;

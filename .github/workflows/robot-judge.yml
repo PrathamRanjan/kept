@@ -1,0 +1,33 @@
+# Robot judge (spec A12): once a day a browser follows the /judge paths on the live site and uploads what it saw
+# (eval/robot-judge.json) as a run artifact. Off until the repository variable ROBOT_JUDGE is "true". It starts a
+# demo shop with no real PayPal subscriptions and never takes a visitor's demo slot, so it uses up nothing the
+# owner has to approve. It makes real model calls (an Ask and an assistant read), a few cents a run.
+name: robot-judge
+on:
+  schedule:
+    - cron: "15 5 * * *"
+  workflow_dispatch: {}
+jobs:
+  judge:
+    if: ${{ vars.ROBOT_JUDGE == 'true' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Follow the judge paths on the live site
+        run: npm run robot:judge
+        env:
+          ROBOT_BASE: ${{ vars.ROBOT_BASE || 'https://pph-kept.onrender.com' }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: robot-judge
+          path: |
+            eval/robot-judge.json
+            test-results/

@@ -153,13 +153,15 @@ export interface StartResult {
  * its slot reused. Sample rows are written before this returns (well under a second); pool claims, which call
  * PayPal, run after it in the background, and the page shows them arriving.
  */
-export async function startWorkspace(ip: string, now = new Date()): Promise<StartResult> {
+export async function startWorkspace(ip: string, now = new Date(), opts: { evict?: boolean; maxLive?: number } = {}): Promise<StartResult> {
+  const maxLive = opts.maxLive ?? MAX_LIVE;
   const db = await getDb();
   const recent = Number((await db.query<{ n: number }>("SELECT count(*)::int AS n FROM workspaces WHERE kind = 'visitor' AND ip_hash = $1 AND created_at > now() - interval '1 hour'", [ip])).rows[0]?.n ?? 0);
   if (recent >= PER_IP_PER_HOUR) throw new KeptError(`You have started ${recent} demo shops in the last hour, the limit for one address. Use the one you have, or reset it from the demo page.`, "rate_limited", 429);
   const live = Number((await db.query<{ n: number }>("SELECT count(*)::int AS n FROM workspaces WHERE kind = 'visitor'")).rows[0]?.n ?? 0);
   let reused = false;
-  if (live >= MAX_LIVE) {
+  if (live >= maxLive && opts.evict === false) throw new KeptError("Every demo slot is in use, and this start does not take one from a visitor. Try again later.", "busy", 503);
+  if (live >= maxLive) {
     const oldest = (await db.query<{ id: string }>("SELECT id FROM workspaces WHERE kind = 'visitor' ORDER BY last_seen_at LIMIT 1")).rows[0];
     if (oldest) {
       await expireWorkspace(oldest.id, "reused: every demo slot was taken");

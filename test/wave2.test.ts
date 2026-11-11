@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
 import { config } from "../src/config.js";
 import { openDb, setDb, type Db } from "../src/db.js";
-import { ensureShowcase } from "../src/demo/workspaces.js";
+import { ensureShowcase, startWorkspace } from "../src/demo/workspaces.js";
 import { TICKS } from "../src/demo/checklist.js";
 import { latestNightly, runNightly } from "../src/eval/nightly.js";
 import { waitForClaims } from "../src/web/demo.js";
@@ -119,6 +119,18 @@ describe("item 8: the judge page", () => {
     // Every tick key the server writes is one the judge page knows.
     for (const k of Object.keys(await ticks())) expect(TICKS as readonly string[]).toContain(k);
     expect(proof.suites.length).toBeGreaterThan(0);
+  });
+
+  it("the robot judge's start uses no pool subscription and never takes a visitor's slot", async () => {
+    const r = new Client(srv.base);
+    const st = (await r.req("POST", "/demo/start", { json: { pool: false }, headers: { "x-forwarded-for": "203.0.113.79" } })).json;
+    expect(st.pool.state).toBe("skipped");
+    expect(st.pool.line).toMatch(/sample members only/);
+    await waitForClaims();
+    expect((await db.query<any>("SELECT count(*)::int AS n FROM approval_pool WHERE claimed_by_ws = $1", [st.workspace.id])).rows[0].n).toBe(0);
+    const live = (await db.query<any>("SELECT count(*)::int AS n FROM workspaces WHERE kind = 'visitor'")).rows[0].n;
+    await expect(startWorkspace("robot-ip", new Date(), { evict: false, maxLive: live })).rejects.toThrow(/does not take one from a visitor/);
+    expect((await db.query<any>("SELECT count(*)::int AS n FROM workspaces WHERE kind = 'visitor'")).rows[0].n).toBe(live);
   });
 
   it("ticks never land on the showcase or on another visitor's workspace", async () => {
