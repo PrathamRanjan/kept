@@ -243,3 +243,19 @@ Each item was built, tested, deployed to https://pph-kept.onrender.com and then 
 - **Not verified live:**
   - The member cancel lines on a real member: the approval pool has 0 ready, with 9 waiting for the owner's approval.
   - The model-down failure state on the live site. It is covered by `test/ai-failure.test.ts`: 503 with a plain sentence, an unreadable reason gets no offer and the cancel goes through, and template-worded offers are labelled "code".
+- **Item 4 follow-up: model-down state verified live (11 Nov 2026).** I set the model names on Render to a model that does not exist, redeployed, checked, then removed them and redeployed again.
+  - Owner Ask returned 503 with "I couldn't answer that just now. Try again in a moment." in 0.5 s. No error text leaked and no rules answer was shown.
+  - The rules draft page said "I couldn't read those rules just now. Try again in a moment. Press "Draft and backtest" again to retry".
+  - After the models were restored, Ask answered from `gpt-6.1-sol`.
+
+#### Item 5: K3, Ask on plain-word facts with code words rejected (live 05a7a0f, 11 Nov 2026)
+
+- **Passed live** (fresh workspace `ember-oak-o63qax`, 40 samples, 0 real members): 5 owner questions, all answered by `gpt-6.1-sol` in 2.0–4.0 s.
+  - No answer contains a backtick, camelCase or snake_case word.
+  - Real and sample figures are kept apart in every answer ("these are demo results, not real retained revenue").
+  - The $27 question is now answered from code-computed eligibility: "Raising Signature bag from $24 to $27 would not change who qualifies… 0 real members and 30 sample members could receive an offer… The data does not show who would stay after a price increase."
+- **Tests:**
+  - The model gets numbered facts, never the statistics object.
+  - A code-like answer goes to the backup model; when every answer is code-like, the owner gets the failure sentence.
+  - `npm run eval:b5` passes 8 of 8 with the real model.
+- **Also changed:** a shop with no time zone set no longer gets the odd-hour scam signal guessed from UTC; the signal is skipped until the owner sets one.
