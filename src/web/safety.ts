@@ -8,6 +8,7 @@ import { Router, type NextFunction, type Request, type Response } from "express"
 import { getDb } from "../db.js";
 import { assessMessage, protectedMode, safetyHolds, setProtectedMode } from "../safety/index.js";
 import { checkMessage } from "../safety/readers.js";
+import { tick } from "../demo/checklist.js";
 import { TACTIC_WORDS, TACTICS } from "../safety/rules.js";
 import { KeptError, merchantById, subscriberByRef, type Merchant } from "../store.js";
 import { ownerOf } from "./guard.js";
@@ -35,8 +36,8 @@ export const DEMO_FAKE_FAILED = "Kept Billing: your Morning Roast subscription p
 
 const SCRIPTS = raw(`<script src="https://cdnjs.cloudflare.com/ajax/libs/onnxruntime-web/1.22.0/ort.min.js"></script><script type="module" src="/static/safety.js"></script>`);
 
-const checkCard = (intro: string, demo: string) => html`<div class="card" id="check"><h2>Check a message</h2><p class="small muted">${intro} The model scores it on this device; the words never leave your browser for the score.</p>
-<form id="scan-form" class="stack"><label for="scan-text" class="sr">Message to check</label><textarea id="scan-text" name="text" rows="6" placeholder="Paste the message here" style="width:100%"></textarea>
+const checkCard = (intro: string, demo: string, prefill = "") => html`<div class="card" id="check"><h2>Check a message</h2><p class="small muted">${intro} The model scores it on this device; the words never leave your browser for the score.</p>
+<form id="scan-form" class="stack"><label for="scan-text" class="sr">Message to check</label><textarea id="scan-text" name="text" rows="6" placeholder="Paste the message here" style="width:100%">${prefill}</textarea>
 <div class="row"><button class="btn primary" type="submit" id="scan-btn">Check this message</button><button class="btn" type="button" id="scan-demo">Paste the demo scam</button><span class="small muted" id="scan-status" aria-live="polite"></span></div></form>
 <div id="scan-result" aria-live="polite"></div>${raw(`<script type="application/json" id="demo-bec">${JSON.stringify({ text: demo }).replace(/</g, "\\u003c")}</script>`)}</div>`;
 
@@ -63,6 +64,7 @@ async function scanBody(req: Request, res: Response) {
     if (!s) throw new KeptError("Subscription not found", "not_found", 404);
     shop = await merchantById(db, s.merchant_id);
   } else shop = await ownerOf(req);
+  if (shop) await tick(shop.id, "scam_checked");
   res.json(await checkMessage(text, { ws: shop?.id ?? null, shopEmail: shop?.owner_email ?? null, shopName: shop?.name ?? null }));
 }
 
@@ -89,7 +91,7 @@ export function safetyRouter(): Router {
 <li><b>Protected mode</b> holds every capture, invoice, refund and offer made by an agent or the worker, and tells a trusted contact.</li></ul></div>
 <div class="card" id="protected"><h2>Protected mode <span class="pill ${prot.on ? "active" : "cancelled"}">${prot.on ? "on" : "off"}</span></h2><p class="small muted">Holds are explained calmly with no timers, and a trusted contact is told about every hold.</p>
 <form method="post" action="/dashboard/safety/protected" class="stack"><label for="pc1">Trusted contact (Telegram chat id, optional)</label><input id="pc1" name="contact1" value="${prot.contacts[0] ?? ""}" placeholder="telegram:123456789"><label for="pc2">Second contact</label><input id="pc2" name="contact2" value="${prot.contacts[1] ?? ""}"><button class="btn primary" type="submit" name="on" value="${prot.on ? "0" : "1"}">${prot.on ? "Turn protected mode off" : "Turn protected mode on"}</button></form></div></div>
-${checkCard("Paste a text, email or chat message a subscriber forwarded.", DEMO_FAKE_FAILED)}
+${checkCard("Paste a text, email or chat message a subscriber forwarded.", DEMO_FAKE_FAILED, typeof req.query.text === "string" ? req.query.text.slice(0, 4000) : "")}
 <div class="card" id="inbound"><h2>Messages received</h2>${inbound.length ? html`<ul class="feed">${inbound.map((x) => { const a = assessMessage(x.body); return html`<li>${a.level !== "clear" ? html`<div class="banner ${a.level === "hold" ? "bad" : "warn"}" role="alert"><b>Scam check:</b> ${a.reasons[0]}</div>` : ""}<span class="small muted">${x.channel} · ${x.address} · ${fmtDate(x.created_at, true)}</span><br>${x.body}</li>`; })}</ul>` : html`<p class="muted">No inbound messages yet.</p>`}</div>
 <div class="card" id="holds"><h2>Holds the safety layer created</h2>${holds.length ? html`<ul class="feed">${holds.map((h) => html`<li><b>${h.action} ${h.payload.cents ? `$${(Number(h.payload.cents) / 100).toFixed(2)}` : ""}</b> <span class="pill ${h.status}">${h.status}</span>${h.payload.safety_reasons?.length ? html`<details class="small"><summary>Why we paused this</summary><ul>${h.payload.safety_reasons.map((x: string) => html`<li>${x}</li>`)}</ul></details>` : ""}</li>`)}</ul>` : html`<p class="muted">None yet.</p>`}</div>
 <div class="card" id="a11y"><h2>Accessibility</h2><p class="small muted">Text size, contrast, a clearer font, read-aloud, voice input, plain words, bigger buttons and more time: open <button class="btn small" type="button" data-a11y-open>Display and help</button> on any page. Choices stay on this device.</p></div>`));
@@ -119,7 +121,7 @@ ${checkCard("Paste a text, email or chat message a subscriber forwarded.", DEMO_
     const m = (await merchantById(db, s.merchant_id))!;
     res.send(layout({ title: "Is this message really from us?", nav: "manage", scripts: SCRIPTS }, html`<h1>Is this message really from ${m.name}?</h1>
 <p data-simple="If a payment fails, it shows on your subscription page. We never send a link to pay. Paste the message below to check it.">If a payment ever fails, it shows on <a href="/manage/${s.ref}">your subscription page</a>, and only there. ${m.name} and Kept never send a "pay here" link by text or email. Paste any message you are unsure about and it is checked here, on your device.</p>
-${checkCard("Paste the text or email you received.", DEMO_FAKE_FAILED)}
+${checkCard("Paste the text or email you received.", DEMO_FAKE_FAILED, typeof req.query.text === "string" ? req.query.text.slice(0, 4000) : "")}
 <p class="small muted"><a href="/manage/${s.ref}">Back to your subscription</a></p>`));
   }));
   r.post("/manage/:ref/check/scan", page(scanBody));

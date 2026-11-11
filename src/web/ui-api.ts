@@ -21,7 +21,9 @@ import { telegramReady } from "../channels/index.js";
 import { smsLinks, smsPending, smsReady, startSmsLink, stopSms, verifySmsLink } from "../channels/sms.js";
 import { cycleCard } from "./cycles.js";
 import { askOwnerAgent } from "../ask/agent-ask.js";
+import { runAssistant } from "../ask/assistant.js";
 import { spendAllowance } from "../demo/allowance.js";
+import { tick } from "../demo/checklist.js";
 
 const COOKIE = "kept_owner";
 const DEMO_SLUG = () => process.env.KEPT_DEMO_SHOP || "ember-oak-coffee-club";
@@ -192,6 +194,7 @@ export function uiApi(): Router {
     const policy = await currentPolicy(db, m.id);
     const offer = await openOfferFor(db, s.id);
     const tg = Number((await db.query<any>("SELECT count(*)::int AS n FROM party_links WHERE channel = 'telegram' AND party = 'subscriber' AND party_id = $1", [s.id])).rows[0]?.n ?? 0) > 0;
+    if (!s.is_sample) await tick(m.id, "member_opened", db);
     return {
       view: v,
       member: { name: s.subscriber_name, first: (s.subscriber_name ?? "").split(" ")[0] || null, channel: s.channel, agent_id: s.agent_id, sample: s.is_sample, started_at: s.started_at, cancel_requested_at: s.cancel_requested_at ?? null, kept_state: s.kept_state },
@@ -207,6 +210,28 @@ export function uiApi(): Router {
       mcp: `${config.appUrl}/s/${m.slug}/mcp`,
     };
   }));
+
+  // Spec B5 differentiator 1: the member's own AI assistant, streamed step by step.
+  r.post("/ui/manage/:ref/assistant/stream", async (req, res) => {
+    const s = await subscriberByRef(await getDb(), req.params.ref);
+    if (!s) return res.status(404).json({ error: "not_found", message: "Subscription not found" });
+    const msg = String(req.body?.message ?? "").trim().slice(0, 400);
+    if (!msg) return res.status(422).json({ error: "empty", message: "Type what you want the assistant to do." });
+    res.status(200).set({ "content-type": "text/event-stream; charset=utf-8", "cache-control": "no-store", "x-accel-buffering": "no" });
+    res.flushHeaders?.();
+    const send = (event: string, data: unknown) => {
+      res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+      (res as any).flush?.();
+    };
+    try {
+      await spendAllowance(s.merchant_id);
+      const r = await runAssistant(s.ref, msg, (st) => send("step", st));
+      send("answer", { answer: r.answer, sentences: r.sentences, facts: r.facts, model: r.model, runId: r.runId, readBack: r.readBack, ms: r.ms });
+    } catch (e) {
+      send("failed", { error: e instanceof KeptError ? e.code : "internal_error", message: e instanceof KeptError ? e.message : "The assistant hit a problem and stopped. Check the steps above for anything it changed." });
+    }
+    res.end();
+  });
 
   /* Texts: the number is linked only once the code Kept texts it comes back. */
   const member = async (ref: string) => {
@@ -238,6 +263,8 @@ export function uiApi(): Router {
   act("cancel", async (ref, b) => {
     const hear = b.hear_offer === true || b.hear_offer === "1";
     const out = await svc.requestCancel(ref, { reason: b.reason ? String(b.reason) : undefined, hearOffer: hear }, web, key(b));
+    const mid = (await subscriberByRef(await getDb(), ref))?.merchant_id;
+    await tick(mid, out.status === "offer_open" ? "offer_shown" : "cancel_answered");
     if (out.status === "offer_open") return { status: out.status, message: "Here is one offer. Take it, or cancel now." };
     if (out.status === "cancel_pending") return { status: out.status, message: (out as any).note ?? "Cancellation requested. PayPal hasn't confirmed yet; Kept keeps retrying." };
     return { status: "cancelled", message: hear ? "No offer applies to you right now, so we cancelled as you asked. You won't be charged again." : "Cancelled. You won't be charged again." };
@@ -250,6 +277,7 @@ export function uiApi(): Router {
 
   r.post("/ui/offer/:id/:choice(accept|decline)", j(async (req) => {
     const out = await svc.respondToOffer(req.params.id, req.params.choice === "accept", web);
+    await tick((await (await getDb()).query<{ merchant_id: string }>("SELECT merchant_id FROM offers WHERE id = $1", [req.params.id])).rows[0]?.merchant_id, "cancel_answered");
     return { ok: true, status: out.status, message: out.status === "kept" ? "Done. Thanks for staying." : out.status === "cancel_pending" ? "Cancellation requested. PayPal hasn't confirmed yet; we keep retrying." : "Cancelled. You won't be charged again.", approvalUrl: (out as any).approvalUrl ?? null };
   }));
 
@@ -317,6 +345,7 @@ export function uiApi(): Router {
     if (!q) throw new KeptError("Ask a question first.", "empty", 422);
     await spendAllowance(m.id);
     const r = await askOwnerAgent(m, q);
+    await tick(m.id, "owner_asked");
     return { answer: r.answer, sentences: r.sentences, facts: r.facts, steps: r.steps, by: r.by, model: r.model, runId: r.runId, toolCalls: r.toolCalls, ms: r.ms };
   }));
 
@@ -339,6 +368,7 @@ export function uiApi(): Router {
     try {
       await spendAllowance(m.id);
       const r = await askOwnerAgent(m, q, (s) => send("step", s));
+      await tick(m.id, "owner_asked");
       send("answer", { answer: r.answer, sentences: r.sentences, facts: r.facts, by: r.by, model: r.model, runId: r.runId, toolCalls: r.toolCalls, ms: r.ms });
     } catch (e) {
       send("failed", { error: e instanceof KeptError ? e.code : "internal_error", message: e instanceof KeptError ? e.message : "Something went wrong answering that. Nothing was changed." });

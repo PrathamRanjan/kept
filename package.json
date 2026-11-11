@@ -27,7 +27,8 @@
     "build:web": "npm --prefix web ci --include=dev && npm --prefix web run build",
     "e2e": "playwright test",
     "shots": "node scripts/shots.mjs",
-    "calibrate": "tsx --env-file-if-exists=.env scripts/calibrate.ts"
+    "calibrate": "tsx --env-file-if-exists=.env scripts/calibrate.ts",
+    "eval:fairness": "tsx --env-file-if-exists=.env scripts/eval-fairness.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.15",

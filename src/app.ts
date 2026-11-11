@@ -1,4 +1,5 @@
 import compression from "compression";
+import { publicRouter } from "./web/public.js";
 import express from "express";
 import cookieParser from "cookie-parser";
 import { readFileSync } from "node:fs";
@@ -88,6 +89,7 @@ export function createApp() {
   app.use(adminRouter());
   app.use(demoRouter());
   app.use(uiApi());
+  app.use(publicRouter());
   app.use(spaRouter());
   app.use("/api/v1", runsApi());
   app.use("/api/v1", apiRouter());

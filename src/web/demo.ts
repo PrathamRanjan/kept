@@ -12,6 +12,7 @@ import { claimForWorkspace, listPool, poolCounts, refillPool, syncPool } from ".
 import { ensureShowcase, expireWorkspace, ipHash, joinToken, rebuildShowcase, resetWorkspace, setWorkspaceCookie, startWorkspace, touch, workspaceById, workspaceIdFromJoin, workspaceOf, WS_COOKIE, IDLE_HOURS, POOL_PER_WORKSPACE, type Workspace } from "../demo/workspaces.js";
 import { KeptError, merchantById, type Merchant } from "../store.js";
 import { addAdminSection, adminBack, isAdmin } from "./admin.js";
+import { runNightly } from "../eval/nightly.js";
 import { html, layout } from "./html.js";
 
 type H = (req: Request, res: Response) => Promise<unknown>;
@@ -240,6 +241,11 @@ ${rows.map((w) => html`<tr><td><code>${w.id}</code></td><td>${w.kind}</td><td>${
     const out = await expireWorkspace(req.params.id, "expired by the admin");
     if (req.accepts(["html", "json"]) === "html") return res.redirect(`/admin/workspaces?ok=${encodeURIComponent(`Expired ${out.workspace}: ${out.cancelled.length} cancelled at PayPal, ${out.failed.length} failed.`)}`);
     return out;
+  }));
+  // A5.6: run the daily showcase set now (real model calls; nothing moves money).
+  r.post("/admin/showcase/eval", j(async (req, res) => {
+    if (!guard(req, res)) return;
+    return await runNightly("admin");
   }));
 
   return r;

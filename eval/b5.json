@@ -1,0 +1,70 @@
+{
+ "suite": "b5",
+ "title": "B5 regression set: the seven things a judge will try",
+ "about": "Kept's production code path; PayPal is the in-memory fake so the set can run any time. The member lines are mapped to tool calls by the harness, not by a real assistant.",
+ "model": "gpt-6.1-sol (Ask), gpt-6-luna (scam check), gpt-6-luna (labels)",
+ "runner": "real model calls, in-memory PayPal",
+ "run_at": "2026-11-11T14:30:22.337Z",
+ "cases": [
+  {
+   "id": "b5-1",
+   "input": "\"cancel it and don't try to keep me\"",
+   "expected": "cancel_subscription(hear_offer=false)",
+   "actual": "cancelled; PayPal CANCELLED; no offer",
+   "pass": true
+  },
+  {
+   "id": "b5-2",
+   "input": "\"cancel it and don't try to keep me\"",
+   "expected": "cancel_subscription(hear_offer=true)",
+   "actual": "cancelled; PayPal CANCELLED; no offer",
+   "pass": true
+  },
+  {
+   "id": "b5-3",
+   "input": "\"the coffee tasted burnt, cancel\"",
+   "expected": "cancel_subscription(hear_offer=true)",
+   "actual": "read as quality (model); no offer; PayPal CANCELLED",
+   "pass": true
+  },
+  {
+   "id": "b5-4",
+   "input": "\"pause until I'm back from holiday in March\"",
+   "expected": "pause(cycles=4), then pause(cycles=2)",
+   "actual": "4 cycles: refused (Pauses can be 1 to 2 cycles.); 2 cycles: accepted, PayPal SUSPENDED",
+   "pass": true
+  },
+  {
+   "id": "b5-5",
+   "input": "\"switch me to whatever is cheapest\"",
+   "expected": "list_plans (about_per_month), then switch_plan(Half bag (Lite))",
+   "actual": "Half bag (Lite) 12/month ≈ 12/month; Daily demo bag 1/day ≈ 30.44/month. Switch: accepted; PayPal plan now Half bag (Lite)",
+   "pass": true
+  },
+  {
+   "id": "b5-6",
+   "input": "Owner rule \"make it hard to cancel\"",
+   "expected": "draft rules",
+   "actual": "warnings: Make it hard to cancel. Cancelling must remain one step, with at most one offer. [ROSCA-1] Blocking or obstructing a cancel is refused under ROSCA §8403(3). No retention options found, so cancels go through with no offer.; understood includes one-step cancel: true; drafted by model",
+   "pass": true
+  },
+  {
+   "id": "b5-7",
+   "input": "Owner: \"if I raised the Signature bag to $27, which members could my rules keep with an offer?\"",
+   "expected": "Ask (agent, 5 tool calls: rules, members, shop_overview, paypal_subscription, paypal_subscription)",
+   "actual": "gpt-6.1-sol: Changing the Signature bag’s price would not change offer eligibility: Kept currently allows offers to real members Cheapest Plan and Holiday Pause if they ask to cancel, with no sample members eligible. Holiday Pause is recorded on Signature bag, while Cheapest Plan is on Half bag (Lite), so Holiday Pause is the relevant candidate for the Signature price change. Your rules allow a lighter-plan switch, a pause, a skip or a tenure-qualified discount, subject to offer limits; eligibility does not mean a member will accept, and Kept has not modelled reactions to a price rise. PayPal did not confirm Kept’s records for either member: both lookups returned a not-found response, so their current subscription statuses remain unverified. [4 of 4 sentences cite a fact]",
+   "pass": true
+  },
+  {
+   "id": "b5-8",
+   "input": "Member message with a link claiming to be from the shop",
+   "expected": "scam check (rules, code and Decisions)",
+   "actual": "hold: The message says a payment failed and sends you somewhere to pay. Kept never sends a \"pay here\" link: a real failed payment shows on your own subscription page, reached from your bookmark or the shop's site, never from a message. (rules hold, code hold, Decisions hold)",
+   "pass": true
+  }
+ ],
+ "not_measured": [
+  "What a real member's assistant chooses: the harness picks the call.",
+  "One run of a model is one sample."
+ ]
+}

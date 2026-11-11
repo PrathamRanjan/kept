@@ -16,7 +16,8 @@ import { config } from "../src/config.js";
 import { openDb, setDb } from "../src/db.js";
 import { FakePayPal } from "../src/paypal/fake.js";
 import { setPayPalFactory } from "../src/paypal/index.js";
-import { assessMessage } from "../src/safety/index.js";
+import { checkMessage } from "../src/safety/readers.js";
+import { askOwnerAgent } from "../src/ask/agent-ask.js";
 import { aboutPerMonth } from "../src/mcp/tools.js";
 import * as svc from "../src/service.js";
 import { plansFor, subscriberByRef } from "../src/store.js";
@@ -124,17 +125,18 @@ for (const hear of [false, true]) {
 
 // 6. Owner question about a hypothetical price.
 {
-  const r = await err(() => svc.askOwnerWithSource(m, "if I raised the Signature bag to $27, which members could my rules keep with an offer?"));
+  const r = await err(() => askOwnerAgent(m, "if I raised the Signature bag to $27, which members could my rules keep with an offer?"));
   const a: any = r.ok ? r.out : null;
   const looksLikeCode = a ? /`|\b[a-z]+[A-Z][a-zA-Z]*\b/.test(a.answer) : false;
-  rows.push({ case: "Owner: \"if I raised the Signature bag to $27, which members could my rules keep with an offer?\"", call: "Ask", outcome: r.ok ? `${a.model} (${a.by}): ${a.answer}${looksLikeCode ? " [contains code-like tokens]" : ""}` : `failed: ${r.message}`, pass: r.ok && !looksLikeCode });
+  const grounded = a ? a.sentences.filter((x: any) => x.grounded).length : 0;
+  rows.push({ case: "Owner: \"if I raised the Signature bag to $27, which members could my rules keep with an offer?\"", call: `Ask (agent, ${a?.toolCalls ?? 0} tool calls: ${a ? a.steps.filter((x: any) => x.kind === "tool").map((x: any) => x.name).join(", ") : "none"})`, outcome: r.ok ? `${a.model}: ${a.answer} [${grounded} of ${a.sentences.length} sentences cite a fact]${looksLikeCode ? " [contains code-like tokens]" : ""}` : `failed: ${r.message}`, pass: r.ok && !looksLikeCode && a.toolCalls >= 1 && grounded === a.sentences.length });
 }
 
 // 7. A member message with a link claiming to be from the shop.
 {
   const text = "Ember & Oak: your subscription payment failed. To avoid losing your plan, pay now at https://ember-oak-billing.help/pay and confirm your card number.";
-  const a = assessMessage(text);
-  rows.push({ case: "Member message with a link claiming to be from the shop", call: "scam check", outcome: `${a.level}: ${a.reasons[0]}`, pass: a.level === "hold" });
+  const a = await checkMessage(text, { shopName: m.name, shopEmail: null, ws: m.id });
+  rows.push({ case: "Member message with a link claiming to be from the shop", call: "scam check (rules, code and Decisions)", outcome: `${a.level}: ${a.reasons[0]} (rules ${a.readers.rules.level}, code ${a.readers.code.level}, Decisions ${a.readers.decisions.level})`, pass: a.level === "hold" });
 }
 
 const passed = rows.filter((r) => r.pass).length;
@@ -155,5 +157,15 @@ const report = [
 ].join("\n");
 mkdirSync("eval", { recursive: true });
 writeFileSync("eval/b5.md", report);
+writeFileSync("eval/b5.json", JSON.stringify({
+  suite: "b5",
+  title: "B5 regression set: the seven things a judge will try",
+  about: "Kept's production code path; PayPal is the in-memory fake so the set can run any time. The member lines are mapped to tool calls by the harness, not by a real assistant.",
+  model: `${config.ai.models.agent} (Ask), ${config.ai.models.decide} (scam check), ${config.ai.models.classify} (labels)`,
+  runner: "real model calls, in-memory PayPal",
+  run_at: new Date().toISOString(),
+  cases: rows.map((r, i) => ({ id: `b5-${i + 1}`, input: r.case, expected: r.call, actual: r.outcome, pass: r.pass })),
+  not_measured: ["What a real member's assistant chooses: the harness picks the call.", "One run of a model is one sample."],
+}, null, 1));
 console.log(report);
 process.exit(passed === rows.length ? 0 : 1);

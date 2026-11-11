@@ -81,3 +81,7 @@ export const isSmsRoute = (r: string) => SMS_ROUTE.test(r);
 /** Wave 1 routes (admin, wallet, pool, private demo workspaces, health); walked in wave1.test.ts. */
 export const WAVE1_ROUTE = /^(GET|POST|ALL) \/(admin|demo\/|healthz)/;
 export const isWave1Route = (r: string) => WAVE1_ROUTE.test(r);
+
+/** Wave 2 routes (judge data, public proof pages, streamed Ask and assistant); walked in wave2.test.ts. */
+export const WAVE2_ROUTE = /^(GET|POST) \/(api\/public\/|proof$|ai$|paypal$|who-can-move-money$|accessibility$|ui\/owner\/ask\/stream$|ui\/manage\/:ref\/assistant\/stream$)/;
+export const isWave2Route = (r: string) => WAVE2_ROUTE.test(r);

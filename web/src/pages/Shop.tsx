@@ -11,7 +11,7 @@ import { api, ApiError, newKey } from "@/lib/api";
 import { fmtMoney } from "@/lib/format";
 import { useData } from "@/lib/useData";
 import type { PlanJson } from "@/lib/types";
-import { resumeTour, startTour } from "@/tours";
+import { startTour } from "@/tours";
 
 interface ShopData {
   showcase?: boolean;
@@ -143,13 +143,6 @@ export default function Shop() {
   const { slug = "" } = useParams();
   const { data, error, loading, reload } = useData<ShopData>(`/ui/shop/${slug}`);
   const [copied, setCopied] = useState(false);
-  useEffect(() => {
-    if (!data) return;
-    const t = setTimeout(() => {
-      if (!resumeTour(location.pathname)) startTour("shop");
-    }, 300);
-    return () => clearTimeout(t);
-  }, [data]);
 
   return (
     <>

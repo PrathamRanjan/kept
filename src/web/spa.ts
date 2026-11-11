@@ -18,7 +18,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const SPA_DIR = join(root, "web", "dist");
 
 /** Pages the React app renders. Everything else stays server-rendered. */
-export const SPA_PATHS = ["/", "/demo", "/judge", "/s/:slug", "/manage/:ref", "/dashboard", "/dashboard/members", "/dashboard/approvals"];
+export const SPA_PATHS = ["/", "/demo", "/judge", "/proof", "/ai", "/paypal", "/who-can-move-money", "/accessibility", "/s/:slug", "/manage/:ref", "/dashboard", "/dashboard/members", "/dashboard/approvals"];
 
 export function spaEnabled(): boolean {
   return process.env.KEPT_SPA !== "off" && existsSync(join(SPA_DIR, "index.html"));
@@ -70,7 +70,9 @@ async function headFor(req: Request): Promise<{ title: string; description?: str
     return s ? { title: "Your subscription · Kept", extra: `<meta name="robots" content="noindex">` } : { title: "Subscription not found · Kept", status: 404, extra: `<meta name="robots" content="noindex">` };
   }
   if (p.startsWith("/dashboard")) return { title: "Today · Kept", extra: `<meta name="robots" content="noindex">` };
-  if (p === "/judge") return { title: "Judge mode · Kept" };
+  if (p === "/judge") return { title: "For judges · Kept", description: "Three paths through Kept that tick themselves, and what is live versus simulated." };
+  const pub: Record<string, string> = { "/proof": "Proof: every evaluation case", "/ai": "The last 20 model calls", "/paypal": "Every PayPal API Kept uses", "/who-can-move-money": "Who can move money", "/accessibility": "Accessibility: what was tested" };
+  if (pub[p]) return { title: `${pub[p]} · Kept` };
   if (p === "/demo") return { title: "Try the live demo · Kept" };
   return { title: "Kept: subscriptions people can change in one step" };
 }

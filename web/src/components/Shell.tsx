@@ -130,6 +130,9 @@ export function PublicHeader({ right }: { right?: React.ReactNode }) {
         <div className="mx-auto flex h-16 max-w-6xl items-center gap-2 px-4">
           <Logo />
           <div className="ml-auto flex items-center gap-1">
+            <Button variant="ghost" size="sm" asChild className="min-h-11">
+              <a href="/judge">For judges</a>
+            </Button>
             {right}
             <Button variant="ghost" size="icon" data-a11y-open aria-label="Display and help">
               <Accessibility aria-hidden="true" />

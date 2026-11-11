@@ -8,6 +8,7 @@ import { FakePayPal } from "../src/paypal/fake.js";
 import * as svc from "../src/service.js";
 import { createApp } from "../src/app.js";
 import { plansFor } from "../src/store.js";
+import { ensureShowcase } from "../src/demo/workspaces.js";
 
 const port = Number(process.env.PORT || 4199);
 const db = await openDb({ memory: true });
@@ -28,6 +29,12 @@ for (const name of ["Ada Lovelace", "Grace Hopper"]) {
   await svc.syncSubscription(out.ref);
 }
 
+// A separate showcase shop so /demo/start works; the test shop above stays writable for /__e2e/member.
+const show = await svc.createMerchant({ name: "Ember & Oak Showcase", tagline: "Beans monthly", currency: "USD" });
+await svc.createPlans(show.id, drafts);
+await svc.approveRules(show.id, rules.value, "e2e rules");
+process.env.KEPT_DEMO_SHOP = show.slug;
+await ensureShowcase(db);
 const app = createApp();
 // Test-only: a fresh, active member (approved on the fake PayPal) so each browser test starts clean.
 let n = 0;

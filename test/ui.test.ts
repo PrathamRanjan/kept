@@ -9,7 +9,7 @@ import { plansFor, type Merchant } from "../src/store.js";
 import { cycleCard } from "../src/web/cycles.js";
 import { Client } from "./client.js";
 import { stubAgent } from "./agent-stub.js";
-import { isSmsRoute, isWave1Route, serveTracked } from "./journey-coverage.js";
+import { isSmsRoute, isWave1Route, isWave2Route, serveTracked } from "./journey-coverage.js";
 
 // The JSON API behind the React UI (src/web/ui-api.ts) and the page shell (src/web/spa.ts):
 // every route used, no 5xx, and each answer checked against what PayPal (the fake) holds.
@@ -180,7 +180,7 @@ describe("UI JSON API", () => {
   it("used every UI route with no server error", () => {
     expect(srv.failures).toEqual([]);
     const ours = (r: string) => /^(GET|POST) \/(ui\/|demo$|judge$|dashboard$|dashboard\/(members|approvals)$|s\/:slug$|manage\/:ref$|favicon\.svg|robots\.txt|og\.png|$)/.test(r);
-    const missed = srv.missed((r) => !ours(r) || isSmsRoute(r) || isWave1Route(r) || r === "GET /og.png" || (!spaBuilt && !r.includes("/ui/")));
+    const missed = srv.missed((r) => !ours(r) || isSmsRoute(r) || isWave1Route(r) || isWave2Route(r) || r === "GET /og.png" || (!spaBuilt && !r.includes("/ui/")));
     expect(missed).toEqual([]);
   });
 });

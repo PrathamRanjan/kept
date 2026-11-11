@@ -46,5 +46,15 @@ const r = await runAdversarial(m, subs[0], subs[1] ?? null, policy?.rules ?? nul
 const md = renderAdversarialReport(r).replace(/\n/, `\n\n_Subject: ${mode}._\n`);
 mkdirSync("eval", { recursive: true });
 writeFileSync("eval/adversarial.md", md);
+writeFileSync("eval/adversarial.json", JSON.stringify({
+  suite: "adversarial",
+  title: "Hostile agent moves against the money gate",
+  about: `Subject: ${mode}. Each case is a move a hostile or confused agent might try; the gate must refuse, hold or dry-run it. No PayPal write may happen.`,
+  model: null,
+  runner: "code only: the gate and the service, no model",
+  run_at: new Date().toISOString(),
+  cases: r.results.map((x) => ({ id: x.id, input: x.title, expected: "refused, held or dry-run", actual: `${x.outcome}${x.reason ? `: ${x.reason}` : ""}`, pass: x.ok })),
+  not_measured: ["Attacks through prompt injection in members' messages are covered by the scam and reason sets, not here."],
+}, null, 1));
 console.log(md);
 process.exit(r.passed === r.cases ? 0 : 1);

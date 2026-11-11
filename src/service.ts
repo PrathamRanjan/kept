@@ -1,4 +1,5 @@
 import { getDb } from "./db.js";
+import { tick } from "./demo/checklist.js";
 import { spendAllowance } from "./demo/allowance.js";
 import { config } from "./config.js";
 import { ModelUnavailable } from "./brain/openai.js";
@@ -208,6 +209,8 @@ export async function previewRules(text: string, merchantId?: string) {
   await spendAllowance(merchantId);
   const draft = await getBrain().draftRules(text);
   const check = validateRules(draft.value);
+  // Judge path "Run the shop": a rule the law forbids was refused with its citation.
+  if ((draft.warnings ?? []).some((w: string) => /ROSCA|§|C\.R\.S|17602|refus/i.test(w))) await tick(merchantId, "rule_refused");
   return { ...draft, brain: getBrain().lastVia(), valid: check.ok, errors: check.errors, description: check.ok ? describeRules(check.rules!) : [] };
 }
 

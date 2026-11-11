@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { ArrowRight, Bot, Check, Compass, FileText, Scale } from "lucide-react";
 import { PublicFooter, PublicHeader } from "@/components/Shell";
 import { CycleCard, StampLegend } from "@/components/CycleCard";
@@ -12,7 +12,6 @@ import { useData } from "@/lib/useData";
 import { fmtMoney } from "@/lib/format";
 import { getSession } from "@/lib/session";
 import type { CycleCardData, PlanJson } from "@/lib/types";
-import { resumeTour, startTour } from "@/tours";
 
 interface Preview {
   shop: { name: string; slug: string; tagline: string; currency: string } | null;
@@ -41,18 +40,9 @@ const SHOPS = ["Coffee clubs", "Bakery boxes", "Farm boxes", "Meal kits", "Flowe
 
 export default function Landing() {
   const { data, loading } = useData<Preview>("/ui/preview");
-  const [params] = useSearchParams();
   useEffect(() => {
     void getSession();
   }, []);
-  useEffect(() => {
-    if (loading) return;
-    if (params.get("tour") === "judge") {
-      startTour("judge");
-      return;
-    }
-    resumeTour("/");
-  }, [loading, params]);
 
   const ex = data?.example;
   const cur = data?.shop?.currency ?? "USD";
@@ -87,9 +77,11 @@ export default function Landing() {
                   <ArrowRight aria-hidden="true" />
                 </Link>
               </Button>
-              <Button size="lg" variant="outline" onClick={() => startTour("judge")}>
-                <Compass aria-hidden="true" />
-                Judge Mode, 3 minutes
+              <Button size="lg" variant="outline" asChild>
+                <Link to="/judge">
+                  <Compass aria-hidden="true" />
+                  For judges: 3 paths, with ticks
+                </Link>
               </Button>
             </div>
           </div>
@@ -263,8 +255,8 @@ export default function Landing() {
               <Button size="lg" variant="stamp" asChild>
                 <Link to="/demo">Try the live demo</Link>
               </Button>
-              <Button size="lg" variant="ghost" className="text-paper hover:bg-paper/10 hover:text-paper" onClick={() => startTour("judge")}>
-                Start Judge Mode
+              <Button size="lg" variant="ghost" className="text-paper hover:bg-paper/10 hover:text-paper" asChild>
+                <Link to="/judge">For judges</Link>
               </Button>
             </div>
           </div>

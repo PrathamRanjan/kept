@@ -9,6 +9,7 @@ import { sendPush } from "./channels/push.js";
 import { checkWallet } from "./demo/wallet.js";
 import { ensureShowcase, expireIdle, rebuildShowcase } from "./demo/workspaces.js";
 import { syncPool } from "./demo/pool.js";
+import { runNightly } from "./eval/nightly.js";
 
 export const handlers: Record<JobType, Handler> = {
   process_webhook: (p) => processWebhook(p.eventId),
@@ -32,6 +33,8 @@ export const handlers: Record<JobType, Handler> = {
   workspace_expiry: () => expireIdle().then(() => undefined),
   pool_sync: () => syncPool().then(() => undefined),
   showcase_rebuild: () => rebuildShowcase().then(() => undefined),
+  /* Wave 2 (A5.6): the daily showcase run; only where a model key is set, so tests and keyless installs skip it */
+  showcase_eval: () => runNightly("schedule").then(() => undefined),
 };
 
 export async function tick(): Promise<number> {
@@ -77,6 +80,10 @@ export async function scheduleSlowJobs() {
   try {
     await ensureShowcase(db);
     await enqueue(db, "showcase_rebuild", {}, at, `showcase:${at.toISOString().slice(0, 10)}`);
+    if (config.ai.provider === "openai" && config.ai.openaiKey) {
+      const ev = new Date(at.getTime() + 30 * 60_000);
+      await enqueue(db, "showcase_eval", {}, ev, `showcase_eval:${ev.toISOString().slice(0, 10)}`);
+    }
   } catch {
     /* no showcase shop on this server (tests, a fresh install): nothing to rebuild */
   }

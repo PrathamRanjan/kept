@@ -213,13 +213,13 @@ async function openaiStructured(model: string, call: StructuredCall<unknown>, sc
   }
 }
 
-export async function audit(row: { purpose: string; model: string; via: string; inputHash: string; outputHash: string; tokensIn: number; tokensOut: number; costUsd: number; latencyMs: number; ok: boolean; error: string | null; output: unknown; runId: string | null; inputSummary?: string | null }): Promise<number | null> {
+export async function audit(row: { purpose: string; model: string; via: string; inputHash: string; outputHash: string; tokensIn: number; tokensOut: number; costUsd: number; latencyMs: number; ok: boolean; error: string | null; output: unknown; runId: string | null; inputSummary?: string | null; merchantId?: string | null }): Promise<number | null> {
   try {
     const db = await getDb();
     const r = await db.query<{ id: number }>(
-      `INSERT INTO ai_calls (purpose, model, via, input_hash, output_hash, tokens_in, tokens_out, cost_usd, latency_ms, ok, error, output, run_id, input_summary)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id`,
-      [row.purpose, row.model, row.via, row.inputHash, row.outputHash, row.tokensIn, row.tokensOut, row.costUsd, row.latencyMs, row.ok, row.error, row.ok ? JSON.stringify(row.output) : null, row.runId, row.inputSummary ? row.inputSummary.slice(0, 240) : null],
+      `INSERT INTO ai_calls (purpose, model, via, input_hash, output_hash, tokens_in, tokens_out, cost_usd, latency_ms, ok, error, output, run_id, input_summary, merchant_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING id`,
+      [row.purpose, row.model, row.via, row.inputHash, row.outputHash, row.tokensIn, row.tokensOut, row.costUsd, row.latencyMs, row.ok, row.error, row.ok ? JSON.stringify(row.output) : null, row.runId, row.inputSummary ? row.inputSummary.slice(0, 240) : null, row.merchantId ?? null],
     );
     return r.rows[0]?.id ?? null;
   } catch {

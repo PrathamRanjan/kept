@@ -136,7 +136,7 @@ export async function runAgent(opts: {
   let usedModel = model;
   const finish = async (status: string) => {
     await db.query("UPDATE agent_runs SET status = $2, ended_at = now() WHERE id = $1", [runId, status]);
-    await audit({ purpose: opts.purpose, model: usedModel, via: "primary", inputHash: createHash("sha256").update(opts.system + opts.question).digest("hex"), outputHash: "", tokensIn, tokensOut, costUsd: estimateCost(usedModel, tokensIn, tokensOut), latencyMs: Date.now() - t0, ok: status === "done", error: status === "done" ? null : status, output: { steps: steps.map((s) => ({ name: s.name, summary: s.summary, ms: s.ms })) }, runId, inputSummary: opts.question.slice(0, 200) });
+    await audit({ purpose: opts.purpose, model: usedModel, via: "primary", inputHash: createHash("sha256").update(opts.system + opts.question).digest("hex"), outputHash: "", tokensIn, tokensOut, costUsd: estimateCost(usedModel, tokensIn, tokensOut), latencyMs: Date.now() - t0, ok: status === "done", error: status === "done" ? null : status, output: { steps: steps.map((s) => ({ name: s.name, summary: s.summary, ms: s.ms })) }, runId, inputSummary: opts.question.slice(0, 200), merchantId: opts.merchantId });
   };
 
   try {

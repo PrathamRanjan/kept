@@ -6,6 +6,23 @@ Kept gives a small subscription business (a coffee club, meal-prep kitchen, farm
 
 Built for the PayPal AI Hackathon. Runs on the **PayPal sandbox**; no real money moves.
 
+## For judges: try it in 60 seconds
+
+Open **https://pph-kept.onrender.com/judge** and press **Start my demo shop**. You get a private copy of the demo coffee shop, with no sign-in. It has real PayPal sandbox subscriptions while the approval pool has some, and about 40 labelled sample members. Then pick a path. Each step ticks itself when the server sees you do it.
+
+| Path | Time | PayPal login | What you see |
+|---|---|---|---|
+| Be the member's assistant | 2 min | no | An AI assistant calls Kept's MCP tools to read, pause and resume a real member's subscription. Each call and its rule appear on the work rail, and code reads PayPal back after each change. |
+| Cancel in one step yourself | 1 min | no | At most one offer, and only if you ask for one. Code decides whether an offer applies. Saying no cancels the subscription on PayPal at once. |
+| Run the shop | 2 min | no | The owner's Ask runs as an agent with read tools, one of them PayPal's own MCP server. A rule the law forbids is refused with its citation. The 10 Nov scam message is held by all three checks. |
+
+| Judging criterion | Where to look |
+|---|---|
+| Use of PayPal | `/paypal`: every PayPal API Kept uses, when it last used each one, and the latest sandbox id |
+| Use of AI | `/ai`: the last 20 model calls in the showcase shop, with inputs, tools, outputs, time and cost. `/proof`: every evaluation case |
+| Safety | `/who-can-move-money`: no model can call PayPal. `/proof`: the scam check, adversarial and fairness sets |
+| Accessibility | `/accessibility`: what was tested, how and when, and what was not |
+
 ---
 
 ## Why

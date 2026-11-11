@@ -14,7 +14,7 @@ import { fmtDate, fmtMoney, fmtRelative } from "@/lib/format";
 import { useData } from "@/lib/useData";
 import type { CycleCardData, PlanJson } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { resumeTour, startTour } from "@/tours";
+import { startTour } from "@/tours";
 
 const Members = lazy(() => import("./Members"));
 
@@ -46,16 +46,8 @@ export function Sample() {
   return <span className="ml-1.5 inline-flex h-5 items-center rounded border border-rule px-1.5 align-middle text-[0.6875rem] font-medium uppercase tracking-wide text-ink-2">sample</span>;
 }
 
-function useTour(ready: boolean, first: "owner" | null) {
-  const loc = useLocation();
-  useEffect(() => {
-    if (!ready) return;
-    const t = setTimeout(() => {
-      if (!resumeTour(loc.pathname) && first) startTour(first);
-    }, 500);
-    return () => clearTimeout(t);
-  }, [ready, loc.pathname]);
-}
+/** Spec A3.3: tours start only from a button, so this hook no longer starts anything. Kept for callers. */
+function useTour(_ready: boolean, _first: "owner" | null) {}
 
 /* ------------------------------------------------------------------ approvals */
 function ApprovalCard({ a, currency, onDone }: { a: Approval; currency: string; onDone: () => void }) {
@@ -217,7 +209,11 @@ function OwnerKey() {
 }
 
 function TodayPage({ d, reload }: { d: Today; reload: () => void }) {
-  const [q, setQ] = useState("");
+  // The judge page opens the dashboard with a question already typed (?ask=...#ask).
+  const [q, setQ] = useState(() => new URLSearchParams(location.search).get("ask") ?? "");
+  useEffect(() => {
+    if (location.hash === "#ask") setTimeout(() => document.getElementById("q")?.scrollIntoView({ block: "center" }), 120);
+  }, []);
   const [answer, setAnswer] = useState<{ text: string; by: string | null; model: string | null; failed: boolean; sentences?: Sentence[]; facts?: Fact[]; ms?: number } | null>(null);
   const [steps, setSteps] = useState<RailStep[]>([]);
   const [asking, setAsking] = useState(false);

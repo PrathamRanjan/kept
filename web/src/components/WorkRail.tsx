@@ -35,11 +35,11 @@ export function WorkRail({ steps, running, title = "AI work" }: { steps: RailSte
       </p>
       {steps.length === 0 && !running && <p className="mt-2 mb-0 text-sm text-ink-2">Ask a question and each step the model takes shows here as it happens.</p>}
       <ol className="mt-2 mb-0 list-none space-y-2 p-0" aria-live="polite">
-        {steps.map((s) => {
+        {steps.map((s, i) => {
           const src = s.source ? SOURCE[s.source] : null;
           const Icon = s.kind === "error" ? XCircle : s.kind === "tool" ? src?.icon ?? Wrench : s.kind === "answer" ? MessageSquareText : Bot;
           return (
-            <li key={s.n} className="rounded-md border border-rule bg-card p-2 text-sm">
+            <li key={`${s.n}-${s.name}-${i}`} className="rounded-md border border-rule bg-card p-2 text-sm">
               <div className="flex items-center gap-2">
                 <Icon className={cn("size-4 shrink-0", s.kind === "error" ? "text-fail" : src?.cls ?? "text-ink-2")} aria-hidden="true" />
                 <span className="font-mono font-medium break-all">{s.kind === "model" ? `model: ${s.name}` : s.name}</span>

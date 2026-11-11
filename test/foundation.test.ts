@@ -15,7 +15,7 @@ import { backtest } from "../src/guard/backtest.js";
 import { tick } from "../src/worker.js";
 import { Client } from "./client.js";
 import { DEMO_FAKE_FAILED } from "../src/web/safety.js";
-import { isFoundationRoute, isSmsRoute, isWave1Route, serveTracked } from "./journey-coverage.js";
+import { isFoundationRoute, isSmsRoute, isWave1Route, isWave2Route, serveTracked } from "./journey-coverage.js";
 
 // Foundation walk: every guard, compliance, trace, eval, money, channel, PWA and judge route is used by an
 // owner, a subscriber, an agent and a hostile caller; nothing returns a 5xx; money moves that should be
@@ -260,8 +260,8 @@ describe("Kept foundation", () => {
     /* ---- evidence and judge mode ---- */
     expect((await owner.get("/dashboard/evidence")).text).toMatch(/what is real/i);
     const judge = new Client(base);
-    expect((await judge.get("/judge")).text).toMatch(/beat 1/);
-    expect((await judge.get("/judge?beat=3")).text).toMatch(/beat 4/);
+    expect((await judge.get("/judge")).status).toBeLessThan(500);
+    expect((await judge.get("/api/public/judge")).json.paths).toHaveLength(3); // the judge page is the React app now (wave2.test.ts)
     expect((await judge.get("/judge/reset")).location).toBe("/judge");
 
     /* ---- MCP additions: buyer get_trace with ownership; owner read-only tools ---- */
@@ -291,6 +291,6 @@ describe("Kept foundation", () => {
     await svc.sendRenewalReminders(new Date());
 
     expect(srv.failures).toEqual([]);
-    expect(srv.missed((r) => !isFoundationRoute(r) || isSmsRoute(r) || isWave1Route(r))).toEqual([]); // SMS routes are walked in sms.test.ts
+    expect(srv.missed((r) => !isFoundationRoute(r) || isSmsRoute(r) || isWave1Route(r) || isWave2Route(r))).toEqual([]); // SMS routes are walked in sms.test.ts
   });
 });

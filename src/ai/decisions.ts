@@ -78,7 +78,7 @@ export async function decide(input: string | InputPart[], questions: Question[],
   const latencyMs = Date.now() - t0;
   const purpose = `decide_${meta.purpose}`;
   if (!data) {
-    await audit({ purpose, model: body.model, via: "primary", inputHash, outputHash: "", tokensIn: 0, tokensOut: 0, costUsd: 0, latencyMs, ok: false, error: lastErr, output: null, runId: meta.runId ?? null, inputSummary: meta.summary ?? null });
+    await audit({ purpose, model: body.model, via: "primary", inputHash, outputHash: "", tokensIn: 0, tokensOut: 0, costUsd: 0, latencyMs, ok: false, error: lastErr, output: null, runId: meta.runId ?? null, inputSummary: meta.summary ?? null, merchantId: meta.ws ?? null });
     throw new NoModelError(`Decisions failed: ${lastErr}`);
   }
   const answers: Record<string, Answer> = {};
@@ -107,6 +107,7 @@ export async function decide(input: string | InputPart[], questions: Question[],
     output: { questions: questions.map((q) => q.name), answers, ws: meta.ws ?? null },
     runId: meta.runId ?? null,
     inputSummary: meta.summary ?? null,
+    merchantId: meta.ws ?? null,
   });
   return { answers, model, latencyMs, tokensIn, costUsd, auditId };
 }

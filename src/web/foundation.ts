@@ -361,34 +361,7 @@ export function foundationRouter(): Router {
     `));
   }));
 
-  /* ---------------- judge mode (B.10) ---------------- */
-  r.get("/judge", page(async (req, res) => {
-    const db = await getDb();
-    const m = (await db.query<Merchant>("SELECT * FROM merchants WHERE slug = $1", [process.env.KEPT_DEMO_SHOP || "ember-oak-coffee-club"])).rows[0] ?? (await db.query<Merchant>("SELECT * FROM merchants ORDER BY created_at LIMIT 1")).rows[0] ?? null;
-    let sid = typeof req.cookies?.kept_judge === "string" ? req.cookies.kept_judge : "";
-    const existing = sid ? (await db.query("SELECT * FROM judge_sessions WHERE id = $1", [sid])).rows[0] : null;
-    if (!existing) {
-      sid = newId("judge");
-      await db.query("INSERT INTO judge_sessions (id, merchant_id) VALUES ($1,$2)", [sid, m?.id ?? null]);
-      res.cookie("kept_judge", sid, { httpOnly: true, sameSite: "lax", maxAge: 2 * 3600_000 });
-    }
-    const beat = Math.max(0, Math.min(5, Number(req.query.beat ?? (existing as any)?.beat ?? 0)));
-    await db.query("UPDATE judge_sessions SET beat = $2, last_seen = now() WHERE id = $1", [sid, beat]);
-    const beats = [
-      ["An agent cancels a coffee subscription for its human", `Claude Desktop (or any MCP client) calls cancel_subscription with hear_offer=true on ${config.appUrl}/s/${m?.slug ?? "<shop>"}/mcp. One honest offer comes back; the agent relays it.`],
-      ["The human declines; the cancel is honoured in one call", "respond_to_offer(accept=false) cancels at PayPal and reads back CANCELLED. No second offer, no survey, no hurdle."],
-      ["The trace", `Every step: reason classified (model or rules), eligibility in code, the gate's decision with the rule it hit, PayPal request id. <a href="/dashboard/traces">Agent runs</a>.`],
-      ["The owner's dashboard: fairness scorecard, backtest, compliance", `<a href="/dashboard/guard">Guard</a> shows the measured one-call cancel rate, the 90-day backtest of real requests with what-if sliders, earned autonomy. <a href="/dashboard/compliance">Compliance</a> scores the policy per jurisdiction.`],
-      ["A rule the law forbids is refused with the citation", `On <a href="/onboard/rules">Rules</a> type "three offers before cancel": refused, citing ROSCA §8403(3) and Cal. §17602(d). Type "customers must call to cancel": refused, citing CA, CO and NY.`],
-      ["Evidence and evals", `<a href="/dashboard/evidence">What is real</a>, <a href="/dashboard/eval">three-arm reason eval with the dollars column</a>, adversarial harness: 26 hostile moves, none reach PayPal.`],
-    ];
-    res.send(layout({ title: "Kept · Judge mode", nav: "home" }, html`
-      <h1>Judge mode</h1><p class="muted">Isolated session ${sid.slice(0, 12)} · beat ${beat + 1} of ${beats.length}. ${config.demoMode ? html`Sign in as the demo owner from <a href="/login">Owner sign-in</a> to open the dashboard links.` : ""}</p>
-      <div class="card beats">${beats.map(([t, d], i) => html`<div class="beat" style="${i === beat ? "background:var(--accent-soft);border-radius:8px;padding:10px" : ""}"><div><b>${t}</b><div class="small">${raw(d)}</div></div></div>`)}
-        <div class="row" style="margin-top:10px"><a class="btn" href="/judge?beat=${Math.max(0, beat - 1)}">Back</a><a class="btn primary" href="/judge?beat=${Math.min(beats.length - 1, beat + 1)}">Next</a><a class="btn" href="/judge/reset">Reset session</a></div></div>
-      <p class="small muted">Each visitor gets a private copy of the demo shop (<a href="/demo">start or open yours</a>); nobody else sees what you do in it, and it is removed 48 hours after your last visit.</p>
-    `));
-  }));
+  /* The judge page is the React page at /judge (src/web/public.ts serves its data). */
   r.get("/judge/reset", page(async (req, res) => {
     const sid = typeof req.cookies?.kept_judge === "string" ? req.cookies.kept_judge : "";
     if (sid) await (await getDb()).query("DELETE FROM judge_sessions WHERE id = $1", [sid]);

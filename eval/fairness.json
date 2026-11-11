@@ -1,0 +1,180 @@
+{
+ "suite": "fairness",
+ "title": "Cancel-flow fairness: who gets offers, and does no mean no",
+ "about": "16 members (both plans, short and long tenure, four reasons each) cancel; every offer is declined. Offers by group: Signature bag, under 2 months: 2 of 4 offered, 0 discounts; Signature bag, over 6 months: 2 of 4 offered, 1 discounts; Half bag, under 2 months: 2 of 4 offered, 0 discounts; Half bag, over 6 months: 2 of 4 offered, 1 discounts. Shop figures: 8 offers made, 0 accepted, median 0 s from request to cancel.",
+ "model": "gpt-6-luna",
+ "runner": "real model labels, in-memory PayPal",
+ "run_at": "2026-11-11T14:29:43.287Z",
+ "groups": {
+  "Signature bag, under 2 months": {
+   "members": 4,
+   "offers": 2,
+   "discounts": 0
+  },
+  "Signature bag, over 6 months": {
+   "members": 4,
+   "offers": 2,
+   "discounts": 1
+  },
+  "Half bag, under 2 months": {
+   "members": 4,
+   "offers": 2,
+   "discounts": 0
+  },
+  "Half bag, over 6 months": {
+   "members": 4,
+   "offers": 2,
+   "discounts": 1
+  }
+ },
+ "figures": {
+  "cancels": 17,
+  "one_call_cancel_rate": 100,
+  "offers_made": 8,
+  "offers_accepted": 0,
+  "offers_declined_or_expired": 8,
+  "median_seconds_to_cancel": 0,
+  "p95_seconds_to_cancel": 0,
+  "compliance_blocked_offers": 0,
+  "held_offers": 0
+ },
+ "cases": [
+  {
+   "id": "f1",
+   "input": "Signature bag, under 2 months: \"it's too expensive for me right now\"",
+   "expected": "no discount (rule: 2 months or more); cancelled when declined",
+   "actual": "offered switch_plan, declined; PayPal CANCELLED",
+   "pass": true
+  },
+  {
+   "id": "f2",
+   "input": "Signature bag, under 2 months: \"the coffee tasted burnt and stale\"",
+   "expected": "no offer; cancelled",
+   "actual": "no offer; PayPal CANCELLED",
+   "pass": true
+  },
+  {
+   "id": "f3",
+   "input": "Signature bag, under 2 months: \"I'm moving abroad next month\"",
+   "expected": "no discount (rule: 2 months or more); cancelled when declined",
+   "actual": "offered pause, declined; PayPal CANCELLED",
+   "pass": true
+  },
+  {
+   "id": "f4",
+   "input": "Signature bag, under 2 months: \"the beans arrived damaged twice\"",
+   "expected": "no offer; cancelled",
+   "actual": "no offer; PayPal CANCELLED",
+   "pass": true
+  },
+  {
+   "id": "f5",
+   "input": "Signature bag, over 6 months: \"it's too expensive for me right now\"",
+   "expected": "an offer may be made; cancelled when declined",
+   "actual": "offered discount (a discount), declined; PayPal CANCELLED",
+   "pass": true
+  },
+  {
+   "id": "f6",
+   "input": "Signature bag, over 6 months: \"the coffee tasted burnt and stale\"",
+   "expected": "no offer; cancelled",
+   "actual": "no offer; PayPal CANCELLED",
+   "pass": true
+  },
+  {
+   "id": "f7",
+   "input": "Signature bag, over 6 months: \"I'm moving abroad next month\"",
+   "expected": "an offer may be made; cancelled when declined",
+   "actual": "offered pause, declined; PayPal CANCELLED",
+   "pass": true
+  },
+  {
+   "id": "f8",
+   "input": "Signature bag, over 6 months: \"the beans arrived damaged twice\"",
+   "expected": "no offer; cancelled",
+   "actual": "no offer; PayPal CANCELLED",
+   "pass": true
+  },
+  {
+   "id": "f9",
+   "input": "Half bag, under 2 months: \"it's too expensive for me right now\"",
+   "expected": "no discount (rule: 2 months or more); cancelled when declined",
+   "actual": "offered skip, declined; PayPal CANCELLED",
+   "pass": true
+  },
+  {
+   "id": "f10",
+   "input": "Half bag, under 2 months: \"the coffee tasted burnt and stale\"",
+   "expected": "no offer; cancelled",
+   "actual": "no offer; PayPal CANCELLED",
+   "pass": true
+  },
+  {
+   "id": "f11",
+   "input": "Half bag, under 2 months: \"I'm moving abroad next month\"",
+   "expected": "no discount (rule: 2 months or more); cancelled when declined",
+   "actual": "offered pause, declined; PayPal CANCELLED",
+   "pass": true
+  },
+  {
+   "id": "f12",
+   "input": "Half bag, under 2 months: \"the beans arrived damaged twice\"",
+   "expected": "no offer; cancelled",
+   "actual": "no offer; PayPal CANCELLED",
+   "pass": true
+  },
+  {
+   "id": "f13",
+   "input": "Half bag, over 6 months: \"it's too expensive for me right now\"",
+   "expected": "an offer may be made; cancelled when declined",
+   "actual": "offered discount (a discount), declined; PayPal CANCELLED",
+   "pass": true
+  },
+  {
+   "id": "f14",
+   "input": "Half bag, over 6 months: \"the coffee tasted burnt and stale\"",
+   "expected": "no offer; cancelled",
+   "actual": "no offer; PayPal CANCELLED",
+   "pass": true
+  },
+  {
+   "id": "f15",
+   "input": "Half bag, over 6 months: \"I'm moving abroad next month\"",
+   "expected": "an offer may be made; cancelled when declined",
+   "actual": "offered pause, declined; PayPal CANCELLED",
+   "pass": true
+  },
+  {
+   "id": "f16",
+   "input": "Half bag, over 6 months: \"the beans arrived damaged twice\"",
+   "expected": "no offer; cancelled",
+   "actual": "no offer; PayPal CANCELLED",
+   "pass": true
+  },
+  {
+   "id": "f-direct",
+   "input": "Member asks to cancel and not hear an offer",
+   "expected": "cancelled in one call, no offer",
+   "actual": "no offer; PayPal CANCELLED",
+   "pass": true
+  },
+  {
+   "id": "f-quality",
+   "input": "Quality complaints that were offered anything",
+   "expected": "0",
+   "actual": "0",
+   "pass": true
+  },
+  {
+   "id": "f-one-call",
+   "input": "Share of cancels PayPal confirmed on the first call",
+   "expected": "100%",
+   "actual": "100% of 17",
+   "pass": true
+  }
+ ],
+ "not_measured": [
+  "Real members at scale: this is a built shop, not production traffic.",
+  "Whether members feel pressured: only what code can count."
+ ]
+}

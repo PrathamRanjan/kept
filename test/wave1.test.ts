@@ -100,6 +100,11 @@ describe("A1 private workspaces and A2.2 the approval pool", () => {
     expect((await anon.req("POST", "/admin/showcase/rebuild", { headers: { accept: "application/json" } })).status).toBe(401);
     const out = (await new Client(srv.base).req("POST", "/admin/showcase/rebuild", { headers: admin() })).json;
     expect(out.pooled).toHaveLength(1);
+    // A5.6: the daily showcase run, started by the admin. With no model it records failures, never passes.
+    expect((await anon.req("POST", "/admin/showcase/eval", { headers: { accept: "application/json" } })).status).toBe(401);
+    const ev = (await new Client(srv.base).req("POST", "/admin/showcase/eval", { headers: admin() })).json;
+    expect(ev.trigger).toBe("admin");
+    expect(ev.cases.find((c: any) => c.id === "ask").pass).toBe(false);
     const rows = (await db.query<any>("SELECT count(*) FILTER (WHERE is_sample)::int AS s, count(*) FILTER (WHERE NOT is_sample)::int AS r FROM subscribers WHERE merchant_id = $1", [showcaseShop.id])).rows[0];
     expect(rows.s).toBeGreaterThanOrEqual(40);
     expect(rows.r).toBe(0);

@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { PageSkeleton } from "@/components/States";
 import Landing from "@/pages/Landing";
+import { endTour } from "./tours";
 import "./index.css";
 
 const Demo = lazy(() => import("@/pages/Demo"));
@@ -12,11 +13,14 @@ const Shop = lazy(() => import("@/pages/Shop"));
 const Manage = lazy(() => import("@/pages/Manage"));
 const Owner = lazy(() => import("@/pages/Owner"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
+const Judge = lazy(() => import("@/pages/Judge"));
+const Public = lazy(() => import("@/pages/Public"));
 
 /** Move focus to the new page's heading on navigation, for keyboard and screen-reader users. */
 function FocusOnNavigate() {
   const loc = useLocation();
   useEffect(() => {
+    endTour();
     const t = setTimeout(() => {
       const h = document.querySelector<HTMLElement>("main h1");
       if (h && loc.key !== "default") {
@@ -37,7 +41,12 @@ function App() {
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/demo" element={<Demo />} />
-          <Route path="/judge" element={<Demo judge />} />
+          <Route path="/judge" element={<Judge />} />
+          <Route path="/proof" element={<Public page="proof" />} />
+          <Route path="/ai" element={<Public page="ai" />} />
+          <Route path="/paypal" element={<Public page="paypal" />} />
+          <Route path="/who-can-move-money" element={<Public page="roles" />} />
+          <Route path="/accessibility" element={<Public page="accessibility" />} />
           <Route path="/s/:slug" element={<Shop />} />
           <Route path="/manage/:ref" element={<Manage />} />
           <Route path="/dashboard/*" element={<Owner />} />

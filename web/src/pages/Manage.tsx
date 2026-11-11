@@ -17,7 +17,8 @@ import { fmtDate, fmtMoney, fmtRelative } from "@/lib/format";
 import { useData } from "@/lib/useData";
 import type { CycleCardData, PlanJson, TimelineRun } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { resumeTour, startTour } from "@/tours";
+import { startTour } from "@/tours";
+import { AssistantPanel } from "@/components/AssistantPanel";
 
 interface ManageData {
   view: {
@@ -66,6 +67,14 @@ export default function Manage() {
   const [reason, setReason] = useState("");
   const [hear, setHear] = useState(false);
   const [promise, setPromise] = useState("");
+  // The judge page opens this page with the assistant's words already typed (?assistant=...#assistant).
+  const [assistantInit] = useState(() => params.get("assistant"));
+  const loaded = Boolean(data);
+  useEffect(() => {
+    if (!loaded || !location.hash) return;
+    const t = setTimeout(() => document.getElementById(location.hash.slice(1))?.scrollIntoView({ block: "start" }), 80);
+    return () => clearTimeout(t);
+  }, [loaded]);
 
   // Messages passed back from PayPal's return page (/r/:ref) or the old server forms.
   useEffect(() => {
@@ -75,13 +84,6 @@ export default function Manage() {
     if (err) toast.error(err);
     if (ok || err) setParams({}, { replace: true });
   }, []);
-  useEffect(() => {
-    if (!data) return;
-    const t = setTimeout(() => {
-      if (!resumeTour(location.pathname)) startTour("member");
-    }, 400);
-    return () => clearTimeout(t);
-  }, [Boolean(data)]);
   useEffect(() => {
     if (data?.switchTo[0] && !planTo) setPlanTo(data.switchTo[0].id);
   }, [data]);
@@ -389,6 +391,8 @@ export default function Manage() {
             </Button>
           </section>
         </div>
+
+        <AssistantPanel memberRef={ref!} sample={data.member.sample} initial={assistantInit} onChanged={reload} />
 
         <section className="mt-8" aria-labelledby="history" data-tour="history">
           <h2 id="history" className="text-2xl font-bold">What happened</h2>

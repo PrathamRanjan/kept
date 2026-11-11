@@ -291,6 +291,9 @@ ALTER TABLE merchants ADD COLUMN IF NOT EXISTS time_zone TEXT;
 -- ---------- Wave 2 (11 Nov 2026): Decisions thresholds, the AI call summary, the agent loop ----------
 ALTER TABLE ai_calls ADD COLUMN IF NOT EXISTS input_summary TEXT;
 ALTER TABLE ai_calls ADD COLUMN IF NOT EXISTS merchant_id TEXT;
+CREATE TABLE IF NOT EXISTS nightly_runs (
+  id TEXT PRIMARY KEY, trigger TEXT NOT NULL, passed INTEGER NOT NULL, total INTEGER NOT NULL, result JSONB NOT NULL, run_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 CREATE TABLE IF NOT EXISTS decision_thresholds (
   name TEXT PRIMARY KEY, clear_below DOUBLE PRECISION NOT NULL, hold_above DOUBLE PRECISION NOT NULL, calibrated_on TEXT NOT NULL,
   n INTEGER NOT NULL DEFAULT 0, precision_at_hold DOUBLE PRECISION, recall_at_hold DOUBLE PRECISION, set_at TIMESTAMPTZ NOT NULL DEFAULT now()

@@ -8,7 +8,6 @@ import { api, ApiError } from "@/lib/api";
 import { getSession } from "@/lib/session";
 import type { Session } from "@/lib/types";
 import { resetDemo, useDemoStatus } from "@/components/WorkspaceBar";
-import { startTour } from "@/tours";
 
 export default function Demo({ judge = false }: { judge?: boolean }) {
   const [s, setS] = useState<Session | null>(null);
@@ -112,15 +111,12 @@ export default function Demo({ judge = false }: { judge?: boolean }) {
             : "Pick who to be. Everything runs on the PayPal sandbox: real PayPal calls, no real money."}
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
-          <Button size="lg" variant={judge ? "default" : "outline"} onClick={() => startTour("judge")}>
-            <Compass aria-hidden="true" />
-            Start Judge Mode
+          <Button size="lg" variant="outline" asChild>
+            <a href="/judge">
+              <Compass aria-hidden="true" />
+              For judges: three paths that tick themselves
+            </a>
           </Button>
-          {judge && (
-            <Button size="lg" variant="ghost" asChild>
-              <a href="/judge/reset">Reset my judge session</a>
-            </Button>
-          )}
         </div>
         <section aria-label="Your private demo shop" className="mt-8 rounded-xl border border-rule bg-card p-5">
           {st?.workspace ? (
