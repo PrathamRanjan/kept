@@ -226,7 +226,7 @@ export function uiApi(): Router {
     try {
       await spendAllowance(s.merchant_id);
       const r = await runAssistant(s.ref, msg, (st) => send("step", st));
-      send("answer", { answer: r.answer, sentences: r.sentences, facts: r.facts, model: r.model, runId: r.runId, readBack: r.readBack, ms: r.ms });
+      send("answer", { answer: r.answer, sentences: r.sentences, facts: r.facts, model: r.model, runId: r.runId, readBack: r.readBack, toolCalls: r.toolCalls, ms: r.ms });
     } catch (e) {
       send("failed", { error: e instanceof KeptError ? e.code : "internal_error", message: e instanceof KeptError ? e.message : "The assistant hit a problem and stopped. Check the steps above for anything it changed." });
     }

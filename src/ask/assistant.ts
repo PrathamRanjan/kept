@@ -94,13 +94,13 @@ export async function runAssistant(ref: string, message: string, onStep?: (s: Ra
       const rule = await lastRule(s.id);
       const facts = [fact(r.ok ? `${name.replace(/_/g, " ")} done: ${r.data.note ?? r.data.message ?? r.data.status ?? "ok"}${rule ? ` (allowed by the rule ${rule})` : ""}.` : `${name.replace(/_/g, " ")} refused: ${r.data.message ?? "not allowed"}.`)];
       // Code reads PayPal back after every change, whatever the model does next.
+      const t0 = Date.now();
       const back = await mcp.call("get_subscription", { subscription_ref: s.ref });
       readBack = describe(back.data);
-      const t0 = Date.now();
       facts.push(fact(`Read back from PayPal just now: ${readBack}.`));
       if (back.ok) await tick(m.id, "assistant_readback");
-      onStep?.({ n: 0, kind: "tool", name: "get_subscription", source: "kept", args: "read-back after the change (by code)", summary: readBack, ms: Date.now() - t0 });
-      return { summary: r.ok ? `${r.data.note ?? r.data.message ?? r.data.status ?? "done"}${rule ? ` · rule ${rule}` : ""}` : `refused: ${r.data.message ?? "not allowed"}`, facts };
+      const after = [{ kind: "tool" as const, name: "get_subscription", source: "kept" as const, args: "read-back after the change (by code, not the model)", summary: readBack ?? "no answer", ms: Date.now() - t0 }];
+      return { summary: r.ok ? `${r.data.note ?? r.data.message ?? r.data.status ?? "done"}${rule ? ` · rule ${rule}` : ""}` : `refused: ${r.data.message ?? "not allowed"}`, facts, after };
     },
   });
 

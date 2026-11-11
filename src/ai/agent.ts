@@ -31,7 +31,8 @@ export interface AgentTool {
   kind: "read" | "member_action";
   /** Who answers, for the rail: Kept's own records, PayPal's MCP server, or a Kept action. */
   source: "kept" | "paypal_mcp" | "kept_action";
-  run: (args: any, ctx: { fact: (text: string) => Fact }) => Promise<{ summary: string; facts?: Fact[]; data?: unknown }>;
+  /** `after` are steps code took on its own once the tool ran (a PayPal read-back), shown after the tool's step. */
+  run: (args: any, ctx: { fact: (text: string) => Fact }) => Promise<{ summary: string; facts?: Fact[]; data?: unknown; after?: Omit<RailStep, "n">[] }>;
 }
 
 export interface RailStep {
@@ -180,11 +181,13 @@ export async function runAgent(opts: {
         let output: unknown;
         let summary: string;
         let got: Fact[] = [];
+        let after: Omit<RailStep, "n">[] = [];
         try {
           if (!tool) throw new Error(`No tool called ${c.name}`);
           const args = JSON.parse(c.arguments || "{}");
           const r = await tool.run(args, { fact });
           got = r.facts ?? [];
+          after = r.after ?? [];
           summary = r.summary;
           output = { facts: got, data: r.data ?? null };
           toolCalls++;
@@ -195,6 +198,7 @@ export async function runAgent(opts: {
         const ms = Date.now() - s0;
         await run.step({ actor: tool?.source === "paypal_mcp" ? "paypal" : "code", tool: `agent.tool.${c.name}`, args: JSON.parse(c.arguments || "{}"), result: { summary, facts: got.map((f) => f.id) }, duration_ms: ms, gate: tool?.kind === "member_action" ? "allowed" : "n/a" });
         emit({ kind: "tool", name: c.name, source: tool?.source, args: short(c.arguments || "{}", 90), summary, ms, facts: got });
+        for (const a of after) emit(a);
         input.push({ type: "function_call_output", call_id: c.call_id, output: JSON.stringify(output).slice(0, 12000) });
       }
     }
