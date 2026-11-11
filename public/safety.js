@@ -64,3 +64,6 @@ form?.addEventListener("submit", async (e) => {
   ${rules?.reasons?.length ? `<h3>Why</h3><ul>${rules.reasons.map((r) => `<li>${esc(r)}</li>`).join("")}</ul>` : ""}
   <p class="small muted">What to do: pay only to details you confirmed by phone with a number you already had. Never share codes. If in doubt, put the payment on hold and ask a second person. ${modelOnly ? `The device model was a little unsure (${Math.round(model.p_scam * 100)}%) but found no scam tactic it was sure of, so on its own it does not raise the level. ` : ""}${level === "clear" ? "A clear result is not a guarantee." : ""}</p>`;
 });
+
+// The button ships disabled so a click before this script runs cannot fall through to a plain page reload.
+if (btn) { btn.disabled = false; status.textContent = ""; }

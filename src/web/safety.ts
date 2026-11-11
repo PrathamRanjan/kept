@@ -38,7 +38,7 @@ const SCRIPTS = raw(`<script async src="https://cdnjs.cloudflare.com/ajax/libs/o
 
 const checkCard = (intro: string, demo: string, prefill = "") => html`<div class="card" id="check"><h2>Check a message</h2><p class="small muted">${intro} The model scores it on this device; the words never leave your browser for the score.</p>
 <form id="scan-form" class="stack"><label for="scan-text" class="sr">Message to check</label><textarea id="scan-text" name="text" rows="6" placeholder="Paste the message here" style="width:100%">${prefill}</textarea>
-<div class="row"><button class="btn primary" type="submit" id="scan-btn">Check this message</button><button class="btn" type="button" id="scan-demo">Paste the demo scam</button><span class="small muted" id="scan-status" aria-live="polite"></span></div></form>
+<div class="row"><button class="btn primary" type="submit" id="scan-btn" disabled aria-describedby="scan-status">Check this message</button><button class="btn" type="button" id="scan-demo">Paste the demo scam</button><span class="small muted" id="scan-status" aria-live="polite">Getting the check ready…</span><noscript><span class="small">The check needs JavaScript in this browser.</span></noscript></div></form>
 <div id="scan-result" aria-live="polite"></div>${raw(`<script type="application/json" id="demo-bec">${JSON.stringify({ text: demo }).replace(/</g, "\\u003c")}</script>`)}</div>`;
 
 const modelCard = (back: string) => html`<h1>How the scam check was tested</h1>
