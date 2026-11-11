@@ -197,8 +197,19 @@ export class FakePayPal implements PayPalApi {
     return [...this.sub(id).history];
   }
 
-  async refundSale(saleId: string, _amount: string, _currency: string, requestId: string) {
-    return this.idem(requestId, () => ({ id: "REFUND-" + saleId, state: "completed" }));
+  refunds = new Map<string, { id: string; state: string; amount: string; saleId: string }>();
+  async refundSale(saleId: string, amount: string, _currency: string, requestId: string) {
+    return this.idem(requestId, () => {
+      const r = { id: "REFUND-" + saleId, state: "completed", amount, saleId };
+      this.refunds.set(r.id, r);
+      return { id: r.id, state: r.state };
+    });
+  }
+
+  async getRefund(refundId: string) {
+    const r = this.refunds.get(refundId);
+    if (!r) throw new Error(`no refund ${refundId}`);
+    return { id: r.id, state: r.state, amount: r.amount };
   }
 
   async createWebhook() {

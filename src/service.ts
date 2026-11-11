@@ -1,3 +1,5 @@
+import { honestExchange, type Exchange } from "./ask/exchange.js";
+import { hasOpenAI, NoModelError } from "./ai/provider.js";
 import { getDb } from "./db.js";
 import { tick } from "./demo/checklist.js";
 import { spendAllowance } from "./demo/allowance.js";
@@ -11,7 +13,7 @@ import { cancelJob, enqueue } from "./jobs.js";
 import { encrypt } from "./lib/crypto.js";
 import { newId, requestKey, slugify } from "./lib/ids.js";
 import { PayPalClient, paypalFor, forgetPayPalClient } from "./paypal/index.js";
-import { describeRules, Rules, validateRules } from "./policy/rules.js";
+import { describeRules, loosens, Rules, validateRules } from "./policy/rules.js";
 import { discountedPrice, eligibleOffers, EligibleOffer, money } from "./policy/eligibility.js";
 import {
   currentPolicy, intervalMs, intervalWords, KeptError, logEvent, Merchant, merchantById, offerById, openOfferFor, Plan, planById, plansFor,
@@ -211,7 +213,9 @@ export async function previewRules(text: string, merchantId?: string) {
   const check = validateRules(draft.value);
   // Judge path "Run the shop": a rule the law forbids was refused with its citation.
   if ((draft.warnings ?? []).some((w: string) => /ROSCA|§|C\.R\.S|17602|refus/i.test(w))) await tick(merchantId, "rule_refused");
-  return { ...draft, brain: getBrain().lastVia(), valid: check.ok, errors: check.errors, description: check.ok ? describeRules(check.rules!) : [] };
+  // What this loosens: code compares the draft with the approved rules; the model has no say.
+  const approved = merchantId ? (await currentPolicy(await getDb(), merchantId))?.rules ?? null : null;
+  return { ...draft, brain: getBrain().lastVia(), valid: check.ok, errors: check.errors, description: check.ok ? describeRules(check.rules!) : [], loosens: check.ok ? loosens(approved, check.rules!) : [], comparedTo: approved ? "your approved rules" : "no rules (nothing allowed)" };
 }
 
 async function ensurePromoPlans(m: Merchant, rules: Rules) {
@@ -467,12 +471,62 @@ async function doCancel(m: Merchant, s: Subscriber, reason: string, actor: Actor
  * A cancellation is a durable command: it is reported done only when PayPal reads back CANCELLED. If PayPal fails
  * or doesn't confirm, the subscriber shows "cancellation pending" and a job retries with the same key until it does.
  */
+/**
+ * Spec B5 (7): the partial-refund remedy. When the owner's rules say so, refund the unused part of the current
+ * cycle on the last completed sale, capped by the rule and by what was paid. Code computes the amount from
+ * PayPal's own sale and the plan's interval; the gate checks it; PayPal is read back.
+ */
+async function refundUnusedPart(m: Merchant, s: Subscriber, actor: Actor, key: string, run: Run | null) {
+  if (s.is_sample || !s.paypal_subscription_id) return null;
+  const policy = await rulesFor(m);
+  const rule = policy?.rules.refundUnused;
+  if (!rule?.enabled || !(rule.maxAmount > 0)) return null;
+  const db = await getDb();
+  const plan = s.plan_id ? await planById(db, s.plan_id) : null;
+  if (!plan) return null;
+  const pay = (await db.query<{ id: string; amount: string; paid_at: Date }>("SELECT id, amount, paid_at FROM payments WHERE subscriber_id = $1 AND status IN ('COMPLETED','S') AND paid_at IS NOT NULL ORDER BY paid_at DESC LIMIT 1", [s.id])).rows[0];
+  if (!pay) {
+    await logEvent(db, { merchantId: m.id, subscriberId: s.id, source: "system", type: "refund.none", summary: "No refund: PayPal shows no completed payment in this cycle." });
+    return null;
+  }
+  const cycle = intervalMs(plan);
+  const unused = Math.max(0, Math.min(1, 1 - (Date.now() - new Date(pay.paid_at).getTime()) / cycle));
+  const paidCents = Math.round(Number(pay.amount) * 100);
+  const cents = Math.min(Math.floor(paidCents * unused), Math.round(rule.maxAmount * 100), paidCents);
+  if (cents <= 0) {
+    await logEvent(db, { merchantId: m.id, subscriberId: s.id, source: "system", type: "refund.none", summary: "No refund: nothing of the current cycle is left unused." });
+    return null;
+  }
+  const amount = (cents / 100).toFixed(2);
+  await run?.step({ actor: "code", tool: "refund_unused", args: { sale: pay.id, paid: pay.amount, unused: Math.round(unused * 1000) / 1000, cap: rule.maxAmount }, result: { cents }, policy: `rules v${policy!.version}`, gate: "n/a" });
+  try {
+    // Customer-initiated: the member's own cancel triggers it and the owner's rule caps it.
+    await gate(await moveFor(m, s, actor, "refund", { cents, trustedCents: [cents], entity: "subscriber", entityId: s.id, customerInitiated: true }), run);
+  } catch (e) {
+    if (e instanceof HeldForApproval || e instanceof GateDenied) {
+      await logEvent(db, { merchantId: m.id, subscriberId: s.id, source: "guard", type: "refund.held", summary: `Refund of ${amount} not made: ${(e as Error).message}` });
+      return null;
+    }
+    throw e;
+  }
+  const out = run
+    ? await run.timed({ actor: "paypal", tool: "payments.sale.refund", args: { sale: pay.id, amount }, pp_request_id: requestKey("refund", s.id, pay.id, key) }, () => exec.refundSale(db, m, s, pay.id, amount, key), (r) => ({ refund: r.refundId, state: r.state }))
+    : await exec.refundSale(db, m, s, pay.id, amount, key);
+  await logEvent(db, { merchantId: m.id, subscriberId: s.id, source: "executor", type: "refund.made", summary: `Refunded ${amount} ${m.currency} for the unused ${Math.round(unused * 100)}% of the cycle (cap ${rule.maxAmount.toFixed(2)}); PayPal shows ${out.readBack}`, payload: { refundId: out.refundId, saleId: pay.id, cents } });
+  return { cents, refundId: out.refundId, state: out.state };
+}
+
 async function cancelDurably(m: Merchant, s: Subscriber, reason: string, actor: Actor, key: string, category: ReasonCategory | null, run: Run | null = null) {
   const db = await getDb();
   try {
     const sub = await doCancel(m, s, reason, actor, key, category, run);
     if ((s as any).cancel_requested_at) await updateSubscriber(db, s.id, { cancel_requested_at: null } as any);
-    return { status: "cancelled" as const, subscription: sub, note: "Cancelled. No further charges." };
+    // The cancel is done; a refund problem is logged and never undoes or delays it.
+    const refund = await refundUnusedPart(m, s, actor, key, run).catch(async (e) => {
+      await logEvent(db, { merchantId: m.id, subscriberId: s.id, source: "system", type: "refund.failed", summary: `The cancel is done, but the refund of the unused part did not go through: ${(e as Error).message.slice(0, 160)}. The owner can refund it in PayPal.` });
+      return null;
+    });
+    return { status: "cancelled" as const, subscription: sub, note: refund ? `Cancelled. No further charges. ${money(refund.cents / 100)} ${m.currency} for the unused part of this cycle is refunded to where you paid from (PayPal shows it ${refund.state}).` : "Cancelled. No further charges.", refund };
   } catch (e) {
     await updateSubscriber(db, s.id, { kept_state: "cancel_pending", cancel_requested_at: new Date() } as any);
     await logEvent(db, { merchantId: m.id, subscriberId: s.id, source: "system", type: "cancel.pending", summary: `Cancellation requested by ${actorLabel(actor)}; PayPal has not confirmed it (${(e as Error).message.slice(0, 120)}). Kept retries until PayPal shows it cancelled.` });
@@ -563,7 +617,28 @@ export async function requestCancel(ref: string, opts: { reason?: string; hearOf
     if (opts.hearOffer && unread && !declined) {
       await logEvent(db, { merchantId: m.id, subscriberId: s.id, source: "system", type: "offer.none", summary: "No offer made: Kept couldn't read the reason just now (the model did not answer), so it made no offer and cancelled as asked." });
     }
-    if (opts.hearOffer && !unread && !declined) {
+    // Spec B5 (3): the honest exchange. With a model configured, one Decisions request checks for a quality
+    // complaint and pressure; either one means no offer, and a complaint goes to the owner.
+    let honest: Exchange | null = null;
+    let exchangeStop: string | null = null;
+    if (opts.hearOffer && !unread && !declined && config.brain === "openai" && hasOpenAI()) {
+      try {
+        honest = await honestExchange(reason, m.id);
+        await run.step({ actor: "model", tool: "honest_exchange", args: { reason: reason.slice(0, 120) }, result: { kind: honest.kindChoice, is_quality_complaint: honest.quality, sounds_pressured: honest.pressured, no_offer: honest.noOffer, model: honest.model }, gate: "n/a" });
+        if (honest.noOffer === "quality") {
+          category = "quality";
+          exchangeStop = "No offer made: the member's words read as a complaint about the product, so Kept cancelled as asked and passed the complaint to the owner.";
+          await logEvent(db, { merchantId: m.id, subscriberId: s.id, source: "brain", type: "complaint.quality", summary: `Quality complaint at cancel, for the owner: "${reason.slice(0, 200)}"` });
+        } else if (honest.noOffer === "pressured") {
+          exchangeStop = "No offer made: the member sounded pressured, so Kept cancelled as asked without trying to keep them.";
+        }
+      } catch (e) {
+        if (!(e instanceof NoModelError)) throw e;
+        exchangeStop = "No offer made: Kept couldn't check the reason for a complaint or pressure just now (the model did not answer), so it made no offer and cancelled as asked.";
+      }
+      if (exchangeStop) await logEvent(db, { merchantId: m.id, subscriberId: s.id, source: "system", type: "offer.none", summary: exchangeStop });
+    }
+    if (opts.hearOffer && !unread && !declined && !exchangeStop) {
       // Anything that goes wrong while preparing an offer falls through to the cancel. Cancelling is never blocked.
       try {
         const policy = await rulesFor(m);
@@ -897,6 +972,7 @@ export async function subscriptionView(ref: string) {
     open_offer: offer ? offerView(offer) : null,
     notice,
     manage_url: `${config.appUrl}/manage/${s.ref}`,
+    paid_cycles: Number((await db.query<{ n: number }>("SELECT count(*)::int AS n FROM payments WHERE subscriber_id = $1 AND status IN ('COMPLETED','S')", [s.id])).rows[0]?.n ?? 0),
     available_actions: actions,
     is_sample: s.is_sample || undefined,
   };
@@ -1122,3 +1198,30 @@ export async function calendarEvents(m: Merchant): Promise<CalendarEvent[]> {
   return out;
 }
 
+
+/**
+ * Spec B5 differentiator 4: win-back for a cancel made inside PayPal. Called on a verified
+ * BILLING.SUBSCRIPTION.CANCELLED webhook. If Kept did not make the cancel (no cancel request or confirmed cancel
+ * of Kept's own on record), it records it and sends one message with a one-tap link back to the shop at the
+ * ordinary price: no discount, nothing outside the owner's rules. Never a second message: one per member, ever,
+ * and one per email address a year. Sample members are never messaged.
+ */
+export async function winBack(subscriberId: string): Promise<{ sent: boolean; why: string }> {
+  const db = await getDb();
+  const s = (await db.query<Subscriber>("SELECT * FROM subscribers WHERE id = $1", [subscriberId])).rows[0];
+  if (!s) return { sent: false, why: "no such member" };
+  if (s.is_sample) return { sent: false, why: "sample member" };
+  const m = (await merchantById(db, s.merchant_id))!;
+  const ours = (await db.query("SELECT 1 FROM event_log WHERE subscriber_id = $1 AND source <> 'webhook' AND (type IN ('subscription.cancelled','cancel.pending')) LIMIT 1", [s.id])).rows.length || (s as any).cancel_requested_at;
+  if (ours) return { sent: false, why: "Kept made this cancel" };
+  await logEvent(db, { merchantId: m.id, subscriberId: s.id, source: "webhook", type: "cancel.outside_kept", summary: "The member cancelled inside PayPal, not through Kept" });
+  const before = (await db.query("SELECT 1 FROM winbacks WHERE subscriber_id = $1 OR (email IS NOT NULL AND email = $2 AND merchant_id = $3 AND sent_at > now() - interval '365 days')", [s.id, s.subscriber_email ?? null, m.id])).rows.length;
+  if (before) return { sent: false, why: "a win-back was already sent" };
+  const link = `${config.appUrl}/s/${m.slug}?rejoin=1`;
+  const body = `${m.name}: we saw you cancelled your subscription in PayPal. That's done, and nothing more will be charged. If you'd like to come back, it's one tap: ${link}. This is the only message we'll send about it.`;
+  const ins = await db.query("INSERT INTO winbacks (subscriber_id, merchant_id, email, sent_at) VALUES ($1,$2,$3, now()) ON CONFLICT (subscriber_id) DO NOTHING RETURNING subscriber_id", [s.id, m.id, s.subscriber_email ?? null]);
+  if (!ins.rows.length) return { sent: false, why: "a win-back was already sent" };
+  await notifyParty("subscriber", s.id, body, undefined, "subscriber", s.id, db);
+  await logEvent(db, { merchantId: m.id, subscriberId: s.id, source: "system", type: "winback.sent", summary: "One win-back message sent (never a second)", payload: { link } });
+  return { sent: true, why: "sent" };
+}

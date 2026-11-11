@@ -3,6 +3,8 @@
  * pages, MCP and REST already use: no business logic lives here. Owner endpoints use the same signed cookie
  * as /dashboard; member endpoints are keyed by the subscription ref, exactly like /manage/:ref.
  */
+import { voiceSession } from "../ai/voice.js";
+import { NoModelError } from "../ai/provider.js";
 import { Router, Request, Response, NextFunction } from "express";
 import { config } from "../config.js";
 import { getDb } from "../db.js";
@@ -211,6 +213,23 @@ export function uiApi(): Router {
     };
   }));
 
+  // Spec A7: push-to-talk. A two-minute secret for a gpt-live-1 dictation session, for a member page or an owner.
+  r.post("/ui/voice/session", j(async (req, res) => {
+    const ref = typeof req.body?.ref === "string" ? req.body.ref : null;
+    const s = ref ? await subscriberByRef(await getDb(), ref) : null;
+    const owner = s ? null : await ownerOf(req);
+    const merchantId = s?.merchant_id ?? owner?.id ?? null;
+    if (!merchantId) throw new KeptError("Open a member page or your shop first.", "forbidden", 403);
+    await spendAllowance(merchantId, "voice", 40);
+    res.setHeader("cache-control", "no-store");
+    try {
+      return await voiceSession(merchantId);
+    } catch (e) {
+      if (e instanceof NoModelError) throw new KeptError("Voice isn't available right now. Typing works as usual.", "voice_unavailable", 503);
+      throw e;
+    }
+  }));
+
   // Spec B5 differentiator 1: the member's own AI assistant, streamed step by step.
   r.post("/ui/manage/:ref/assistant/stream", async (req, res) => {
     const s = await subscriberByRef(await getDb(), req.params.ref);
@@ -226,7 +245,7 @@ export function uiApi(): Router {
     try {
       await spendAllowance(s.merchant_id);
       const r = await runAssistant(s.ref, msg, (st) => send("step", st));
-      send("answer", { answer: r.answer, sentences: r.sentences, facts: r.facts, model: r.model, runId: r.runId, readBack: r.readBack, toolCalls: r.toolCalls, ms: r.ms });
+      send("answer", { answer: r.answer, sentences: r.sentences, facts: r.facts, model: r.model, runId: r.runId, readBack: r.readBack, toolCalls: r.toolCalls, mandate: r.mandate, ms: r.ms });
     } catch (e) {
       send("failed", { error: e instanceof KeptError ? e.code : "internal_error", message: e instanceof KeptError ? e.message : "The assistant hit a problem and stopped. Check the steps above for anything it changed." });
     }
@@ -327,7 +346,7 @@ export function uiApi(): Router {
       events,
       rules: policy ? { version: policy.version, lines: describeRules(policy.rules), source: policy.source_text } : null,
       plans: all.filter((p) => p.active).map((p) => planJson(p, m.currency)),
-      connections: { buyerMcp: `${config.appUrl}/s/${m.slug}/mcp`, ownerMcp: `${config.appUrl}/owner/mcp`, webhookOk, ai: providerLabel(), telegram: telegramReady() },
+      connections: { widget: `<script src="${config.appUrl}/widget.js" data-shop="${m.slug}" async></script>`, buyerMcp: `${config.appUrl}/s/${m.slug}/mcp`, ownerMcp: `${config.appUrl}/owner/mcp`, webhookOk, ai: providerLabel(), telegram: telegramReady() },
       demoMode: config.demoMode,
     };
   }));

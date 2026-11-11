@@ -85,3 +85,7 @@ export const isWave1Route = (r: string) => WAVE1_ROUTE.test(r);
 /** Wave 2 routes (judge data, public proof pages, streamed Ask and assistant); walked in wave2.test.ts. */
 export const WAVE2_ROUTE = /^(GET|POST) \/(api\/public\/|proof$|ai$|paypal$|who-can-move-money$|accessibility$|ui\/owner\/ask\/stream$|ui\/manage\/:ref\/assistant\/stream$)/;
 export const isWave2Route = (r: string) => WAVE2_ROUTE.test(r);
+
+/** Wave 3 routes (the cancel widget); walked in wave3.test.ts. */
+export const WAVE3_ROUTE = /^(GET \/widget\.js|POST \/ui\/voice\/session)$/;
+export const isWave3Route = (r: string) => WAVE3_ROUTE.test(r);

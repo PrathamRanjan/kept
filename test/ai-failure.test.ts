@@ -31,6 +31,11 @@ function answerFor(schema: string): unknown {
 
 const stub = (async (_url: string, init: RequestInit) => {
   const body = JSON.parse(String(init.body));
+  // The honest exchange at cancel (Decisions): a calm member with no complaint, unless every model is down.
+  if (String(_url).endsWith("/v1/decisions")) {
+    if (mode === "all_down") return new Response('{"error":{"message":"model not available"}}', { status: 400 });
+    return new Response(JSON.stringify({ model: "gpt-6-luna", answers: body.questions.map((q: any) => (q.type === "choice" ? { type: "choice", name: q.name, choice: "too_expensive", probabilities: [], confidence: 0.9 } : { type: "predicate", name: q.name, probability: 0.02 })), usage: { input_tokens: 40 } }), { status: 200 });
+  }
   const schema = body.text.format.name as string;
   const repair = String(body.instructions).startsWith("Return valid JSON");
   seen.push({ model: body.model, schema, repair });
@@ -208,7 +213,7 @@ describe("cancel when the model is down", () => {
     // Reason reading works; the wording call returns a message that breaks the number check.
     const wordingBroken = (async (url: string, init: RequestInit) => {
       const body = JSON.parse(String(init.body));
-      if (body.text.format.name === "offer_message") return reply(body.model, { message: "Take 99% off forever! If you'd rather cancel, say no." });
+      if (body.text?.format?.name === "offer_message") return reply(body.model, { message: "Take 99% off forever! If you'd rather cancel, say no." });
       return (stub as any)(url, init);
     }) as unknown as typeof fetch;
     setProviderFetch(wordingBroken);

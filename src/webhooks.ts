@@ -56,6 +56,7 @@ export async function processWebhook(eventId: string) {
       await svc.handlePaymentFailed(sub.id, "webhook");
     } else {
       const after = await svc.syncSubscription(sub.ref, "webhook");
+      if (event.event_type === "BILLING.SUBSCRIPTION.CANCELLED" && after.status === "CANCELLED") await svc.winBack(sub.id);
       if (event.event_type === "PAYMENT.SALE.COMPLETED" && after.kept_state === "payment_failed" && after.outstanding <= 0) {
         await svc.paymentFixed(after.ref, { kind: "system" });
       }

@@ -10,6 +10,7 @@
  *   GET /api/public/roles          who can move money
  *   GET /api/public/accessibility  what was tested, how, when, and what was not
  */
+import { mandateById } from "../ask/mandate.js";
 import { latestNightly } from "../eval/nightly.js";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
@@ -165,6 +166,7 @@ export function publicRouter(): Router {
         "The member's assistant calling Kept's MCP tools, each call on the rail with PayPal's read-back.",
         "The scam check: three readers, strictest wins, never a green for a message that asks you to pay somewhere.",
         "Fair retention in code: one offer only if asked, no bribe for a quality complaint, rules the law forbids refused with the citation.",
+        "Accessibility: every page works with a keyboard, at 200% text and by voice (push-to-talk on the Ask and assistant boxes). See /accessibility for what was tested.",
       ],
     };
   }));
@@ -261,6 +263,14 @@ export function publicRouter(): Router {
     const wh = (await db.query<{ event_type: string; resource_id: string | null; at: Date }>("SELECT event_type, resource_id, received_at AS at FROM webhook_events WHERE verified AND NOT simulated ORDER BY received_at DESC LIMIT 1")).rows[0];
     out.push({ api: "Webhooks (signature verified)", when: "PayPal tells Kept about renewals, failures and cancels made elsewhere.", last: wh ? new Date(wh.at).toISOString() : null, id: wh ? `${wh.event_type} ${wh.resource_id ?? ""}`.trim() : null, from: wh ? "PayPal" : null });
     return { env: config.paypal.env, apis: out };
+  }));
+
+  // Spec B5 (10): anyone can check a mandate is genuine. The member's reference is never part of the record.
+  r.get("/api/public/mandate/:id", j(async (req, res) => {
+    const m = await mandateById(String(req.params.id));
+    if (!m) return { found: false };
+    const uses = (await (await getDb()).query<{ type: string; summary: string; created_at: Date }>("SELECT type, summary, created_at FROM event_log WHERE payload->>'mandate' = $1 ORDER BY id", [m.mandate.id])).rows;
+    return { found: true, ...m, uses: uses.map((u) => ({ type: u.type, summary: u.summary, at: new Date(u.created_at).toISOString() })) };
   }));
 
   r.get("/api/public/roles", j(async () => ({

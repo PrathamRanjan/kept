@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { config } from "../config.js";
@@ -12,9 +14,10 @@ import { pendingApprovals } from "../guard/dryrun.js";
 import { scoreAll, type Jurisdiction, JURISDICTIONS } from "../policy/compliance.js";
 import { fairness } from "../eval/fairness.js";
 
-type ToolResult = { content: { type: "text"; text: string }[]; isError?: boolean };
+type ToolResult = { content: { type: "text"; text: string }[]; isError?: boolean; structuredContent?: Record<string, unknown> };
 
-const ok = (data: unknown): ToolResult => ({ content: [{ type: "text", text: JSON.stringify(data, null, 2) }] });
+// structuredContent lets a chat client's app view (MCP Apps) read the result without parsing text.
+const ok = (data: unknown): ToolResult => ({ content: [{ type: "text", text: JSON.stringify(data, null, 2) }], ...(data && typeof data === "object" && !Array.isArray(data) ? { structuredContent: data as Record<string, unknown> } : {}) });
 const fail = (e: unknown): ToolResult => {
   const err = e instanceof KeptError ? { error: e.code, message: e.message } : { error: "internal_error", message: (e as Error).message };
   return { content: [{ type: "text", text: JSON.stringify(err, null, 2) }], isError: true };
@@ -84,6 +87,8 @@ async function planList(m: Merchant) {
   return plans.map((p, i) => ({ plan_id: p.id, name: p.name, description: p.description, price: money(p.price), currency: m.currency, billing: intervalWords(p), about_per_month: monthly[i].toFixed(2), cheapest_per_month: monthly[i] === low, lighter_plan: p.kind === "lite" }));
 }
 
+export const STAMP_CARD_URI = "ui://kept/stamp-card.html";
+export const STAMP_CARD_SKYBRIDGE = "ui://kept/stamp-card-chatgpt.html";
 const refArg = z.string().min(6).describe("The subscription_ref returned by start_subscription (also shown on the subscriber's manage page).");
 const keyArg = z.string().max(80).optional().describe("Optional idempotency key. Repeating a call with the same key returns the first result and never acts twice.");
 
@@ -179,9 +184,16 @@ export function buildBuyerServer(fixed: Merchant | null, agentId: string): McpSe
       }),
   );
 
+  // Spec B5 (2): Kept as an app inside ChatGPT and Claude. get_subscription points at a UI resource, the stamp card,
+  // which the chat client renders inline; its buttons call the same tools. Registered under both the MCP Apps
+  // mime type and ChatGPT's Apps SDK one, from one HTML file.
+  const card = readFileSync(join(process.cwd(), "public", "mcp-app", "stamp-card.html"), "utf8");
+  for (const [uri, mimeType] of [[STAMP_CARD_URI, "text/html;profile=mcp-app"], [STAMP_CARD_SKYBRIDGE, "text/html+skybridge"]] as const) {
+    server.registerResource(uri === STAMP_CARD_URI ? "stamp-card" : "stamp-card-chatgpt", uri, { title: "Kept stamp card", description: "The member's subscription with Skip, Pause, Resume and Cancel buttons.", mimeType }, async (u) => ({ contents: [{ uri: u.href, mimeType, text: card, _meta: { ui: { prefersBorder: true, csp: { connectDomains: [], resourceDomains: [] } } } }] }));
+  }
   server.registerTool(
     "get_subscription",
-    { title: "Get subscription status", description: "Current status, plan, next billing time, any open offer or payment notice, and which actions are available. Re-reads PayPal.", inputSchema: { subscription_ref: refArg }, annotations: { readOnlyHint: true } },
+    { title: "Get subscription status", description: "Current status, plan, next billing time, any open offer or payment notice, and which actions are available. Re-reads PayPal. Chat clients that show apps render it as the member's stamp card.", inputSchema: { subscription_ref: refArg }, annotations: { readOnlyHint: true }, _meta: { ui: { resourceUri: STAMP_CARD_URI }, "ui/resourceUri": STAMP_CARD_URI, "openai/outputTemplate": STAMP_CARD_SKYBRIDGE, "openai/widgetAccessible": true, "openai/toolInvocation/invoking": "Reading the subscription", "openai/toolInvocation/invoked": "Subscription read" } },
     async ({ subscription_ref }) =>
       guard("get_subscription", { subscription_ref }, undefined, async () => {
         const s = await shopRef(subscription_ref);

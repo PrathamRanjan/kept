@@ -165,6 +165,21 @@ export async function revise(q: Queryable, m: Merchant, s: Subscriber, target: P
   return { sub: (await subscriberById(q, s.id))!, approveUrl: null, confirmed };
 }
 
+/** Spec B5 (7): refund part of a completed sale. Reads the refund back from PayPal before reporting it done. */
+export async function refundSale(q: Queryable, m: Merchant, s: Subscriber, saleId: string, amount: string, key: string): Promise<{ refundId: string; state: string; readBack: string }> {
+  await record(q, m, s, "paypal.refund.requested", `Refund ${amount} ${m.currency} of sale ${saleId} (the unused part of the cycle)`);
+  try {
+    const pp = paypalFor(m);
+    const out = await pp.refundSale(saleId, amount, m.currency, requestKey("refund", s.id, saleId, key));
+    const back = await pp.getRefund(out.id);
+    await record(q, m, s, "paypal.refund.confirmed", `PayPal shows refund ${back.id} ${back.state} for ${back.amount ?? amount} ${m.currency}`, { refundId: back.id, saleId }, back);
+    return { refundId: back.id, state: back.state, readBack: `refund ${back.id} ${back.state}${back.amount ? ` for ${back.amount}` : ""}` };
+  } catch (e) {
+    await record(q, m, s, "paypal.refund.failed", "PayPal did not complete the refund", undefined, { message: (e as Error).message });
+    wrap(e, "refunding the unused part of the cycle");
+  }
+}
+
 export async function captureOutstanding(q: Queryable, m: Merchant, s: Subscriber, key: string): Promise<{ sub: Subscriber; captured: string | null; note: string }> {
   if (!s.paypal_subscription_id) throw new KeptError("This subscription has not been approved on PayPal yet.", "not_approved", 409);
   const { sub: fresh } = await readBack(q, m, s);

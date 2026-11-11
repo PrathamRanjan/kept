@@ -182,7 +182,7 @@ ${typeof req.query.ok === "string" ? html`<div class="banner good" role="status"
 <form method="post" action="/admin/pool/refill" class="row"><label for="n">How many</label><input id="n" name="n" type="number" min="1" max="25" value="5"><button class="btn primary" type="submit">Create</button></form>
 <form method="post" action="/admin/pool/sync" class="row" style="margin-top:8px"><button class="btn" type="submit">Read the pool back from PayPal</button></form>
 <form method="post" action="/admin/showcase/rebuild" class="row" style="margin-top:8px"><button class="btn" type="submit">Rebuild the showcase now</button></form></div>
-<div class="table-wrap"><table><tr><th>PayPal id</th><th>Status</th><th>Workspace</th><th>Note</th><th>Approve</th></tr>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Table, scrolls sideways"><table><tr><th>PayPal id</th><th>Status</th><th>Workspace</th><th>Note</th><th>Approve</th></tr>
 ${items.map((i) => html`<tr><td><code>${i.paypal_id}</code></td><td>${i.status}</td><td>${i.claimed_by_ws ?? ""}</td><td class="small">${i.note ?? ""}</td><td>${i.status === "awaiting_approval" && i.approve_url ? html`<a href="${i.approve_url}" rel="noopener" target="_blank">Approve on PayPal</a>` : ""}</td></tr>`)}</table></div>
 <p><a href="/admin">Back to admin</a></p>`));
   }));
@@ -228,7 +228,7 @@ ${items.map((i) => html`<tr><td><code>${i.paypal_id}</code></td><td>${i.status}<
 ${typeof req.query.ok === "string" ? html`<div class="banner good" role="status">${req.query.ok}</div>` : ""}
 <p class="muted">${rows.filter((r) => r.kind === "visitor").length} visitor workspaces. Each expires ${IDLE_HOURS} hours after its last visit.</p>
 <form method="post" action="/admin/showcase/rotate-token"><button class="btn" type="submit">Replace the showcase's owner key</button></form>
-<div class="table-wrap"><table><tr><th>Id</th><th>Kind</th><th>Shop</th><th>Real members</th><th>Last seen</th><th>Expires</th><th></th></tr>
+<div class="table-wrap" tabindex="0" role="region" aria-label="Table, scrolls sideways"><table><tr><th>Id</th><th>Kind</th><th>Shop</th><th>Real members</th><th>Last seen</th><th>Expires</th><th></th></tr>
 ${rows.map((w) => html`<tr><td><code>${w.id}</code></td><td>${w.kind}</td><td>${w.slug ?? ""}</td><td>${w.real}</td><td>${new Date(w.last_seen_at).toISOString().slice(0, 16)}</td><td>${w.kind === "visitor" ? new Date(w.expires_at).toISOString().slice(0, 16) : "never"}</td><td>${w.kind === "visitor" ? html`<form method="post" action="/admin/workspaces/${w.id}/expire" class="inline"><button class="btn small" type="submit">Expire now</button></form>` : ""}</td></tr>`)}</table></div>
 <p><a href="/admin">Back to admin</a></p>`));
   }));

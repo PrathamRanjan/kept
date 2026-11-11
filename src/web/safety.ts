@@ -34,7 +34,7 @@ async function requireOwner(req: Request, res: Response): Promise<Merchant | nul
 /** The message the demo button pastes: the fake failed-payment text aimed at a subscriber. */
 export const DEMO_FAKE_FAILED = "Kept Billing: your Morning Roast subscription payment failed and your membership will be cancelled within 24 hours. Pay here to keep it: http://kept-billing-renew.co/pay and re-enter your card details. Reply with the code PayPal texts you to confirm.";
 
-const SCRIPTS = raw(`<script src="https://cdnjs.cloudflare.com/ajax/libs/onnxruntime-web/1.22.0/ort.min.js"></script><script type="module" src="/static/safety.js"></script>`);
+const SCRIPTS = raw(`<script async src="https://cdnjs.cloudflare.com/ajax/libs/onnxruntime-web/1.22.0/ort.min.js"></script><script type="module" src="/static/safety.js"></script>`);
 
 const checkCard = (intro: string, demo: string, prefill = "") => html`<div class="card" id="check"><h2>Check a message</h2><p class="small muted">${intro} The model scores it on this device; the words never leave your browser for the score.</p>
 <form id="scan-form" class="stack"><label for="scan-text" class="sr">Message to check</label><textarea id="scan-text" name="text" rows="6" placeholder="Paste the message here" style="width:100%">${prefill}</textarea>

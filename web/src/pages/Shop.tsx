@@ -157,6 +157,9 @@ export default function Shop() {
             <p className="m-0 text-sm font-medium uppercase tracking-wider text-ink-2">Subscribe</p>
             <h1 className="mt-1 text-4xl font-bold sm:text-5xl">{data.shop.name}</h1>
             {data.shop.tagline && <p className="mt-2 max-w-[60ch] text-lg text-ink-2">{data.shop.tagline}</p>}
+            {new URLSearchParams(location.search).has("rejoin") && (
+              <p role="status" className="mt-4 rounded-lg bg-paid-wash p-3">Welcome back. These are the ordinary prices; pick a plan and PayPal asks you to approve it, the same as the first time.</p>
+            )}
             {data.showcase && (
               <div role="note" className="mt-5 rounded-lg border border-rule bg-stamp-wash p-4">
                 This is the read-only showcase. To subscribe for real on the PayPal sandbox, <a className="font-medium text-stamp underline" href="/demo">start your own private demo shop</a>: its shop page works the same way, on the same plans.

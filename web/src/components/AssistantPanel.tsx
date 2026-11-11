@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Bot } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { VoiceButton } from "@/components/VoiceButton";
 import { ApiError, streamPost } from "@/lib/api";
 import { CitedAnswer, WorkRail, type Fact, type RailStep, type Sentence } from "@/components/WorkRail";
 
@@ -16,7 +17,7 @@ export function AssistantPanel({ memberRef, sample, initial, onChanged }: { memb
   const [msg, setMsg] = useState(initial ?? "");
   const [steps, setSteps] = useState<RailStep[]>([]);
   const [busy, setBusy] = useState(false);
-  const [out, setOut] = useState<{ sentences?: Sentence[]; facts?: Fact[]; text?: string; failed?: boolean; model?: string; ms?: number } | null>(null);
+  const [out, setOut] = useState<{ sentences?: Sentence[]; facts?: Fact[]; text?: string; failed?: boolean; model?: string; ms?: number; mandate?: string } | null>(null);
   const ref = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (initial) {
@@ -35,7 +36,7 @@ export function AssistantPanel({ memberRef, sample, initial, onChanged }: { memb
       let done = false;
       await streamPost(`/ui/manage/${memberRef}/assistant/stream`, { message: msg }, (ev, data) => {
         if (ev === "step") setSteps((x) => [...x, data]);
-        if (ev === "answer") (done = true), setOut({ sentences: data.sentences, facts: data.facts, model: data.model, ms: data.ms });
+        if (ev === "answer") (done = true), setOut({ sentences: data.sentences, facts: data.facts, model: data.model, ms: data.ms, mandate: data.mandate });
         if (ev === "failed") (done = true), setOut({ text: data.message, failed: true });
       });
       if (!done) setOut({ text: "The assistant stopped part way. Check the steps for anything it changed.", failed: true });
@@ -57,6 +58,7 @@ export function AssistantPanel({ memberRef, sample, initial, onChanged }: { memb
       <form onSubmit={send} className="mt-3 flex flex-col gap-2 sm:flex-row">
         <label htmlFor="assistant-msg" className="sr-only">What should the assistant do?</label>
         <Input id="assistant-msg" ref={ref} value={msg} onChange={(e) => setMsg(e.target.value)} placeholder="Pause my coffee for a month" className="h-11 flex-1" maxLength={400} />
+        <VoiceButton onText={(t) => setMsg(t)} memberRef={memberRef} label="Tell the assistant by voice" />
         <Button type="submit" disabled={busy || !msg.trim()}>{busy ? "Working…" : "Send to the assistant"}</Button>
       </form>
       <div className="mt-2 flex flex-wrap gap-2">
@@ -71,6 +73,7 @@ export function AssistantPanel({ memberRef, sample, initial, onChanged }: { memb
               <p className="m-0 text-sm font-semibold">Your assistant</p>
               <div className="mt-1"><CitedAnswer sentences={out.sentences} facts={out.facts ?? []} idPrefix="afact" /></div>
               <p className="mt-2 mb-0 text-xs text-ink-2">By {out.model}{out.ms ? ` in ${(out.ms / 1000).toFixed(1)} s` : ""}. The model chose the tools; Kept's rules and gate decided; PayPal made the change.</p>
+              {out.mandate && <p className="mt-1 mb-0 text-xs text-ink-2">Allowed by signed mandate <a className="font-mono underline" href={`/api/public/mandate/${out.mandate}`} target="_blank" rel="noreferrer">{out.mandate}</a>: its scope came from your words, and code checked it before each change.</p>}
             </div>
           )}
           {out?.failed && <div role="alert" className="rounded-lg border border-rule p-4"><p className="m-0 font-semibold">The assistant stopped</p><p className="mt-1 mb-0">{out.text}</p></div>}

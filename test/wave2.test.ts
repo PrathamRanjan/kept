@@ -176,6 +176,7 @@ describe("item 9: proof, AI, PayPal, roles and accessibility pages", () => {
     expect(pp.apis.length).toBeGreaterThan(4);
     const roles = (await c.get("/api/public/roles")).json;
     expect(JSON.stringify(roles)).toMatch(/No model can call PayPal|cannot/i);
+    expect((await c.get("/api/public/mandate/mdt_none")).json.found).toBe(false);
     const a11y = (await c.get("/api/public/accessibility")).json;
     expect(a11y.checks.length).toBeGreaterThan(0);
     expect(a11y.notTested.length).toBeGreaterThan(0);

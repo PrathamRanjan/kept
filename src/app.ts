@@ -42,6 +42,8 @@ export function createApp() {
     res.setHeader("Permissions-Policy", 'payment=(self "https://www.paypal.com" "https://www.sandbox.paypal.com"), camera=(), geolocation=()');
     next();
   });
+  // Spec B5 (5): the cancel widget any shop can embed. Cross-origin by design; it reads nothing and sets nothing.
+  app.get("/widget.js", (_req, res) => res.set({ "content-type": "text/javascript; charset=utf-8", "cache-control": "public, max-age=300", "cross-origin-resource-policy": "cross-origin", "access-control-allow-origin": "*" }).sendFile(join(root, "public", "widget.js")));
   app.use("/static", express.static(join(root, "public"), { maxAge: 0, setHeaders: (res, file) => { if (/[\\/]safety[\\/]/.test(file)) res.setHeader("Cache-Control", "public, max-age=86400"); } }));
 
   // Server timing on every API and page response, so slow first paint can be measured from the browser.

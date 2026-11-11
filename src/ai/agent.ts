@@ -108,6 +108,8 @@ export async function runAgent(opts: {
   model?: string;
   onStep?: (s: RailStep) => void;
   q?: Queryable;
+  /** Steps code took before the model started (the member assistant's mandate), shown first on the rail. */
+  pre?: Omit<RailStep, "n">[];
 }): Promise<AgentResult> {
   if (!hasOpenAI()) throw new NoModelError("AI_PROVIDER is not openai or OPENAI_API_KEY is unset");
   const db = opts.q ?? (await getDb());
@@ -129,6 +131,7 @@ export async function runAgent(opts: {
     facts.push(f);
     return f;
   };
+  for (const p of opts.pre ?? []) emit(p);
   const tools = opts.tools.map((t) => ({ type: "function", name: t.name, description: t.description, parameters: t.parameters, strict: true }));
   const input: any[] = [{ role: "user", content: [{ type: "input_text", text: opts.question.slice(0, 600) }] }];
   let tokensIn = 0;

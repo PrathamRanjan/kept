@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kept stamp card</title>
+<style>
+  :root { color-scheme: light dark; --ink: #1f2a24; --ink2: #56615a; --paper: #fbf8f1; --rule: #d9d2c3; --stamp: #9b3d23; --paid: #2f6b46; }
+  @media (prefers-color-scheme: dark) { :root { --ink: #efe9dc; --ink2: #b9b2a4; --paper: #1b1f1c; --rule: #3a403b; --stamp: #e08a6c; --paid: #7cc49a; } }
+  body { margin: 0; font: 16px/1.45 system-ui, sans-serif; color: var(--ink); background: var(--paper); }
+  .card { border: 1px solid var(--rule); border-radius: 14px; padding: 16px; margin: 8px; }
+  h1 { font-size: 18px; margin: 0; }
+  .muted { color: var(--ink2); font-size: 14px; margin: 4px 0 0; }
+  .stamps { display: flex; gap: 8px; margin: 14px 0; flex-wrap: wrap; }
+  .stamp { width: 40px; height: 40px; border-radius: 50%; border: 2px dashed var(--rule); display: grid; place-items: center; font-size: 12px; }
+  .stamp.on { border: 2px solid var(--stamp); color: var(--stamp); font-weight: 700; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  button, a.btn { min-height: 44px; padding: 8px 14px; border-radius: 10px; border: 1px solid var(--ink); background: transparent; color: var(--ink); font: inherit; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; }
+  button.primary { background: var(--ink); color: var(--paper); }
+  button:disabled { opacity: .5; cursor: default; }
+  .status { margin-top: 10px; min-height: 1.4em; }
+  .ok { color: var(--paid); }
+</style>
+</head>
+<body>
+<main class="card" aria-labelledby="t">
+  <h1 id="t">Your subscription</h1>
+  <p class="muted" id="sub">Waiting for the subscription…</p>
+  <div class="stamps" id="stamps" aria-hidden="true"></div>
+  <div class="row" id="acts"></div>
+  <p class="status" id="status" role="status" aria-live="polite"></p>
+  <p class="muted">Kept: cancelling always works in one step. Changes go through the shop's rules, and PayPal is read back after each one.</p>
+</main>
+<script>
+/*
+ * Spec B5 differentiator 2: Kept as an app inside a chat client (MCP Apps). The host renders this page for the
+ * get_subscription tool and hands it the tool's result. Buttons call the same MCP tools an assistant would; the
+ * host shows each call. Works with the MCP Apps bridge (JSON-RPC over postMessage) and with ChatGPT's window.openai.
+ */
+(function () {
+  var data = null, nextId = 1, pending = {};
+  var $ = function (id) { return document.getElementById(id); };
+  function rpc(method, params) {
+    return new Promise(function (resolve, reject) {
+      var id = nextId++;
+      pending[id] = { resolve: resolve, reject: reject };
+      window.parent.postMessage({ jsonrpc: "2.0", id: id, method: method, params: params }, "*");
+      setTimeout(function () { if (pending[id]) { delete pending[id]; reject(new Error("The chat app did not answer.")); } }, 30000);
+    });
+  }
+  function parse(result) {
+    if (!result) return null;
+    if (result.structuredContent) return result.structuredContent;
+    var t = result.content && result.content[0] && result.content[0].text;
+    try { return t ? JSON.parse(t) : null; } catch (e) { return null; }
+  }
+  function call(name, args) {
+    if (window.openai && window.openai.callTool) return window.openai.callTool(name, args).then(function (r) { return parse(r) || r; });
+    return rpc("tools/call", { name: name, arguments: args }).then(parse);
+  }
+  function say(t, good) { var s = $("status"); s.textContent = t; s.className = "status" + (good ? " ok" : ""); }
+  function act(label, name, args, confirmText) {
+    var b = document.createElement("button");
+    b.type = "button"; b.textContent = label;
+    if (name === "cancel_subscription") b.className = "";
+    b.onclick = function () {
+      if (confirmText && !window.confirm(confirmText)) return;
+      [].forEach.call(document.querySelectorAll("button"), function (x) { x.disabled = true; });
+      say("Working…");
+      var a = Object.assign({ subscription_ref: data.subscription_ref, idempotency_key: "app-" + Date.now() }, args || {});
+      call(name, a).then(function (out) {
+        if (out && out.error) { say(out.message || "Not allowed."); return refresh(); }
+        say((out && (out.note || out.message)) || "Done.", true);
+        return refresh();
+      }).catch(function (e) { say(e.message); refresh(); });
+    };
+    return b;
+  }
+  function refresh() { return call("get_subscription", { subscription_ref: data.subscription_ref }).then(function (v) { if (v && v.subscription_ref) render(v); }).catch(function () {}); }
+  function render(v) {
+    data = v;
+    $("t").textContent = (v.shop || "Your") + " subscription";
+    var plan = v.plan ? v.plan.name + ", " + v.plan.price + " " + v.plan.currency + " " + v.plan.billing : "no plan";
+    var when = v.status === "SUSPENDED" && v.resumes_at ? "paused until " + v.resumes_at.slice(0, 10) : v.next_billing_time ? "next payment " + v.next_billing_time.slice(0, 10) : "";
+    $("sub").textContent = v.status.toLowerCase() + " · " + plan + (when ? " · " + when : "");
+    var st = $("stamps"); st.innerHTML = "";
+    var n = v.paid_cycles || 0;
+    for (var i = 0; i < 6; i++) { var d = document.createElement("span"); d.className = "stamp" + (i < n ? " on" : ""); d.textContent = i < n ? "✓" : ""; st.appendChild(d); }
+    var acts = $("acts"); acts.innerHTML = "";
+    var can = v.available_actions || [];
+    if (can.indexOf("skip_next") >= 0) acts.appendChild(act("Skip next", "skip_next"));
+    if (can.indexOf("pause") >= 0) acts.appendChild(act("Pause a cycle", "pause", { cycles: 1 }));
+    if (can.indexOf("resume") >= 0) acts.appendChild(act("Resume", "resume"));
+    if (can.indexOf("switch_plan") >= 0 && v.manage_url) { var a = document.createElement("a"); a.className = "btn"; a.href = v.manage_url; a.target = "_blank"; a.rel = "noopener"; a.textContent = "Switch plan"; acts.appendChild(a); }
+    if (can.indexOf("cancel_subscription") >= 0) acts.appendChild(act("Cancel", "cancel_subscription", { hear_offer: false }, "Cancel this subscription now? It is done in one step, with no offer."));
+    if (v.approval_url) { var p = document.createElement("a"); p.className = "btn"; p.href = v.approval_url; p.target = "_blank"; p.rel = "noopener"; p.textContent = "Approve on PayPal"; acts.appendChild(p); }
+    if (!can.length) say(v.status === "CANCELLED" ? "Cancelled. Nothing more will be charged." : "No changes are available right now.");
+  }
+  window.addEventListener("message", function (e) {
+    var m = e.data || {};
+    if (m.jsonrpc !== "2.0") return;
+    if (m.id && pending[m.id]) { var p = pending[m.id]; delete pending[m.id]; m.error ? p.reject(new Error(m.error.message || "error")) : p.resolve(m.result); return; }
+    if (m.method === "ui/notifications/tool-result") { var v = parse(m.params); if (v && v.subscription_ref) render(v); }
+  });
+  if (window.openai && window.openai.toolOutput) render(window.openai.toolOutput);
+  else rpc("ui/initialize", { appInfo: { name: "kept-stamp-card", version: "1.0.0" }, appCapabilities: {}, protocolVersion: "2025-06-18" }).then(function () { window.parent.postMessage({ jsonrpc: "2.0", method: "ui/notifications/initialized", params: {} }, "*"); }).catch(function () {});
+})();
+</script>
+</body>
+</html>

@@ -261,7 +261,8 @@ export function webRouter(): Router {
         <div class="card"><h3>What Kept understood</h3><ul>${p.understood.map((u) => html`<li>${u}</li>`)}</ul></div>
         <div class="card"><h3>What subscribers and agents will be told</h3><ul>${p.description.map((u) => html`<li>${u}</li>`)}</ul></div>
       </div>
-      <div class="card"><h3>Exact rules to approve</h3><div class="codebox">${JSON.stringify(p.value, null, 2)}</div>
+      <div class="card"><h3>What this loosens</h3><p class="muted small">Worked out by code against ${p.comparedTo}, not by the model.</p>${p.loosens.length ? html`<ul>${p.loosens.map((u) => html`<li>${u}</li>`)}</ul>` : html`<p>Nothing: these rules give members nothing they don't already get.</p>`}</div>
+      <div class="card"><h3>Exact rules to approve</h3><div class="codebox" tabindex="0" role="region" aria-label="Code, scrolls sideways">${JSON.stringify(p.value, null, 2)}</div>
         <form method="post" action="/onboard/rules/approve" style="margin-top:12px">
           <input type="hidden" name="rules" value="${JSON.stringify(p.value)}"><input type="hidden" name="text" value="${text}"><input type="hidden" name="notes" value="${JSON.stringify(p.understood)}">
           <div class="row"><button class="btn primary" type="submit" ${p.valid ? "" : "disabled"}>Approve these rules</button><a class="btn" href="/onboard/rules">Edit</a></div>
@@ -287,7 +288,7 @@ export function webRouter(): Router {
       <h1>${m.name} is ready</h1>${flash(req)}
       <div class="grid g2">
         <div class="card"><h2>Share with people</h2><p>Your shop page: <a href="/s/${m.slug}">${config.appUrl}/s/${m.slug}</a></p></div>
-        <div class="card"><h2>Share with AI agents</h2><p>Your agent endpoint (MCP):</p><div class="codebox">${config.appUrl}/s/${m.slug}/mcp</div><p style="margin-top:8px"><a href="/agents">How agents connect →</a></p></div>
+        <div class="card"><h2>Share with AI agents</h2><p>Your agent endpoint (MCP):</p><div class="codebox" tabindex="0" role="region" aria-label="Code, scrolls sideways">${config.appUrl}/s/${m.slug}/mcp</div><p style="margin-top:8px"><a href="/agents">How agents connect →</a></p></div>
       </div>
       <p style="margin-top:16px"><a class="btn primary" href="/dashboard">Go to your dashboard</a></p>`));
   }));
@@ -369,8 +370,8 @@ export function webRouter(): Router {
 
       <div class="card"><h2>Connections</h2>
         <div class="grid g2">
-          <div><h3>Buyer agents</h3><div class="codebox">${config.appUrl}/s/${m.slug}/mcp</div><h3 style="margin-top:12px">Your own agent (read-only)</h3><div class="codebox">${config.appUrl}/owner/mcp\nAuthorization: Bearer &lt;owner key&gt;</div>
-            <details style="margin-top:8px"><summary>Show owner key</summary><div class="codebox">${m.owner_token}</div></details></div>
+          <div><h3>Buyer agents</h3><div class="codebox" tabindex="0" role="region" aria-label="Code, scrolls sideways">${config.appUrl}/s/${m.slug}/mcp</div><h3 style="margin-top:12px">Your own agent (read-only)</h3><div class="codebox" tabindex="0" role="region" aria-label="Code, scrolls sideways">${config.appUrl}/owner/mcp\nAuthorization: Bearer &lt;owner key&gt;</div>
+            <details style="margin-top:8px"><summary>Show owner key</summary><div class="codebox" tabindex="0" role="region" aria-label="Code, scrolls sideways">${m.owner_token}</div></details></div>
           <div><h3>PayPal webhooks</h3>${webhookOk ? html`<p><span class="pill good">configured</span> Events are signature-verified with PayPal before Kept acts on them.</p>` : html`<p><span class="pill warn">not registered</span> Kept still reconciles by reading PayPal, but webhooks make changes instant. Webhooks need a public HTTPS URL (for example on Render).</p>`}
             <form method="post" action="/dashboard/webhook" class="inline"><button class="btn" type="submit" ${config.appUrl.startsWith("https://") ? "" : "disabled"}>Register webhook for ${config.appUrl}</button></form>
             <p class="muted" style="margin-top:8px">PayPal environment: ${m.paypal_env}. Product: <code>${m.paypal_product_id ?? "not created yet"}</code></p></div>
@@ -476,7 +477,7 @@ export function webRouter(): Router {
       ${plans.length ? "" : html`<div class="empty">This shop hasn't published plans yet.</div>`}
       <div class="grid g2">
         <div class="card"><h2>Our promise</h2><ul>${(policy ? describeRules(policy.rules) : ["Cancelling always works in one step."]).map((d) => html`<li>${d}</li>`)}</ul></div>
-        <div class="card"><h2>Use an AI assistant?</h2><p class="small">It can subscribe and manage this subscription for you through our agent endpoint (MCP):</p><div class="codebox">${config.appUrl}/s/${m.slug}/mcp</div><p class="small" style="margin-top:8px"><a href="/s/${m.slug}/llms.txt">llms.txt</a> · <a href="/agents">setup guide</a></p></div>
+        <div class="card"><h2>Use an AI assistant?</h2><p class="small">It can subscribe and manage this subscription for you through our agent endpoint (MCP):</p><div class="codebox" tabindex="0" role="region" aria-label="Code, scrolls sideways">${config.appUrl}/s/${m.slug}/mcp</div><p class="small" style="margin-top:8px"><a href="/s/${m.slug}/llms.txt">llms.txt</a> · <a href="/agents">setup guide</a></p></div>
       </div>`));
   }));
 
@@ -571,7 +572,7 @@ export function webRouter(): Router {
           <label class="check"><input type="checkbox" name="hear_offer" value="1"> Show me one offer before cancelling (optional)</label>
           <button class="btn danger" type="submit" style="margin-top:10px">Cancel subscription</button></form></details>`
         : v.status === "CANCELLED" ? html`<div class="card"><h2>Changed your mind?</h2><p class="muted">You can subscribe again on <a href="/s/${m.slug}">${m.name}'s page</a> whenever you like.</p></div>` : ""}
-      <details class="card"><summary><b>Let your AI assistant manage this</b> <span class="muted small">for Claude or any MCP client</span></summary><p class="small">Give your assistant this reference and the shop's endpoint:</p><div class="codebox">subscription_ref: ${s.ref}\nendpoint: ${config.appUrl}/s/${m.slug}/mcp</div></details>`));
+      <details class="card"><summary><b>Let your AI assistant manage this</b> <span class="muted small">for Claude or any MCP client</span></summary><p class="small">Give your assistant this reference and the shop's endpoint:</p><div class="codebox" tabindex="0" role="region" aria-label="Code, scrolls sideways">subscription_ref: ${s.ref}\nendpoint: ${config.appUrl}/s/${m.slug}/mcp</div></details>`));
   }));
 
   const manageAction = (path: string, fn: (ref: string, body: any) => Promise<string>) =>
@@ -620,9 +621,15 @@ export function webRouter(): Router {
     res.send(layout({ title: "Connect an AI agent · Kept", nav: "agents", owner: ownerNav(await ownerOf(req)) }, html`
       <h1>Connect an AI agent</h1><p class="lead muted">Kept speaks the Model Context Protocol (Streamable HTTP, stateless). Any MCP client can subscribe and manage subscriptions for its user.</p>
       <div class="grid g2">
-        <div class="card"><h2>Endpoints</h2><p>All shops (directory):</p><div class="codebox">${config.appUrl}/mcp</div><p style="margin-top:10px">One shop:</p><div class="codebox">${config.appUrl}/s/${ex}/mcp</div><p style="margin-top:10px">Send an <code>X-Agent-Id</code> header so shops can see which agent acted.</p></div>
-        <div class="card"><h2>Claude Code</h2><div class="codebox">claude mcp add --transport http kept ${config.appUrl}/mcp</div><h2 style="margin-top:14px">Claude Desktop</h2><p>Settings → Connectors → Add custom connector, with the URL above. Or in <code>claude_desktop_config.json</code>:</p><div class="codebox">${JSON.stringify({ mcpServers: { kept: { command: "npx", args: ["-y", "mcp-remote", `${config.appUrl}/mcp`] } } }, null, 2)}</div></div>
+        <div class="card"><h2>Endpoints</h2><p>All shops (directory):</p><div class="codebox" tabindex="0" role="region" aria-label="Code, scrolls sideways">${config.appUrl}/mcp</div><p style="margin-top:10px">One shop:</p><div class="codebox" tabindex="0" role="region" aria-label="Code, scrolls sideways">${config.appUrl}/s/${ex}/mcp</div><p style="margin-top:10px">Send an <code>X-Agent-Id</code> header so shops can see which agent acted.</p></div>
+        <div class="card"><h2>Claude Code</h2><div class="codebox" tabindex="0" role="region" aria-label="Code, scrolls sideways">claude mcp add --transport http kept ${config.appUrl}/mcp</div><h2 style="margin-top:14px">Claude Desktop</h2><p>Settings → Connectors → Add custom connector, with the URL above. Or in <code>claude_desktop_config.json</code>:</p><div class="codebox" tabindex="0" role="region" aria-label="Code, scrolls sideways">${JSON.stringify({ mcpServers: { kept: { command: "npx", args: ["-y", "mcp-remote", `${config.appUrl}/mcp`] } } }, null, 2)}</div></div>
       </div>
+      <div class="card"><h2>Kept as an app inside ChatGPT or Claude</h2>
+        <p><code>get_subscription</code> comes with a small app view: the member's stamp card, with Skip, Pause, Resume and Cancel buttons that call the same tools. Chat clients that support MCP Apps show it in the conversation; others get the plain result. Where PayPal needs approval, the card shows a PayPal link.</p>
+        <ol><li><b>ChatGPT:</b> Settings → Apps and connectors → Advanced → turn on developer mode, then Create, with the URL <code>${config.appUrl}/s/${ex}/mcp</code> and no authentication. Ask: "show my subscription ref_…".</li>
+        <li><b>Claude:</b> Settings → Connectors → Add custom connector, with the same URL.</li></ol>
+        <p class="muted small">Tested here by listing the resource and calling the tool through an MCP client. It has not been tried inside ChatGPT or Claude yet: that needs the shop owner's account with developer mode on.</p></div>
+      <div class="card"><h2>Cancel widget for your own site</h2><p>One script tag puts a "Manage or cancel my subscription" button on any page. It opens the member's Kept page; it reads nothing from your page and sets no cookies.</p><div class="codebox" tabindex="0" role="region" aria-label="Code, scrolls sideways">&lt;script src="${config.appUrl}/widget.js" data-shop="${ex}" async&gt;&lt;/script&gt;</div><p class="muted small">Add <code>data-ref="ref_…"</code> on a signed-in account page so the button opens that member directly.</p></div>
       <div class="card"><h2>Tools</h2><table><tr><th>Tool</th><th>What it does</th></tr>
         ${[
           ["find_shops", "Search shops; returns plans and each shop's MCP URL (directory endpoint only)."],

@@ -84,6 +84,9 @@ export default function Landing() {
                 </Link>
               </Button>
             </div>
+            <p className="mt-4 text-sm text-ink-2">
+              Works with a screen reader, at 200% text, and by voice. <Link to="/accessibility" className="underline">What was tested, and what wasn't</Link>.
+            </p>
           </div>
 
           {/* The signature: a member's stamp card, from the demo shop's real data. */}

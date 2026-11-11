@@ -1,4 +1,4 @@
-import { DEFAULT_RULES, Rules } from "../policy/rules.js";
+import { DEFAULT_RULES, refundCapFrom, Rules } from "../policy/rules.js";
 import { FORBIDDEN_PHRASES } from "../policy/compliance.js";
 import type { EligibleOffer } from "../policy/eligibility.js";
 import type { IntervalUnit } from "../paypal/types.js";
@@ -220,6 +220,12 @@ export class LocalBrain implements Brain {
     } else if (/\b(no|without|skip)\s+(renewal\s+)?reminders?\b/.test(t)) {
       r.renewalReminderDays = 0;
       understood.push("No renewal reminders (allowed only while no plan bills yearly or longer).");
+    }
+    // Refund of the unused part on cancel: "refund the unused part of the month on cancel, up to $10"
+    const refCap = refundCapFrom(t);
+    if (refCap !== null && refCap > 0) {
+      r.refundUnused = { enabled: true, maxAmount: refCap };
+      understood.push(`On cancel, refund the unused part of the current cycle, up to ${r.refundUnused.maxAmount.toFixed(2)}.`);
     }
     // Jurisdiction: "my customers are in California", "New York law", "we sell in the EU"
     const jur: [RegExp, Rules["jurisdiction"]][] = [[/\bcalifornia\b|\bca law\b/, "US_CA"], [/\bcolorado\b/, "US_CO"], [/\bnew york\b|\bny law\b/, "US_NY"], [/\b(eu|european union|europe)\b/, "EU"], [/\b(uk|united kingdom|britain)\b/, "UK"]];

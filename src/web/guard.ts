@@ -81,7 +81,7 @@ export function guardRouter(): Router {
       try {
         const p = await svc.previewRules(req.query.text, m.id);
         candidate = p.valid ? (validateRules(p.value).rules as Rules) : null;
-        draftNotes = [...p.understood, ...p.warnings.map((w) => `Not used: ${w}`), `Drafted by: ${p.brain}`];
+        draftNotes = [...p.understood, ...p.warnings.map((w) => `Not used: ${w}`), ...(p.valid ? (p.loosens.length ? p.loosens.map((l) => `Loosens (worked out by code): ${l}`) : ["Loosens nothing compared with your approved rules (worked out by code)."]) : []), `Drafted by: ${p.brain}`];
       } catch (e) {
         if (!(e instanceof KeptError)) throw e;
         candidate = null;
@@ -124,7 +124,7 @@ export function guardRouter(): Router {
             <div class="tile"><div class="label">No offer</div><div class="big">${bt.deny}</div><div class="hint">${bt.cancels_without_offer} never asked; ${bt.compliance_blocked} blocked by a compliance rule</div></div>
             <div class="tile"><div class="label">Real requests replayed</div><div class="big">${bt.cases}</div><div class="hint">this shop's last 90 days</div></div>
           </div>
-          <details><summary>Every case</summary><div class="table-wrap"><table class="evalgrid"><tr><th>Date</th><th>Subscriber</th><th>Reason</th><th>Outcome</th><th>Offer</th><th>Kept</th><th>Why</th></tr>${bt.rows.map((x) => html`<tr><td>${x.at}</td><td>${x.subscriber}</td><td>${x.reason || "—"} <small class="muted">${x.category}</small></td><td><span class="pill ${x.outcome}">${x.outcome}</span></td><td>${x.offer ?? "—"}</td><td>${x.kept_usd ? fmtMoney(x.kept_usd, m.currency) : "—"}</td><td class="small">${x.note}</td></tr>`)}</table></div></details>
+          <details><summary>Every case</summary><div class="table-wrap" tabindex="0" role="region" aria-label="Table, scrolls sideways"><table class="evalgrid"><tr><th>Date</th><th>Subscriber</th><th>Reason</th><th>Outcome</th><th>Offer</th><th>Kept</th><th>Why</th></tr>${bt.rows.map((x) => html`<tr><td>${x.at}</td><td>${x.subscriber}</td><td>${x.reason || "—"} <small class="muted">${x.category}</small></td><td><span class="pill ${x.outcome}">${x.outcome}</span></td><td>${x.offer ?? "—"}</td><td>${x.kept_usd ? fmtMoney(x.kept_usd, m.currency) : "—"}</td><td class="small">${x.note}</td></tr>`)}</table></div></details>
           ${candidate && typeof req.query.text === "string" ? html`<form method="post" action="/dashboard/guard/adopt" class="row" style="margin-top:10px"><input type="hidden" name="text" value="${req.query.text}"><input type="hidden" name="pct" value="${pct}"><input type="hidden" name="cycles" value="${cycles}"><button class="btn primary" type="submit">Adopt these rules and limits</button></form>` : html`<form method="post" action="/dashboard/guard/limits" class="row" style="margin-top:10px"><input type="hidden" name="pct" value="${pct}"><input type="hidden" name="cycles" value="${cycles}"><button class="btn" type="submit">Save these autonomy limits</button></form>`}
         ` : ""}
       </div>
@@ -156,7 +156,7 @@ export function guardRouter(): Router {
       </div>
 
       <div class="card"><h2>History (${hist.length} real cancellation requests)</h2><p class="sub">What the backtest replays: every member of this shop who asked to cancel in the last 90 days. ${hist.length ? "" : "None yet; the backtest fills in as members use the shop."}</p>
-        <details><summary>Show</summary><div class="table-wrap"><table class="evalgrid"><tr><th>Date</th><th>Reason</th><th>Category</th><th>Heard an offer</th><th>Accepted</th></tr>${hist.map((h) => html`<tr><td>${h.at.toISOString().slice(0, 10)}</td><td>${h.reason || "—"}</td><td>${h.category}</td><td>${h.heard_offer ? "yes" : "no"}</td><td>${h.accepted_type ?? "—"}</td></tr>`)}</table></div></details>
+        <details><summary>Show</summary><div class="table-wrap" tabindex="0" role="region" aria-label="Table, scrolls sideways"><table class="evalgrid"><tr><th>Date</th><th>Reason</th><th>Category</th><th>Heard an offer</th><th>Accepted</th></tr>${hist.map((h) => html`<tr><td>${h.at.toISOString().slice(0, 10)}</td><td>${h.reason || "—"}</td><td>${h.category}</td><td>${h.heard_offer ? "yes" : "no"}</td><td>${h.accepted_type ?? "—"}</td></tr>`)}</table></div></details>
       </div>
     `));
   }));

@@ -93,6 +93,7 @@ export interface PayPalApi {
   captureOutstanding(id: string, amount: string, currency: string, note: string, requestId: string): Promise<{ status?: string; id?: string }>;
   listSubscriptionTransactions(id: string, startIso: string, endIso: string): Promise<PayPalTransaction[]>;
   refundSale(saleId: string, amount: string, currency: string, requestId: string): Promise<{ id: string; state: string }>;
+  getRefund(refundId: string): Promise<{ id: string; state: string; amount?: string }>;
   createWebhook(url: string, eventTypes: string[]): Promise<{ id: string }>;
   listWebhooks(): Promise<{ id: string; url: string; event_types: { name: string }[] }[]>;
   verifyWebhookSignature(headers: Record<string, string | undefined>, body: unknown, webhookId: string): Promise<boolean>;

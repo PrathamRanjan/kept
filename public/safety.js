@@ -15,7 +15,9 @@ const LEVEL = { hold: ["bad", "Hold: do not pay yet"], caution: ["warn", "Cautio
 let guardPromise = null;
 function guard() {
   if (!guardPromise) {
-    if (!window.ort) return Promise.reject(new Error("onnxruntime-web did not load"));
+    // The runtime loads from the CDN in parallel (async) so a slow CDN never leaves the check button dead; wait for
+    // it here, a little, and if it never comes the server's checks still run and the page says the model did not load.
+    if (!window.ort) return new Promise((ok, bad) => { let n = 0; const t = setInterval(() => { if (window.ort) { clearInterval(t); guardPromise = null; guard().then(ok, bad); } else if (++n > 50) { clearInterval(t); guardPromise = null; bad(new Error("onnxruntime-web did not load")); } }, 200); });
     window.ort.env.wasm.wasmPaths = "https://cdnjs.cloudflare.com/ajax/libs/onnxruntime-web/1.22.0/";
     guardPromise = loadGuard({ modelUrl: "/static/safety/model/model_quantized.onnx", tokenizerUrl: "/static/safety/model/tokenizer.json", headsUrl: "/static/safety/model/heads.json", ort: window.ort });
   }

@@ -219,6 +219,11 @@ export class PayPalClient implements PayPalApi {
     return data;
   }
 
+  async getRefund(refundId: string) {
+    const { data } = await this.call<{ id: string; state: string; amount?: { total: string } }>("GET", `/v1/payments/refund/${encodeURIComponent(refundId)}`);
+    return { id: data.id, state: data.state, amount: data.amount?.total };
+  }
+
   async createWebhook(url: string, eventTypes: string[]) {
     const { data } = await this.call<{ id: string }>("POST", "/v1/notifications/webhooks", {
       url,

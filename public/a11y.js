@@ -72,7 +72,14 @@
         const r = new SR(); r.lang = document.documentElement.lang || "en"; r.interimResults = false;
         if ("processLocally" in r) { try { r.processLocally = true; } catch (_) {} }
         m.setAttribute("aria-pressed", "true"); announce(("processLocally" in r) ? "Listening, on this device" : "Listening, using the browser's speech service");
-        r.onresult = (e) => { const t = e.results[0][0].transcript; el.value = (el.value ? el.value + " " : "") + t; el.dispatchEvent(new Event("input", { bubbles: true })); announce("Heard: " + t); };
+        r.onresult = (e) => {
+          const t = e.results[0][0].transcript;
+          // The native setter, so React-controlled boxes see the change too.
+          const proto = el.tagName === "TEXTAREA" ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+          Object.getOwnPropertyDescriptor(proto, "value").set.call(el, (el.value ? el.value + " " : "") + t);
+          el.dispatchEvent(new Event("input", { bubbles: true }));
+          announce("Heard: " + t);
+        };
         r.onend = () => m.setAttribute("aria-pressed", "false"); r.onerror = () => { m.setAttribute("aria-pressed", "false"); announce("Could not hear you. You can type instead."); };
         r.start();
       });
@@ -85,11 +92,12 @@
     if (document.getElementById("a11y-panel")) { document.getElementById("a11y-panel").remove(); return; }
     const d = document.createElement("div"); d.id = "a11y-panel"; d.className = "a11y-panel"; d.setAttribute("role", "dialog"); d.setAttribute("aria-label", "Display and help");
     const seg = (name, opts, cur) => `<div class="seg" role="group" aria-label="${name}">${opts.map(([v, l]) => `<button type="button" class="btn small" data-set="${name}" data-val="${v}" aria-pressed="${String(cur) === String(v)}">${l}</button>`).join("")}</div>`;
-    const tog = (name, label, hint) => `<label class="tog"><input type="checkbox" data-tog="${name}" ${p[name] === true ? "checked" : ""}><span>${label}${hint ? `<br><span class="small muted">${hint}</span>` : ""}</span></label>`;
-    d.innerHTML = `<div class="spread"><h2>Display and help</h2><button type="button" class="btn small" id="a11y-close" aria-label="Close">Close</button></div><p class="sub small muted">Changes apply at once and stay on this device.</p>
+    // Each switch is named by its visible title and described by its hint (spec A7: names for controls).
+    const tog = (name, label, hint) => `<label class="tog"><input type="checkbox" role="switch" data-tog="${name}" aria-labelledby="tog-${name}-t"${hint ? ` aria-describedby="tog-${name}-d"` : ""} ${p[name] === true ? "checked" : ""}><span><span id="tog-${name}-t">${label}</span>${hint ? `<br><span class="small muted" id="tog-${name}-d">${hint}</span>` : ""}</span></label>`;
+    d.innerHTML = `<div class="spread"><h2>Display and help</h2><button type="button" class="btn small" id="a11y-close" aria-label="Close display and help">Close</button></div><p class="sub small muted">Changes apply at once and stay on this device.</p>
 <fieldset><legend>Text size</legend>${seg("textScale", [[1, "A"], [1.25, "A+"], [1.5, "A++"], [2, "A+++"]], p.textScale)}</fieldset>
 <fieldset><legend>Contrast and font</legend>${seg("contrast", [["default", "Normal"], ["high", "High contrast"]], p.contrast)}<div style="height:6px"></div>${seg("font", [["default", "Default font"], ["hyperlegible", "Clearer font"]], p.font)}</fieldset>
-<fieldset><legend>Help</legend>${tog("readAloud", "Read pages aloud", "A button reads the page; payment updates are spoken.")}${tog("voiceInput", "Speak instead of typing", "A microphone appears beside text boxes.")}${tog("simpleWords", "Plain words", "Shorter sentences for the important messages.")}${tog("bigTargets", "Bigger buttons", "44 px targets and more space.")}${tog("extraTime", "More time", "No auto-refresh, no countdowns.")}<label class="tog"><input type="checkbox" data-tog="reducedMotion" ${p.reducedMotion === true ? "checked" : ""}><span>Stop all motion</span></label></fieldset>
+<fieldset><legend>Help</legend>${tog("readAloud", "Read pages aloud", "A button reads the page; payment updates are spoken.")}${tog("voiceInput", "Speak instead of typing", "A microphone appears beside text boxes.")}${tog("simpleWords", "Plain words", "Shorter sentences for the important messages.")}${tog("bigTargets", "Bigger buttons", "44 px targets and more space.")}${tog("extraTime", "More time", "No auto-refresh, no countdowns.")}${tog("reducedMotion", "Stop all motion", "")}</fieldset>
 <div class="row" style="margin:4px 0 10px"><button type="button" class="btn small" id="a11y-reset">Reset to default</button></div>
 <p class="small muted">Head-movement pointer and voice chat are listed in the project roadmap; this app offers keyboard, voice input and read-aloud today.</p>`;
     d.addEventListener("click", (e) => {
@@ -98,7 +106,7 @@
       d.querySelectorAll(`[data-set="${b.dataset.set}"]`).forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
       announce(`${b.dataset.set} set to ${b.textContent}`);
     });
-    d.addEventListener("change", (e) => { const c = e.target.closest("[data-tog]"); if (!c) return; p[c.dataset.tog] = c.checked; save(); apply(); announce(`${c.parentElement.textContent.trim().split("\n")[0]} ${c.checked ? "on" : "off"}`); });
+    d.addEventListener("change", (e) => { const c = e.target.closest("[data-tog]"); if (!c) return; p[c.dataset.tog] = c.checked; save(); apply(); announce(`${document.getElementById(c.getAttribute("aria-labelledby"))?.textContent ?? "Setting"} ${c.checked ? "on" : "off"}`); });
     d.querySelector("#a11y-close").addEventListener("click", () => { d.remove(); opener().focus(); });
     d.querySelector("#a11y-reset").addEventListener("click", () => { const seen = p.seen; p = { ...DEF, seen }; save(); apply(); d.remove(); panel(); announce("Display settings reset"); });
     document.body.appendChild(d); d.querySelector("button").focus();

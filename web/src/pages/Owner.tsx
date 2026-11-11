@@ -7,6 +7,7 @@ import { WorkspaceBar } from "@/components/WorkspaceBar";
 import { TrustStrip, WhoChip } from "@/components/Timeline";
 import { Empty, ErrorState, PageSkeleton } from "@/components/States";
 import { Button } from "@/components/ui/button";
+import { VoiceButton } from "@/components/VoiceButton";
 import { Input } from "@/components/ui/input";
 import { api, ApiError, streamPost } from "@/lib/api";
 import { CitedAnswer, WorkRail, type Fact, type RailStep, type Sentence } from "@/components/WorkRail";
@@ -36,7 +37,7 @@ export interface Today {
   events: { id: number; created_at: string; source: string; type: string; summary: string; is_sample: boolean }[];
   rules: { version: number; lines: string[]; source: string } | null;
   plans: PlanJson[];
-  connections: { buyerMcp: string; ownerMcp: string; webhookOk: boolean; ai: string; telegram: boolean };
+  connections: { widget: string; buyerMcp: string; ownerMcp: string; webhookOk: boolean; ai: string; telegram: boolean };
   demoMode: boolean;
 }
 
@@ -352,6 +353,7 @@ function TodayPage({ d, reload }: { d: Today; reload: () => void }) {
         <form onSubmit={ask} className="mt-3 flex flex-col gap-2 sm:flex-row">
           <label htmlFor="q" className="sr-only">Your question</label>
           <Input id="q" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Why are people cancelling?" className="h-11 flex-1" maxLength={500} />
+          <VoiceButton onText={(t) => setQ(t)} label="Ask by voice" />
           <Button type="submit" disabled={asking || !q.trim()}>{asking ? "Thinking…" : "Ask"}</Button>
         </form>
         <div className="mt-2 flex flex-wrap gap-2">
@@ -452,6 +454,12 @@ function TodayPage({ d, reload }: { d: Today; reload: () => void }) {
         <section className="rounded-xl border border-rule bg-card p-5" aria-labelledby="conn">
           <h2 id="conn" className="m-0 text-xl font-semibold">Connections</h2>
           <dl className="mt-3 grid gap-2 text-sm">
+            <div>
+              <dt className="text-ink-2">Cancel widget for your own site</dt>
+              <dd className="m-0"><code className="block truncate font-mono text-xs">{d.connections.widget}</code>
+                <Button size="sm" variant="outline" className="mt-1" onClick={() => navigator.clipboard?.writeText(d.connections.widget).then(() => toast.success("Widget code copied"), () => toast.error("Couldn't copy"))}>Copy the script tag</Button>
+                <span className="ml-2 text-xs text-ink-2">One button that opens the member's page: skip, pause, switch or cancel in one step.</span></dd>
+            </div>
             <div><dt className="text-ink-2">AI assistants (MCP)</dt><dd className="m-0 truncate font-mono">{d.connections.buyerMcp}</dd></div>
             <div>
               <dt className="text-ink-2">Your own agent (read-only owner MCP)</dt>

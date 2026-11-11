@@ -28,6 +28,8 @@ export const RulesSchema = z.object({
   neverBlockCancel: z.literal(true),
   /** Not configurable either: one optional offer, never a sequence (compliance rule KEPT-OFFER). */
   offersBeforeCancel: z.literal(1).default(1),
+  /** Spec B5 (7): on cancel, refund the unused part of the current cycle, up to this amount. Code computes it. */
+  refundUnused: z.object({ enabled: z.boolean(), maxAmount: z.number().min(0).max(500) }).default({ enabled: false, maxAmount: 0 }),
   /** Days before a renewal to remind the subscriber (0 = no reminder). Annual plans need one in most US states. */
   renewalReminderDays: z.number().int().min(0).max(60).default(7),
   /** The jurisdiction the owner's policy is scored against on the compliance page. */
@@ -47,6 +49,7 @@ export const DEFAULT_RULES: Rules = {
   offerExpiryMinutes: 60,
   neverBlockCancel: true,
   offersBeforeCancel: 1,
+  refundUnused: { enabled: false, maxAmount: 0 },
   renewalReminderDays: 7,
   jurisdiction: "US_FEDERAL",
 };
@@ -77,11 +80,52 @@ export function describeRules(r: Rules): string[] {
   if (r.skip.enabled) out.push(`Skip up to ${r.skip.maxPerPeriod} renewal${r.skip.maxPerPeriod > 1 ? "s" : ""} every ${r.skip.periodDays} days.`);
   if (r.pause.enabled) out.push(`Pause for up to ${r.pause.maxCycles} billing cycle${r.pause.maxCycles > 1 ? "s" : ""}.`);
   if (r.switchToLite.enabled) out.push("Switch to the lighter plan at any time.");
+  if (r.refundUnused?.enabled && r.refundUnused.maxAmount > 0) out.push(`If you cancel, the unused part of the current cycle is refunded, up to ${r.refundUnused.maxAmount.toFixed(2)}.`);
   if (r.discount.enabled) {
     out.push(`A ${r.discount.percent}% discount for ${r.discount.cycles} cycle${r.discount.cycles > 1 ? "s" : ""}` + (r.minTenureDaysForDiscount ? ` for subscribers of at least ${r.minTenureDaysForDiscount} days.` : "."));
   }
   out.push(`At most one retention offer per subscriber every ${r.offerCooldownDays} days; offers expire after ${r.offerExpiryMinutes} minutes.`);
   if ((r.renewalReminderDays ?? 0) > 0) out.push(`A renewal reminder ${r.renewalReminderDays} days before each charge, with one-tap skip where skips are allowed.`);
   out.push("Cancelling always works in one step. Hearing an offer is optional and never required.");
+  return out;
+}
+
+/**
+ * Spec B5 "what this loosens": computed by code, never by the model. Every way the new rules give members more
+ * than the approved ones (more skips, longer pauses, bigger or longer discounts, discounts sooner, offers more
+ * often, longer to decide, a shorter renewal reminder). With no approved rules yet, everything enabled loosens.
+ */
+/**
+ * The most the owner allows back on cancel, read by code from the owner's own words ("refund the unused part of the
+ * month, up to $10"). A model may say a refund rule is present; it never supplies the amount (spec 0.2).
+ */
+export function refundCapFrom(text: string): number | null {
+  const m = text.toLowerCase().match(/refund\w*\s+(?:the\s+)?(?:unused|rest|remaining)[^.]*?up to\s*\$?\s*(\d+(?:\.\d{1,2})?)/);
+  return m ? Math.min(500, Number(m[1])) : null;
+}
+
+export function loosens(before: Rules | null, after: Rules): string[] {
+  const b = before ?? DEFAULT_RULES;
+  const out: string[] = [];
+  const cycles = (n: number) => `${n} cycle${n === 1 ? "" : "s"}`;
+  if (after.skip.enabled && !b.skip.enabled) out.push(`Skips are allowed now (up to ${after.skip.maxPerPeriod} every ${after.skip.periodDays} days).`);
+  else if (after.skip.enabled && after.skip.maxPerPeriod / after.skip.periodDays > b.skip.maxPerPeriod / b.skip.periodDays) out.push(`More skips: ${b.skip.maxPerPeriod} every ${b.skip.periodDays} days becomes ${after.skip.maxPerPeriod} every ${after.skip.periodDays} days.`);
+  if (after.pause.enabled && !b.pause.enabled) out.push(`Pauses are allowed now (up to ${cycles(after.pause.maxCycles)}).`);
+  else if (after.pause.enabled && after.pause.maxCycles > b.pause.maxCycles) out.push(`Longer pauses: up to ${cycles(b.pause.maxCycles)} becomes up to ${cycles(after.pause.maxCycles)}.`);
+  if (after.switchToLite.enabled && !b.switchToLite.enabled) out.push("Members may switch to the lighter plan now.");
+  if (after.discount.enabled && !b.discount.enabled) out.push(`A discount offer is allowed now: ${after.discount.percent}% off for ${cycles(after.discount.cycles)}.`);
+  else if (after.discount.enabled) {
+    if (after.discount.percent > b.discount.percent) out.push(`Bigger discount: ${b.discount.percent}% becomes ${after.discount.percent}%.`);
+    if (after.discount.cycles > b.discount.cycles) out.push(`Longer discount: ${cycles(b.discount.cycles)} becomes ${cycles(after.discount.cycles)}.`);
+  }
+  if (after.maxDiscountPercent > b.maxDiscountPercent) out.push(`The discount ceiling rises from ${b.maxDiscountPercent}% to ${after.maxDiscountPercent}%.`);
+  if (after.discount.enabled && after.minTenureDaysForDiscount < b.minTenureDaysForDiscount) out.push(`Discounts reach newer members: ${b.minTenureDaysForDiscount} days of membership becomes ${after.minTenureDaysForDiscount}.`);
+  if (after.offerCooldownDays < b.offerCooldownDays) out.push(`Offers can come more often: one every ${b.offerCooldownDays} days becomes one every ${after.offerCooldownDays} days.`);
+  if (after.offerExpiryMinutes > b.offerExpiryMinutes) out.push(`Members get longer to decide on an offer: ${b.offerExpiryMinutes} minutes becomes ${after.offerExpiryMinutes}.`);
+  const rb = b.refundUnused ?? { enabled: false, maxAmount: 0 };
+  const ra = after.refundUnused ?? { enabled: false, maxAmount: 0 };
+  if (ra.enabled && !rb.enabled) out.push(`Members who cancel get the unused part of their cycle back, up to ${ra.maxAmount.toFixed(2)}.`);
+  else if (ra.enabled && ra.maxAmount > rb.maxAmount) out.push(`The refund on cancel can be bigger: up to ${rb.maxAmount.toFixed(2)} becomes up to ${ra.maxAmount.toFixed(2)}.`);
+  if (after.renewalReminderDays < b.renewalReminderDays) out.push(`Renewal reminders come later: ${b.renewalReminderDays} days before becomes ${after.renewalReminderDays}${after.renewalReminderDays === 0 ? " (no reminder)" : ""}.`);
   return out;
 }

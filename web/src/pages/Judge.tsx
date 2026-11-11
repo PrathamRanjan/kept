@@ -144,7 +144,7 @@ export default function Judge() {
             </div>
 
             <section aria-labelledby="look" className="mt-10">
-              <h2 id="look" className="text-2xl font-bold">Three things to look at</h2>
+              <h2 id="look" className="text-2xl font-bold">Things to look at</h2>
               <ol className="mt-2">{d.lookAt.map((x) => <li key={x}>{x}</li>)}</ol>
             </section>
 
