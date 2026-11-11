@@ -10,11 +10,12 @@ import { FakePayPal } from "../src/paypal/fake.js";
 import * as svc from "../src/service.js";
 import { plansFor, subscriberByRef } from "../src/store.js";
 import { createApp } from "../src/app.js";
+import { codeLikeTokens, shopFacts } from "../src/ask/facts.js";
 import type { AddressInfo } from "node:net";
 
 // Spec A5.1 / A5.4 / A5.5 / A11: the model chain, one JSON repair, the backup model, and the honest failure
 // state when nothing answers. The OpenAI endpoint is stubbed; every request body is the real one.
-type Mode = "ok" | "broken_json_then_ok" | "primary_down" | "all_down";
+type Mode = "ok" | "broken_json_then_ok" | "primary_down" | "all_down" | "code_primary" | "code_all";
 let mode: Mode = "ok";
 const seen: { model: string; schema: string; repair: boolean }[] = [];
 
@@ -36,6 +37,7 @@ const stub = (async (_url: string, init: RequestInit) => {
   if (mode === "all_down") return new Response('{"error":{"message":"model not available"}}', { status: 400 });
   if (mode === "primary_down" && body.model === config.ai.models.read) return new Response('{"error":{"message":"model not available"}}', { status: 400 });
   if (mode === "primary_down" && body.model === config.ai.models.classify) return new Response('{"error":{"message":"model not available"}}', { status: 400 });
+  if (schema === "owner_answer" && (mode === "code_all" || (mode === "code_primary" && body.model === config.ai.models.read))) return reply(body.model, { answer: "You have 0 sample rows (sampleRows: 0) and `mrr` is 12." });
   if (mode === "broken_json_then_ok" && !repair) return reply(body.model, null, '{"answer": "Most cancels were about price."');
   return reply(body.model, answerFor(schema));
 }) as unknown as typeof fetch;
@@ -142,6 +144,47 @@ describe("model chain", () => {
     } finally {
       (config.ai as any).openaiKey = "sk-test-not-a-real-key";
     }
+  });
+});
+
+describe("K3: Ask reads plain facts and refuses code in answers", () => {
+  it("the model sees numbered plain-word facts, not the statistics object", async () => {
+    let sent = "";
+    setProviderFetch((async (url: string, init: RequestInit) => {
+      const body = JSON.parse(String(init.body));
+      if (body.text.format.name === "owner_answer") sent = body.input[0].content[0].text;
+      return (stub as any)(url, init);
+    }) as unknown as typeof fetch);
+    try {
+      await svc.askOwnerWithSource(m, "Which members could my rules keep with an offer?");
+    } finally {
+      setProviderFetch(stub);
+    }
+    expect(sent).toMatch(/^Facts:\n1\. Shop: Model Test Roasters/);
+    expect(sent).toMatch(/Members the rules allow an offer to today/);
+    expect(sent).toMatch(/not on the plan's price/);
+    expect(sent).not.toMatch(/sampleRows|revenueKept3|"mrr"/);
+    const facts = await shopFacts(m, await svc.computeStats(m));
+    expect(facts.flatMap((f) => codeLikeTokens(f))).toEqual([]);
+  });
+
+  it("flags backticks, camelCase and snake_case, but not brand names", () => {
+    expect(codeLikeTokens("You have `mrr` and sampleRows and offers_made")).toEqual(["`", "sampleRows", "offers_made"]);
+    expect(codeLikeTokens("Members pay through PayPal on an iPhone.")).toEqual([]);
+  });
+
+  it("an answer with code in it goes to the backup model", async () => {
+    mode = "code_primary";
+    const r = await svc.askOwnerWithSource(m, "Why are people cancelling?");
+    expect(r.by).toBe("backup");
+    expect(r.answer).not.toMatch(/sampleRows|`/);
+    const bad = (await db.query<any>("SELECT error FROM ai_calls WHERE purpose = 'owner_answer' AND NOT ok ORDER BY id DESC LIMIT 1")).rows[0];
+    expect(bad.error).toMatch(/code-like tokens: `, sampleRows/);
+  });
+
+  it("if every answer has code in it, the owner sees the failure sentence instead", async () => {
+    mode = "code_all";
+    await expect(svc.askOwner(m, "Why are people cancelling?")).rejects.toBeInstanceOf(ModelUnavailable);
   });
 });
 

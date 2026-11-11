@@ -287,7 +287,7 @@ CREATE TABLE IF NOT EXISTS invoices (
   id TEXT PRIMARY KEY, merchant_id TEXT NOT NULL, subscriber_id TEXT NOT NULL, paypal_invoice_id TEXT, amount NUMERIC(12,2) NOT NULL, currency TEXT NOT NULL,
   status TEXT NOT NULL, run_id TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-ALTER TABLE merchants ADD COLUMN IF NOT EXISTS time_zone TEXT NOT NULL DEFAULT 'UTC';
+ALTER TABLE merchants ADD COLUMN IF NOT EXISTS time_zone TEXT;
 ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS run_id TEXT;
 ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS jurisdiction TEXT;
 ALTER TABLE offers ADD COLUMN IF NOT EXISTS run_id TEXT;
@@ -340,6 +340,8 @@ let shared: Db | null = null;
 export async function openDb(opts: { memory?: boolean } = {}): Promise<Db> {
   const db = opts.memory ? await openPglite(null) : config.databaseUrl ? await openPostgres(config.databaseUrl) : await openPglite(config.pglitePath);
   await db.exec(SCHEMA);
+  // No time zone is a guess: unset means the scam check skips the time-of-day signal instead of assuming UTC.
+  await runOnce(db, "2026-11-11-time-zone-unset", `ALTER TABLE merchants ALTER COLUMN time_zone DROP NOT NULL; ALTER TABLE merchants ALTER COLUMN time_zone DROP DEFAULT; UPDATE merchants SET time_zone = NULL WHERE time_zone = 'UTC';`);
   await runOnce(db, "2026-11-10-purge-old-samples", `
     DELETE FROM offers WHERE subscriber_id IN (SELECT id FROM subscribers WHERE is_sample);
     DELETE FROM feedback WHERE subscriber_id IN (SELECT id FROM subscribers WHERE is_sample);

@@ -48,3 +48,21 @@ describe("gate", () => {
     expect(c.decision).toBe("allowed");
   });
 });
+
+describe("scam check inputs come from the shop's own records", () => {
+  it("reads the hour in the shop's time zone, and only when one is set", async () => {
+    const { hourIn, moveContext } = await import("../src/safety/index.js");
+    expect(hourIn("Etc/GMT-5", new Date("2026-01-01T00:00:00Z"))).toBe(5);
+    expect(hourIn("Asia/Singapore", new Date("2026-01-01T18:00:00Z"))).toBe(2);
+    const { openDb, setDb } = await import("../src/db.js");
+    const db = await openDb({ memory: true });
+    setDb(db);
+    const svc = await import("../src/service.js");
+    const m = await svc.createMerchant({ name: "Clock Shop", currency: "USD" });
+    expect((await moveContext(db, { merchantId: m.id, cents: 100 }, null)).hourLocal).toBe(12);
+    const zone = `Etc/GMT${(() => { const off = 3 - new Date().getUTCHours(); const z = -off; return z >= 0 ? `+${z}` : `${z}`; })()}`;
+    await db.query("UPDATE merchants SET time_zone = $2 WHERE id = $1", [m.id, zone]);
+    expect((await moveContext(db, { merchantId: m.id, cents: 100 }, null)).hourLocal).toBe(hourIn(zone));
+    await db.close();
+  });
+});

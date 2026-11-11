@@ -57,7 +57,8 @@ const MONEY_GATES = ["gate.refund", "gate.capture", "gate.invoice"];
  * - payee age: days since this member joined (refunds, captures and invoices all go to or from the member);
  * - history: the median of the shop's real (non-sample) completed payments;
  * - velocity: money moves this shop's gate saw in the last 10 minutes, and the last 24 h against its 30-day daily mean;
- * - hour: the hour now in the shop's time zone (merchants.time_zone, UTC unless the owner set one).
+ * - hour: the hour now in the shop's time zone (merchants.time_zone). With no time zone set, the time-of-day
+ *   signal is skipped (hour passed as midday, so the odd-hour rule cannot fire) rather than guessed.
  * Kept stores no payout details, so "details changed" is always null: a refund can only go back to the PayPal
  * payment it came from. Moves reach the gate from the owner, the worker or a signed-in agent, never from a
  * pasted message, so the request channel is trusted here; message text is scanned separately.
@@ -78,8 +79,8 @@ export async function moveContext(db: Queryable, m: { merchantId: string; cents:
   )).rows[0] ?? { m10: 0, d1: 0, d30: 0 };
   const dailyMean = Number(v.d30) / 30;
   const velocity24hSumRatio = dailyMean > 0 ? Number(v.d1) / dailyMean : Number(v.d1) > 3 ? Number(v.d1) : 1;
-  const tz = (await db.query<{ time_zone: string }>("SELECT time_zone FROM merchants WHERE id = $1", [m.merchantId])).rows[0]?.time_zone || "UTC";
-  return { payeeAgeDays, detailsChangedDaysAgo: null, detailsChangeSource: null, historyMedianCents, velocity10m: Number(v.m10), velocity24hSumRatio, requestChannelUntrusted: false, hourLocal: hourIn(tz) };
+  const tz = (await db.query<{ time_zone: string | null }>("SELECT time_zone FROM merchants WHERE id = $1", [m.merchantId])).rows[0]?.time_zone ?? null;
+  return { payeeAgeDays, detailsChangedDaysAgo: null, detailsChangeSource: null, historyMedianCents, velocity10m: Number(v.m10), velocity24hSumRatio, requestChannelUntrusted: false, hourLocal: tz ? hourIn(tz) : 12 };
 }
 
 export function hourIn(tz: string, at = new Date()): number {

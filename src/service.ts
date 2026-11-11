@@ -3,6 +3,7 @@ import { spendAllowance } from "./demo/allowance.js";
 import { config } from "./config.js";
 import { ModelUnavailable } from "./brain/openai.js";
 import { getBrain } from "./brain/index.js";
+import { shopFacts } from "./ask/facts.js";
 import type { DraftPlan, ReasonCategory, ShopStats } from "./brain/types.js";
 import * as exec from "./executor.js";
 import { cancelJob, enqueue } from "./jobs.js";
@@ -974,7 +975,8 @@ export async function computeStats(m: Merchant): Promise<ShopStats & { collected
 export async function askOwner(m: Merchant, question: string) {
   await spendAllowance(m.id);
   const stats = await computeStats(m);
-  return getBrain().answer(question.slice(0, 500), stats);
+  const facts = await shopFacts(m, stats);
+  return getBrain().answer(question.slice(0, 500), stats, facts);
 }
 
 /** The answer plus who wrote it, for the owner's Ask box. */
