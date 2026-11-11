@@ -215,6 +215,12 @@ async function build(steps: DriveStep[], opts: { name: TourName; last?: { label:
 export function startTour(name: TourName, o: { force?: boolean } = {}) {
   if (name === "judge") {
     store.set({ name: "judge", page: 0 });
+    // Judge Mode covers the owner, member and shop pages, so their first-run tours should not pop up afterwards.
+    for (const t of ["owner", "member", "shop"] as TourName[]) {
+      try {
+        if (!localStorage.getItem(SEEN(t))) localStorage.setItem(SEEN(t), "once");
+      } catch {}
+    }
     if (location.pathname !== "/") {
       location.assign("/?tour=judge");
       return;

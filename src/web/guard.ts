@@ -112,7 +112,7 @@ export function guardRouter(): Router {
         <form method="get" action="/dashboard/guard">
           <textarea name="text" rows="3" style="width:100%" placeholder="One skip per quarter. Pause up to 2 months. At most 15% off for 3 months. Remind people 7 days before a renewal. My customers are in California.">${candidateText}</textarea>
           <div class="slider"><label for="bt-slider">Discount the offer step may give without you</label><input id="bt-slider" type="range" name="pct" min="0" max="50" value="${pct}"><output id="bt-out">${pct}%</output></div>
-          <div class="slider"><label>Pause length it may give without you</label><input type="range" name="cycles" min="0" max="6" value="${cycles}"><output>${cycles} cycles</output></div>
+          <div class="slider"><label for="bt-cycles">Pause length it may give without you</label><input id="bt-cycles" type="range" name="cycles" min="0" max="6" value="${cycles}"><output>${cycles} cycles</output></div>
           <button class="btn primary" type="submit">Draft and backtest</button>
         </form>
         ${draftNotes.length ? html`<ul class="small">${draftNotes.map((d) => html`<li>${d}</li>`)}</ul>` : ""}
@@ -145,8 +145,8 @@ export function guardRouter(): Router {
 
       <div class="grid g2">
         <div class="card"><h2>Kill switches</h2><p class="sub">Stop agents in this shop, or the whole shop. A cancel is never blocked by these switches. The switch for every shop at once is for the site admin only.</p>
-          <form method="post" action="/dashboard/guard/kill" class="row"><select name="scope"><option value="agents">All agents (this shop)</option><option value="merchant:${m.id}">This shop</option></select><input type="text" name="reason" placeholder="Why (shown on the banner)"><input type="hidden" name="engaged" value="true"><button class="btn" type="submit">Engage</button></form>
-          <form method="post" action="/dashboard/guard/kill" class="row" style="margin-top:6px"><input type="text" name="scope" placeholder="agent:<id> to stop one agent" style="flex:1"><input type="hidden" name="engaged" value="true"><button class="btn small" type="submit">Stop that agent</button></form>
+          <form method="post" action="/dashboard/guard/kill" class="row"><label for="kill-scope" class="sr">What to stop</label><select id="kill-scope" name="scope"><option value="agents">All agents (this shop)</option><option value="merchant:${m.id}">This shop</option></select><label for="kill-reason" class="sr">Why (shown on the banner)</label><input id="kill-reason" type="text" name="reason" placeholder="Why (shown on the banner)"><input type="hidden" name="engaged" value="true"><button class="btn" type="submit">Engage</button></form>
+          <form method="post" action="/dashboard/guard/kill" class="row" style="margin-top:6px"><label for="kill-agent" class="sr">Agent to stop, as agent:&lt;id&gt;</label><input id="kill-agent" type="text" name="scope" placeholder="agent:<id> to stop one agent" style="flex:1"><input type="hidden" name="engaged" value="true"><button class="btn small" type="submit">Stop that agent</button></form>
           ${kills.filter((k) => k.engaged).length ? html`<ul>${kills.filter((k) => k.engaged).map((k) => html`<li><span class="pill bad">${k.scope}</span> ${k.reason ?? ""} <form method="post" action="/dashboard/guard/kill" class="inline"><input type="hidden" name="scope" value="${k.scope}"><input type="hidden" name="engaged" value="false"><button class="btn small" type="submit">Release</button></form></li>`)}</ul>` : html`<p class="muted">None engaged.</p>`}
         </div>
         <div class="card"><h2>Audit chain</h2><p class="sub">Every policy, approval, kill switch and money decision, hash-chained.</p>
@@ -263,7 +263,7 @@ export function guardRouter(): Router {
     const sel = (typeof req.query.j === "string" ? req.query.j : rules?.jurisdiction ?? "US_FEDERAL") as Jurisdiction;
     const focus = rules ? scoreCompliance(rules, sel, ctx) : null;
     res.send(layout({ title: `${m.name} · Compliance`, nav: "dashboard", owner: nav(m) }, html`
-      <h1>Compliance scorecard</h1><p class="muted">Your approved rules (v${policy?.version ?? 0}) scored against each jurisdiction's negative-option rules. A failing rule for the buyer's jurisdiction blocks the offer step in code; the cancel always goes through. Paraphrased for a product scorecard, not legal advice; sources and [verify] marks in <code>docs/compliance.md</code>.</p>
+      <h1>Compliance scorecard</h1><p class="muted">Your approved rules (v${policy?.version ?? 0}) scored against each jurisdiction's negative-option rules. A failing rule for the buyer's jurisdiction blocks the offer step in code; the cancel always goes through. Paraphrased for a product scorecard, not legal advice. Sources, and the points still to be checked against each statute, are in <code>docs/compliance.md</code>.</p>
       ${flash(req)}
       ${!rules ? html`<div class="banner info">No rules approved yet. The scorecard scores an approved policy.</div>` : ""}
       <div class="score">${cards.map((c) => html`<a class="tile" href="/dashboard/compliance?j=${c.jurisdiction}" style="text-decoration:none;color:inherit"><div class="label">${JURISDICTIONS.find((j) => j.id === c.jurisdiction)?.name}</div><div class="big">${c.total ? `${c.passed}/${c.total}` : "info"}</div><div class="hint">${c.failed ? html`<span class="pill fail">${c.failed} failing</span>` : c.total ? html`<span class="pill pass">all pass</span>` : html`<span class="pill info">informational</span>`}</div></a>`)}</div>

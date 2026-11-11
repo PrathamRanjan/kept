@@ -7,6 +7,7 @@
  * Rules (A) and the synthetic-data risk model (C) run here; the browser text model (B) only explains messages.
  * Reads the database only; never imports the PayPal client or the service layer.
  */
+import { config } from "../config.js";
 import type { Queryable } from "../db.js";
 import { getDb } from "../db.js";
 import { maxLevel, payeeRules, scanText, TACTIC_WORDS, type Level, type PayeeContext, type RuleResult, type Tactic } from "./rules.js";
@@ -113,8 +114,36 @@ const FAKE_FAILED = /\b(subscription|membership|payment|renewal|direct debit|car
 
 const MESSAGE_ONLY: Omit<PayeeContext, "text"> = { payeeAgeDays: null, detailsChangedDaysAgo: null, detailsChangeSource: null, amountCents: 1, historyMedianCents: null, velocity10m: 0, velocity24hSumRatio: 1, requestChannelUntrusted: true, hourLocal: 12 };
 
+/**
+ * Links to Kept's own member pages (exact host match on APP_URL, path /manage/ or /s/) are Kept's own reminders,
+ * so they are not counted as "a link to click". A look-alike host is not stripped and still counts.
+ */
+export function stripOwnLinks(text: string, appUrl = config.appUrl): { text: string; own: number } {
+  let own = 0;
+  let host = "";
+  try {
+    host = new URL(appUrl).host.toLowerCase();
+  } catch {
+    return { text, own };
+  }
+  const out = text.replace(/https?:\/\/[^\s<>"')]+/gi, (u) => {
+    try {
+      const url = new URL(u.replace(/[.,;:!?]+$/, ""));
+      if (url.host.toLowerCase() === host && /^\/(manage|s)\//.test(url.pathname) && !url.username && !url.password) {
+        own++;
+        return "(this shop's member page)";
+      }
+    } catch {
+      /* not a URL: leave it */
+    }
+    return u;
+  });
+  return { text: out, own };
+}
+
 /** A message a subscriber or owner received or pasted. Rules only on the server; the browser adds the text model. */
-export function assessMessage(text: string): Assessment & { words: string[] } {
+export function assessMessage(raw: string): Assessment & { words: string[]; ownLinks: number } {
+  const { text, own } = stripOwnLinks(raw);
   const scan = scanText(text);
   // A pasted message has no payment behind it, so the payment-context signals are switched off on purpose
   // (no payee, no amount, no velocity; hour set to midday so the odd-hour rule cannot fire). Only the words count.
@@ -126,9 +155,14 @@ export function assessMessage(text: string): Assessment & { words: string[] } {
     out.rule = "fake_failed_payment";
     out.reasons.unshift("The message says a payment failed and sends you somewhere to pay. Kept never sends a \"pay here\" link: a real failed payment shows on your own subscription page, reached from your bookmark or the shop's site, never from a message.");
   }
+  if (REDIRECT.test(text)) {
+    out.level = "hold";
+    out.rule = out.rule === "fake_failed_payment" ? out.rule : "refund_to_other_account";
+    out.reasons.unshift("The message asks for money to go to a different account, card or person. Refunds from the shop only ever go back to the PayPal payment they came from; check with the shop directly, from its own site, before doing anything.");
+  }
   if (out.reasons.length === 0) out.level = "clear";
-  out.summary = out.level === "clear" ? "no scam signals" : `${out.level}: ${out.reasons[0]}`;
-  return { ...out, words: scan.fired.map((t) => TACTIC_WORDS[t]) };
+  out.summary = out.level === "clear" ? (own ? "no scam signals; the only link is to this shop's own member page" : "no scam signals") : `${out.level}: ${out.reasons[0]}`;
+  return { ...out, words: scan.fired.map((t) => TACTIC_WORDS[t]), ownLinks: own };
 }
 
 /** Protected mode (§4.5) per merchant. */

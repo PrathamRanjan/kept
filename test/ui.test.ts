@@ -128,6 +128,11 @@ describe("UI JSON API", () => {
     expect(t.stats.live.active).toBeGreaterThanOrEqual(1);
     expect(t.members.find((x: any) => x.ref === ref).card.stamps.length).toBeGreaterThan(0);
     expect(t.rules.lines.join(" ")).toMatch(/one step/);
+    const k = (await c.postJson("/ui/owner/key", {})).json;
+    expect(k.key).toMatch(/^own_/);
+    expect(k.ownerMcp).toMatch(/\/owner\/mcp$/);
+    expect(JSON.stringify(t)).not.toContain(k.key);
+    expect((await anon.postJson("/ui/owner/key", {})).status).toBe(401);
     expect((await c.postJson("/ui/owner/ask", { question: "" })).status).toBe(422);
     expect((await c.postJson("/ui/owner/ask", { question: "Who has a failed payment?" })).json.answer).toBeTruthy();
     expect((await c.postJson("/ui/owner/reconcile", {})).json.message).toMatch(/Checked \d+/);

@@ -302,6 +302,13 @@ export function uiApi(): Router {
     };
   }));
 
+  // The signed-in owner's own key, for the read-only owner MCP. Fetched on demand, never part of a page payload.
+  r.post("/ui/owner/key", j(async (req, res) => {
+    const m = await needOwner(req);
+    res.setHeader("cache-control", "no-store");
+    return { ownerMcp: `${config.appUrl}/owner/mcp`, key: m.owner_token, header: "Authorization: Bearer <key>" };
+  }));
+
   r.post("/ui/owner/ask", j(async (req) => {
     const m = await needOwner(req);
     const q = String(req.body?.question ?? "").trim().slice(0, 500);

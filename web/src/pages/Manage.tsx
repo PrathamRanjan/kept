@@ -384,7 +384,7 @@ export default function Manage() {
               Got a message about this?
             </h2>
             <p className="mt-1 text-sm text-ink-2">{data.shop.name} bills only through PayPal and never sends a "pay here" link or asks for a card number or a code.</p>
-            <Button variant="outline" asChild>
+            <Button variant="outline" asChild className="h-auto min-h-9 max-w-full whitespace-normal py-2 text-left">
               <a href={`/manage/${ref}/check`}>Check a message for scam signs</a>
             </Button>
           </section>

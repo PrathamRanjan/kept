@@ -187,6 +187,34 @@ function RenewalCalendar() {
 }
 
 /* ------------------------------------------------------------------ Today */
+/** Shows the owner's key for the read-only owner MCP on request; it is never in the page data. */
+function OwnerKey() {
+  const [key, setKey] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  async function show() {
+    setBusy(true);
+    try {
+      setKey((await api.post<{ key: string }>("/ui/owner/key")).key);
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Couldn't load your key.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  if (!key)
+    return (
+      <Button type="button" variant="outline" size="sm" className="mt-1" onClick={show} disabled={busy}>
+        {busy ? "Loading…" : "Show owner key"}
+      </Button>
+    );
+  return (
+    <span className="mt-1 block">
+      <span className="block break-all font-mono text-xs">Authorization: Bearer {key}</span>
+      <span className="block text-xs text-ink-2">Read-only: summaries, Ask, members, events, transactions. It cannot move money or change rules. Anyone with this key can read this shop.</span>
+    </span>
+  );
+}
+
 function TodayPage({ d, reload }: { d: Today; reload: () => void }) {
   const [q, setQ] = useState("");
   const [answer, setAnswer] = useState<{ text: string; by: string | null; model: string | null; failed: boolean } | null>(null);
@@ -410,6 +438,10 @@ function TodayPage({ d, reload }: { d: Today; reload: () => void }) {
           <h2 id="conn" className="m-0 text-xl font-semibold">Connections</h2>
           <dl className="mt-3 grid gap-2 text-sm">
             <div><dt className="text-ink-2">AI assistants (MCP)</dt><dd className="m-0 truncate font-mono">{d.connections.buyerMcp}</dd></div>
+            <div>
+              <dt className="text-ink-2">Your own agent (read-only owner MCP)</dt>
+              <dd className="m-0"><span className="block truncate font-mono">{d.connections.ownerMcp}</span><OwnerKey /></dd>
+            </div>
             <div><dt className="text-ink-2">PayPal webhooks</dt><dd className="m-0">{d.connections.webhookOk ? "Registered; every event is signature-verified before Kept acts." : "Not registered yet; Kept still reconciles by reading PayPal."}</dd></div>
             <div><dt className="text-ink-2">AI model</dt><dd className="m-0">{d.connections.ai}</dd></div>
             <div><dt className="text-ink-2">PayPal</dt><dd className="m-0">{d.shop.paypal_env} · product <span className="font-mono">{d.shop.product ?? "not created yet"}</span></dd></div>

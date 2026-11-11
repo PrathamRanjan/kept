@@ -66,3 +66,35 @@ describe("scam check inputs come from the shop's own records", () => {
     await db.close();
   });
 });
+
+describe("message check: Kept's own links and refund redirects", () => {
+  it("does not flag Kept's own renewal reminder, but still flags a look-alike host", async () => {
+    const { assessMessage } = await import("../src/safety/index.js");
+    const { config } = await import("../src/config.js");
+    const own = `Ember & Oak: your Signature bag renews on 2026-12-10 for 24.00 USD. Nothing to do to keep it. Manage: ${config.appUrl}/manage/ref_abc123def456`;
+    const a = assessMessage(own);
+    expect(a.level).toBe("clear");
+    expect(a.ownLinks).toBe(1);
+    const host = new URL(config.appUrl).host;
+    const fake = own.replace(host, `${host}.billing-help.example`);
+    expect(assessMessage(fake).level).not.toBe("clear");
+  });
+
+  it("holds a message asking for a refund to go to someone else's account", async () => {
+    const { assessMessage } = await import("../src/safety/index.js");
+    const a = assessMessage("Hi, this is the shop. Please send my refund to my son's account instead, he will pass it on.");
+    expect(a.level).toBe("hold");
+    expect(a.reasons[0]).toMatch(/different account/);
+  });
+});
+
+describe("illegal rules are refused with their citation, also when paraphrased", () => {
+  it("matches the common paraphrases", async () => {
+    const { FORBIDDEN_PHRASES } = await import("../src/policy/compliance.js");
+    const id = (t: string) => FORBIDDEN_PHRASES.filter((f) => f.re.test(t)).map((f) => f.ruleId);
+    expect(id("Show three retention offers before cancel")).toContain("KEPT-OFFER");
+    expect(id("cancellation only by phone")).toContain("CA-1");
+    expect(id("make it harder to cancel")).toContain("ROSCA-1");
+    expect(id("One skip per quarter. Pause up to 2 months. At most 15% off for 3 months.")).toEqual([]);
+  });
+});

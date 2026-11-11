@@ -35,7 +35,6 @@ export interface StructuredCall<T> {
   schemaName: string;
   schema: Record<string, unknown>;
   maxOutputTokens?: number;
-  allowReplay?: boolean;
   runId?: string | null;
   parse?: (raw: unknown) => T;
 }

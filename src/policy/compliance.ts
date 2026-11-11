@@ -12,12 +12,12 @@ import type { Rules } from "./rules.js";
 
 export type Jurisdiction = "US_FEDERAL" | "US_CA" | "US_CO" | "US_NY" | "EU" | "UK";
 export const JURISDICTIONS: { id: Jurisdiction; name: string; kind: "enforced" | "informational"; note: string }[] = [
-  { id: "US_FEDERAL", name: "United States (federal)", kind: "enforced", note: "ROSCA (15 U.S.C. §8401 et seq.) and FTC Act §5. The 2024 FTC negative-option rule was vacated on 8 July 2025; a new ANPRM opened in 2026 [verify]." },
-  { id: "US_CA", name: "California", kind: "enforced", note: "Automatic Renewal Law, Bus. & Prof. Code §17600 to §17606, as amended through 2025 [verify]." },
-  { id: "US_CO", name: "Colorado", kind: "enforced", note: "Automatic renewal provisions in the Colorado Consumer Protection Act (HB21-1239) [verify]." },
-  { id: "US_NY", name: "New York", kind: "enforced", note: "General Business Law §527-a (automatic renewal) [verify]." },
+  { id: "US_FEDERAL", name: "United States (federal)", kind: "enforced", note: "ROSCA (15 U.S.C. §8401 et seq.) and FTC Act §5. The 2024 FTC negative-option (click-to-cancel) rule was vacated by the Eighth Circuit on 8 July 2025." },
+  { id: "US_CA", name: "California", kind: "enforced", note: "Automatic Renewal Law, Bus. & Prof. Code §17600 to §17606, as amended through 2025." },
+  { id: "US_CO", name: "Colorado", kind: "enforced", note: "Automatic renewal provisions of the Colorado Consumer Protection Act, C.R.S. §6-1-732." },
+  { id: "US_NY", name: "New York", kind: "enforced", note: "General Business Law §527-a (automatic renewal)." },
   { id: "EU", name: "European Union", kind: "informational", note: "Consumer Rights Directive 2011/83/EU and the Unfair Commercial Practices Directive; member-state law varies. Informational only." },
-  { id: "UK", name: "United Kingdom", kind: "informational", note: "Digital Markets, Competition and Consumers Act 2024 subscription provisions; commencement in stages [verify]. Informational only." },
+  { id: "UK", name: "United Kingdom", kind: "informational", note: "Digital Markets, Competition and Consumers Act 2024 subscription provisions; commencement in stages. Informational only." },
 ];
 
 export type RuleStatus = "pass" | "fail" | "info";
@@ -51,27 +51,27 @@ export const RULES: ComplianceRule[] = [
   {
     id: "ROSCA-1", jurisdiction: "US_FEDERAL", title: "Simple cancellation", requirement: "A consumer can stop recurring charges through a simple mechanism, at least as easy as the one used to sign up.",
     check: (r) => ({ status: symmetric(r) ? "pass" : "fail", evidence: symmetric(r) ? "cancel_subscription is one call or one click; hearing an offer is optional; an offer never blocks a cancel" : "the policy asks for more than one offer or a blocked cancel" }),
-    source: "15 U.S.C. §8403(3); FTC enforcement incl. Amazon Prime settlement (2025) [verify]",
+    source: "15 U.S.C. §8403(3); FTC enforcement incl. Amazon Prime settlement (2025)",
   },
   {
     id: "ROSCA-2", jurisdiction: "US_FEDERAL", title: "Clear disclosure before billing", requirement: "Material terms (price, billing interval, how to cancel) are disclosed clearly before obtaining billing information.",
     check: (_r, ctx) => { const ok = ctx.disclosure.price && ctx.disclosure.interval && ctx.disclosure.cancelTerms; return { status: ok ? "pass" : "fail", evidence: ok ? "quote and start_subscription return price, interval and cancellation terms before the PayPal approval link" : "a plan is missing price, interval or cancellation terms at enrolment" }; },
-    source: "15 U.S.C. §8403(1) [verify]",
+    source: "15 U.S.C. §8403(1)",
   },
   {
     id: "ROSCA-3", jurisdiction: "US_FEDERAL", title: "Express informed consent", requirement: "Billing starts only after the consumer's express consent.",
     check: () => ({ status: "pass", evidence: "every subscription starts with the subscriber approving on PayPal's own page; agents never hold payment details" }),
-    source: "15 U.S.C. §8403(2) [verify]",
+    source: "15 U.S.C. §8403(2)",
   },
   {
     id: "KEPT-OFFER", jurisdiction: "US_FEDERAL", title: "One honest offer, never a hurdle", requirement: "At most one retention offer, only if the subscriber asks to hear one; declining or ignoring it cancels.",
     check: (r) => ({ status: offersBeforeCancel(r) <= 1 ? "pass" : "fail", evidence: `offers before cancel: ${offersBeforeCancel(r)}; offer expiry ${r.offerExpiryMinutes} minutes then the cancel proceeds` }),
-    source: "FTC dark-pattern guidance (2022 staff report) and ROSCA §8403(3) [verify]",
+    source: "FTC dark-pattern guidance (2022 staff report) and ROSCA §8403(3)",
   },
   {
     id: "CA-1", jurisdiction: "US_CA", title: "Online cancellation", requirement: "A subscription accepted online can be cancelled online, without extra steps that obstruct or delay.",
     check: (r) => ({ status: symmetric(r) ? "pass" : "fail", evidence: "the manage page and the API cancel in one step; no save-attempt is required" }),
-    source: "Cal. Bus. & Prof. Code §17602(c) and (d) [verify]",
+    source: "Cal. Bus. & Prof. Code §17602(c) and (d)",
   },
   {
     id: "CA-2", jurisdiction: "US_CA", title: "Renewal reminder for annual terms", requirement: "For terms of a year or longer, a notice before renewal with the cancellation method.",
@@ -81,12 +81,12 @@ export const RULES: ComplianceRule[] = [
   {
     id: "CA-3", jurisdiction: "US_CA", title: "Offer presented once, cancellation still immediate", requirement: "A retention offer may be shown, but the consumer must be able to complete the cancellation without it.",
     check: (r) => ({ status: offersBeforeCancel(r) <= 1 && r.neverBlockCancel ? "pass" : "fail", evidence: "one optional offer; decline or silence cancels" }),
-    source: "Cal. Bus. & Prof. Code §17602(d)(2) (2025 amendments) [verify]",
+    source: "Cal. Bus. & Prof. Code §17602(d)(2) (2025 amendments)",
   },
   {
     id: "CO-1", jurisdiction: "US_CO", title: "Cancellation method matches sign-up", requirement: "Cancel in the same medium used to sign up; an online sign-up gets online cancellation.",
     check: (r) => ({ status: symmetric(r) ? "pass" : "fail", evidence: "web, REST and MCP all cancel in one step" }),
-    source: "C.R.S. §6-1-732 (HB21-1239) [verify]",
+    source: "C.R.S. §6-1-732 (HB21-1239)",
   },
   {
     id: "CO-2", jurisdiction: "US_CO", title: "Annual renewal notice", requirement: "Notice before each automatic renewal of a term of a year or longer.",
@@ -96,12 +96,12 @@ export const RULES: ComplianceRule[] = [
   {
     id: "NY-1", jurisdiction: "US_NY", title: "Annual renewal notice", requirement: "For terms of a year or longer, notice 15 to 45 days before renewal, with how to cancel.",
     check: (r, ctx) => (!ctx.hasAnnualPlans ? { status: "pass", evidence: "no plan bills yearly or longer" } : reminderDays(r) >= 15 && reminderDays(r) <= 45 ? { status: "pass", evidence: `reminder ${reminderDays(r)} days before` } : { status: "fail", evidence: `reminder ${reminderDays(r)} days; needs 15 to 45 for annual plans` }),
-    source: "N.Y. Gen. Bus. Law §527-a(3) [verify]",
+    source: "N.Y. Gen. Bus. Law §527-a(3)",
   },
   {
     id: "NY-2", jurisdiction: "US_NY", title: "Easy online cancellation", requirement: "Online sign-ups can cancel online, exclusively online if they wish.",
     check: (r) => ({ status: symmetric(r) ? "pass" : "fail", evidence: "one step on the manage page, over REST and over MCP" }),
-    source: "N.Y. Gen. Bus. Law §527-a(4) [verify]",
+    source: "N.Y. Gen. Bus. Law §527-a(4)",
   },
   {
     id: "EU-1", jurisdiction: "EU", title: "Withdrawal and clear pre-contract information", requirement: "14-day right of withdrawal from distance contracts and clear pre-contract terms; member-state rules on cancellation vary.",
@@ -111,7 +111,7 @@ export const RULES: ComplianceRule[] = [
   {
     id: "UK-1", jurisdiction: "UK", title: "Subscription reminders and easy exit", requirement: "Reminder notices before renewal and a straightforward way to end a subscription.",
     check: (r) => ({ status: "info", evidence: `informational: reminder ${reminderDays(r)} days; one-step cancel` }),
-    source: "DMCC Act 2024, Part 4 Chapter 2 (commencement staged) [verify]",
+    source: "DMCC Act 2024, Part 4 Chapter 2 (commencement staged)",
   },
 ];
 
@@ -138,9 +138,9 @@ export function scoreAll(rules: Rules, ctx: CheckContext = DEFAULT_CTX): Scoreca
 
 /** Phrases in an owner's plain-words rules that ask for something the law forbids; each is refused with its citation. */
 export const FORBIDDEN_PHRASES: { re: RegExp; ruleId: string; message: string }[] = [
-  { re: /\b(two|three|four|five|several|multiple|2|3|4|5)\s+offers?\b/i, ruleId: "KEPT-OFFER", message: "More than one offer before a cancel is refused: ROSCA §8403(3) and Cal. Bus. & Prof. Code §17602(d) require cancellation to be as simple as sign-up; Kept makes one optional offer." },
-  { re: /\b(must|have to|need to|required to)\s+(call|phone|email|chat|speak|talk)\b.{0,30}\bcancel/i, ruleId: "CA-1", message: "Requiring a call or chat to cancel is refused: California §17602(c), Colorado §6-1-732 and New York §527-a require online cancellation for online sign-ups." },
-  { re: /\b(make it hard|block|prevent|stop them|don'?t let them|no way)\b.{0,20}\bcancel/i, ruleId: "ROSCA-1", message: "Blocking or obstructing a cancel is refused under ROSCA §8403(3)." },
+  { re: /\b(two|three|four|five|several|multiple|many|2|3|4|5)\s+(?:[a-z-]+\s+){0,2}(offers?|attempts?|tries|deals)\b|\bkeep (offering|asking)\b|\boffer again\b/i, ruleId: "KEPT-OFFER", message: "More than one offer before a cancel is refused: ROSCA §8403(3) and Cal. Bus. & Prof. Code §17602(d) require cancellation to be as simple as sign-up; Kept makes one optional offer." },
+  { re: /\b(must|have to|need to|required to|should)\s+(call|phone|ring|email|chat|speak|talk|write)\b.{0,30}\bcancel|\bcancel\w*\b.{0,25}\b(only )?(by|via|over the|through a) (phone|call|telephone|email|letter|post|chat)\b/i, ruleId: "CA-1", message: "Requiring a call or chat to cancel is refused: California §17602(c), Colorado §6-1-732 and New York §527-a require online cancellation for online sign-ups." },
+  { re: /\b(make it (hard|harder|difficult|tough|annoying)|harder to|block|prevent|stop (them|people|members)|don'?t let (them|people|members)|no way|discourage|talk (them|people) out of)\b.{0,25}\bcancel/i, ruleId: "ROSCA-1", message: "Blocking or obstructing a cancel is refused under ROSCA §8403(3)." },
   { re: /\b(hide|bury|hidden)\b.{0,30}\b(cancel|price|renewal)/i, ruleId: "ROSCA-2", message: "Hiding the cancel path or the renewal terms is refused: ROSCA §8403(1) requires clear disclosure." },
   { re: /\b(no|skip|without)\s+(renewal\s+)?reminders?\b/i, ruleId: "NY-1", message: "Turning renewal reminders off is allowed only where no plan bills yearly or longer; New York §527-a, California §17602(b) and Colorado §6-1-732 require them for annual terms." },
 ];
