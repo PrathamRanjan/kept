@@ -1,4 +1,4 @@
-import { renderShell, type Brand, type NavGroup } from "./shell.js";
+import { renderShell, type Brand, type NavGroup, type ShellPage } from "./shell.js";
 /** Minimal safe HTML templating: every interpolated value is escaped unless wrapped in raw(). */
 export class Raw {
   constructor(readonly value: string) {}
@@ -32,6 +32,9 @@ export interface LayoutOpts {
   /** Customer pages: the shop's name in the header. */
   business?: string;
   wide?: boolean;
+  /** Customer pages in another language: the shell's words and the trust line. Absent means English, as before. */
+  words?: ShellPage["words"];
+  trust?: string;
 }
 
 export const BRAND: Brand = {
@@ -59,7 +62,7 @@ const navFor = (slug: string): NavGroup[] => [
 export function layout(o: LayoutOpts, body: Raw): string {
   const common = { title: o.title.replace(/ · Kept( dashboard)?$/, ""), body: body.value, head: `<link rel="manifest" href="/manifest.webmanifest">${o.head?.value ?? ""}`, scripts: o.scripts?.value, wide: o.wide };
   if (o.nav === "manage" || (o.nav === "shop" && o.business)) {
-    return renderShell(BRAND, { ...common, mode: "customer", business: o.business ?? "Your subscription", trust: `${o.business ?? "This shop"} bills only through PayPal. A failed payment is only ever shown on this page; we never send a "pay here" link by text or email, or ask for a card number or a code.` });
+    return renderShell(BRAND, { ...common, mode: "customer", business: o.business ?? "Your subscription", trust: o.trust ?? `${o.business ?? "This shop"} bills only through PayPal. A failed payment is only ever shown on this page; we never send a "pay here" link by text or email, or ask for a card number or a code.`, words: o.words });
   }
   if (o.owner && o.nav !== "home") {
     return renderShell(BRAND, { ...common, mode: "app", nav: navFor(o.owner.slug), homeHref: "/dashboard", workspace: o.owner.name, user: { name: "Shop owner", sub: o.owner.name, logout: "/logout", settings: "/dashboard/channels#phone" } });

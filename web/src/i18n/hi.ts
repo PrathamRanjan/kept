@@ -1,7 +1,9 @@
 import type { Dict } from "./en";
+import { hiPages } from "./pages/hi";
 
 /** Hindi (hi-IN). Machine-written; not yet reviewed by a person. */
 export const hi: Dict = {
+  ...hiPages,
   "shell.skip": "सामग्री पर जाएँ",
   "shell.judges": "जजों के लिए",
   "shell.display": "डिस्प्ले और मदद",

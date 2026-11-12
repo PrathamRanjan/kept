@@ -1,16 +1,18 @@
 import { Link } from "react-router-dom";
 import { PublicHeader } from "@/components/Shell";
 import { Button } from "@/components/ui/button";
+import { useT } from "@/i18n";
 
 export default function NotFound() {
+  const { t } = useT();
   return (
     <>
       <PublicHeader />
       <main id="main" className="mx-auto max-w-2xl px-4 py-20">
-        <h1 className="text-4xl font-bold">This page isn't here</h1>
-        <p className="mt-3 text-ink-2">The link may be old. If you're looking for your subscription, use the link in your PayPal receipt or ask the shop.</p>
+        <h1 className="text-4xl font-bold">{t("nf.h")}</h1>
+        <p className="mt-3 text-ink-2">{t("nf.b")}</p>
         <Button asChild className="mt-6">
-          <Link to="/">Go to the home page</Link>
+          <Link to="/">{t("nf.home")}</Link>
         </Button>
       </main>
     </>

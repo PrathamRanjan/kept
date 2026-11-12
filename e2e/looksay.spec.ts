@@ -74,8 +74,63 @@ test("language: the pseudo-locale (accents, 30% longer) still fits", async ({ pa
   await page.goto(`/manage/${ref}?lang=qps`);
   await expect(page.locator("[data-tour='card'] li").first()).toBeVisible();
   await noSideScroll(page);
-  await page.goto(`/?lang=qps`);
+  for (const p of ["/", "/demo", "/judge", "/proof"]) {
+    await page.goto(`${p}?lang=qps`);
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("[");
+    await noSideScroll(page);
+  }
+});
+
+test("language: every public page follows the picker, and English comes back word for word", async ({ page }) => {
+  await noTours(page);
+  for (const p of ["/", "/demo", "/judge", "/proof", "/accessibility"]) {
+    await page.goto(p);
+    const h1 = page.getByRole("heading", { level: 1 });
+    await expect(h1).toBeVisible();
+    const en = { h1: await h1.innerText(), title: await page.title(), ribbon: await page.getByRole("region", { name: "Demo notice" }).innerText() };
+    await page.getByTestId("lang-picker").first().selectOption("id-ID");
+    await expect(page.locator("html")).toHaveAttribute("lang", "id-ID");
+    await expect(h1).not.toHaveText(en.h1);
+    await expect(page.getByRole("region", { name: "Pemberitahuan demo" })).toContainText("Demo hackathon.");
+    expect(await page.title()).not.toBe(en.title);
+    await page.getByTestId("lang-picker").first().selectOption("en");
+    await expect(h1).toHaveText(en.h1);
+    expect(await page.title()).toBe(en.title);
+    expect(await page.getByRole("region", { name: "Demo notice" }).innerText()).toBe(en.ribbon);
+  }
+});
+
+for (const lang of ["hi-IN", "id-ID", "pt-BR"]) {
+  test(`language: ${lang} landing, demo and proof pages fit and pass axe`, async ({ page }, info) => {
+    await noTours(page);
+    for (const p of ["/", "/demo", "/proof"]) {
+      await page.goto(`${p}?lang=${lang}`);
+      await expect(page.locator("html")).toHaveAttribute("lang", lang);
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+      if (p === "/proof") await expect(page.getByTestId("pub-recorded")).toBeVisible();
+      await noSideScroll(page);
+      await axe(page);
+    }
+    await page.goto(`/?lang=${lang}`);
+    await page.screenshot({ path: `docs/screenshots/lang-${lang}-landing-${info.project.name}.png`, fullPage: false });
+  });
+}
+
+test("language: the member's scam-check page opens in the member's language and checks in it", async ({ page }) => {
+  await noTours(page);
+  const ref = await freshMember(page);
+  await page.goto(`/manage/${ref}?lang=pt-BR`);
+  await page.getByRole("link", { name: /Verificar uma mensagem|golpe/i }).first().click();
+  await expect(page).toHaveURL(new RegExp(`/manage/${ref}/check\\?lang=pt-BR`));
+  await expect(page.locator("html")).toHaveAttribute("lang", "pt-BR");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Esta mensagem é mesmo de");
+  await page.getByRole("button", { name: "Colar o golpe de demonstração" }).click();
+  await page.getByRole("button", { name: "Verificar esta mensagem" }).click();
+  await expect(page.locator("#scan-result .banner")).toContainText(/Espere: não pague ainda|Atenção: confira antes de pagar/, { timeout: 60_000 });
+  await expect(page.locator("#scan-result")).toContainText("3 · Código: para onde o dinheiro iria");
   await noSideScroll(page);
+  await page.getByRole("link", { name: "Voltar à sua assinatura" }).click();
+  await expect(page.locator("html")).toHaveAttribute("lang", "pt-BR");
 });
 
 test("talk before cancelling: two moves each, the referee checks, and nothing changes until you take it", async ({ page }) => {

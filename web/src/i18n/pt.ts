@@ -1,7 +1,9 @@
 import type { Dict } from "./en";
+import { ptPages } from "./pages/pt";
 
 /** Brazilian Portuguese (pt-BR). Machine-written; not yet reviewed by a person. */
 export const pt: Dict = {
+  ...ptPages,
   "shell.skip": "Pular para o conteúdo",
   "shell.judges": "Para jurados",
   "shell.display": "Exibição e ajuda",

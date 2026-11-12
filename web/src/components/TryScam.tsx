@@ -3,6 +3,8 @@ import { ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
+import { useT } from "@/i18n";
+import type { Key } from "@/i18n/en";
 
 /**
  * Spec A6.6: a "try it" box on the landing page. It runs only the on-device model (public/safety/guard-client.js)
@@ -63,19 +65,11 @@ function guard(onPct: (n: number) => void): Promise<Guard> {
   return guardP;
 }
 
-const WORDS: Record<string, string> = {
-  impersonation: "claims to be an authority, a bank or your boss",
-  urgency_secrecy: "pushes you to act fast or keep it quiet",
-  changed_details: "asks you to pay to new bank or PayPal details",
-  off_platform: "asks to pay outside PayPal",
-  gift_cards_crypto: "asks for gift cards or crypto",
-  fee_to_release: "asks for a fee to release money",
-  otp_or_link: "asks for a code or sends a link",
-  overpay_refund: "says they overpaid",
-  too_good: "promises a prize or profit",
-};
+/** Tactic codes from the model, worded for display in the chosen language (the logic never reads these words). */
+const WORDS = new Set(["impersonation", "urgency_secrecy", "changed_details", "off_platform", "gift_cards_crypto", "fee_to_release", "otp_or_link", "overpay_refund", "too_good"]);
 
 export function TryScam() {
+  const { t } = useT();
   const [text, setText] = useState("");
   const [pct, setPct] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
@@ -108,32 +102,32 @@ export function TryScam() {
     <div className="rounded-xl border border-rule bg-card p-6">
       <h3 className="m-0 flex items-center gap-2 text-xl font-semibold">
         <ShieldCheck className="size-5 text-paid" aria-hidden="true" />
-        Try the scam check
+        {t("ts.h")}
       </h3>
-      <p className="mt-1 text-sm text-ink-2">Paste a message you got. A model in this browser reads it; nothing you paste leaves your device.</p>
-      <label htmlFor="try-scam" className="sr-only">Message to check</label>
-      <Textarea id="try-scam" ref={ref} rows={4} value={text} onChange={(e) => setText(e.target.value)} placeholder="Paste a text or email here" className="mt-3" />
+      <p className="mt-1 text-sm text-ink-2">{t("ts.b")}</p>
+      <label htmlFor="try-scam" className="sr-only">{t("ts.label")}</label>
+      <Textarea id="try-scam" ref={ref} rows={4} value={text} onChange={(e) => setText(e.target.value)} placeholder={t("ts.ph")} className="mt-3" />
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <Button onClick={run} disabled={busy}>{busy ? "Checking…" : "Check on this device"}</Button>
-        <Button variant="outline" onClick={() => setText(DEMO)}>Paste the 10 Nov example</Button>
+        <Button onClick={run} disabled={busy}>{busy ? t("ts.checking") : t("ts.run")}</Button>
+        <Button variant="outline" onClick={() => setText(DEMO)}>{t("ts.example")}</Button>
       </div>
       {busy && pct !== null && pct < 100 && (
         <div className="mt-3" aria-live="polite">
-          <p className="text-sm text-ink-2">Downloading the model to this device, once (23 MB): {pct}%</p>
-          <Progress value={pct} aria-label="Model download" />
+          <p className="text-sm text-ink-2">{t("ts.dl", { p: pct })}</p>
+          <Progress value={pct} aria-label={t("ts.dlLabel")} />
         </div>
       )}
       <div aria-live="polite">
         {out && (
           <div className={`mt-4 rounded-lg border-l-4 p-4 ${tone}`} role="status">
             {out.err ? (
-              <p className="m-0">The on-device check could not run here: {out.err}. Nothing is shown as clear.</p>
+              <p className="m-0">{t("ts.err", { e: out.err })}</p>
             ) : (
               <>
-                <p className="m-0 font-semibold">{out.level === "hold" ? "Hold: do not pay or reply yet" : out.pays ? "Check before you pay" : out.level === "caution" ? "Caution: check before you do anything" : "No scam signs found"}</p>
-                {out.pays && <p className="m-0 mt-1">This asks you to pay somewhere. Confirm it by phone on a number you already had.</p>}
-                {out.tactics.length > 0 && <p className="m-0 mt-1 text-sm">It {out.tactics.map((k) => WORDS[k] ?? k).join("; ")}.</p>}
-                <p className="m-0 mt-2 text-sm text-ink-2">Checked on this device in {Math.round(out.ms)} ms; nothing left your browser. Scam score {Math.round(out.p * 100)}%. {out.level === "clear" ? "A clear result is not a guarantee." : ""}</p>
+                <p className="m-0 font-semibold">{out.level === "hold" ? t("ts.hold") : out.pays ? t("ts.pays") : out.level === "caution" ? t("ts.caution") : t("ts.clear")}</p>
+                {out.pays && <p className="m-0 mt-1">{t("ts.paysB")}</p>}
+                {out.tactics.length > 0 && <p className="m-0 mt-1 text-sm">{t("ts.it", { list: out.tactics.map((k) => (WORDS.has(k) ? t(`ts.${k}` as Key) : k)).join("; ") })}</p>}
+                <p className="m-0 mt-2 text-sm text-ink-2">{t("ts.done", { ms: Math.round(out.ms), p: Math.round(out.p * 100) })} {out.level === "clear" ? t("ts.notGuarantee") : ""}</p>
               </>
             )}
           </div>

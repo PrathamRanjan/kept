@@ -69,19 +69,23 @@ export interface ShellPage {
   business?: string;
   trust?: string;
   wide?: boolean;
+  /** customer mode in another language: the page's lang and the shell's own words. Absent means English. */
+  words?: { lang: string; skip: string; read: string; display: string; testChip: string; testMode: string; footer: string };
 }
 
-const tools = () =>
-  `<div class="tools"><button class="iconbtn" type="button" data-a11y-read aria-pressed="false" title="Read this page aloud" aria-label="Read this page aloud">${icon("volume")}</button><button class="btn small" type="button" data-a11y-open aria-haspopup="dialog">${icon("type")}<span>Display</span></button></div>`;
+const tools = (w?: ShellPage["words"]) =>
+  `<div class="tools"><button class="iconbtn" type="button" data-a11y-read aria-pressed="false" title="${e(w?.read ?? "Read this page aloud")}" aria-label="${e(w?.read ?? "Read this page aloud")}">${icon("volume")}</button><button class="btn small" type="button" data-a11y-open aria-haspopup="dialog">${icon("type")}<span>${e(w?.display ?? "Display")}</span></button></div>`;
 
-const testChip = (b: Brand) =>
-  b.testMode ? `<details class="testmode"><summary title="${e(b.testMode)}">${icon("flask")}<span>Test mode</span></summary><div class="menu tm-note">${e(b.testMode)}</div></details>` : "";
+const testChip = (b: Brand, w?: ShellPage["words"]) => {
+  const note = w?.testMode ?? b.testMode;
+  return b.testMode ? `<details class="testmode"><summary title="${e(note!)}">${icon("flask")}<span>${e(w?.testChip ?? "Test mode")}</span></summary><div class="menu tm-note">${e(note!)}</div></details>` : "";
+};
 
-function head(b: Brand, title: string, extra = ""): string {
+function head(b: Brand, title: string, extra = "", lang = "en"): string {
   const s = b.staticBase;
   const css = [...(b.legacyCss ?? []), "ui.css", "theme.css", "a11y.css"].map((f) => `<link rel="stylesheet" href="${s}/${f}?v=${ASSET_V}">`).join("\n");
   return `<!doctype html>
-<html lang="en">
+<html lang="${e(lang)}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -164,13 +168,14 @@ ${tail}`;
   }
   if (p.mode === "customer") {
     const biz = p.business ?? b.name;
-    return `${head(b, `${p.title} · ${biz}`, p.head)}
+    const w = p.words;
+    return `${head(b, `${p.title} · ${biz}`, p.head, w?.lang)}
 <body class="customer">
-<a class="skip" href="#main">Skip to content</a>
-<header class="site-nav"><div class="wrap"><span class="sb-brand plain"><span class="mark">${e(biz[0] ?? "")}</span>${e(biz)}</span><div class="links">${testChip(b)}${tools()}</div></div></header>
+<a class="skip" href="#main">${e(w?.skip ?? "Skip to content")}</a>
+<header class="site-nav"><div class="wrap"><span class="sb-brand plain"><span class="mark">${e(biz[0] ?? "")}</span>${e(biz)}</span><div class="links">${testChip(b, w)}${tools(w)}</div></div></header>
 <main id="main" class="content narrow${p.wide ? " wide" : ""}">${flash}${p.body}
 ${p.trust ? `<p class="trust-line foot-trust">${icon("shieldCheck")}<span>${e(p.trust)}</span></p>` : ""}</main>
-<footer class="lp-foot"><div class="wrap"><span>Payments are handled by PayPal. Powered by ${e(b.name)}.</span></div></footer>
+<footer class="lp-foot"><div class="wrap"><span>${w ? e(w.footer) : `Payments are handled by PayPal. Powered by ${e(b.name)}.`}</span></div></footer>
 ${tail}`;
   }
   const links = b.siteLinks.map(([h, l]) => `<a href="${e(h)}">${e(l)}</a>`).join("");

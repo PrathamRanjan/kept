@@ -6,6 +6,7 @@ import { api, ApiError } from "@/lib/api";
 import { fmtRelative } from "@/lib/format";
 import { getSession } from "@/lib/session";
 import type { DemoStatus } from "@/lib/types";
+import { translate, getLang, useT } from "@/i18n";
 
 /** Loads the visitor's demo workspace; polls while real subscriptions are still being claimed from the pool. */
 export function useDemoStatus() {
@@ -30,23 +31,24 @@ export async function resetDemo(): Promise<boolean> {
   try {
     await api.post("/demo/reset");
     await getSession(true);
-    toast.success("Your demo shop was reset. Real subscriptions it held came with it.");
+    toast.success(translate(getLang(), "ws.resetOk"));
     return true;
   } catch (e) {
-    toast.error(e instanceof ApiError ? e.message : "Couldn't reset the demo.");
+    toast.error(e instanceof ApiError ? e.message : translate(getLang(), "ws.resetFail"));
     return false;
   }
 }
 
 /** The line every owner page shows inside a private demo workspace. */
 export function WorkspaceBar() {
+  const { t } = useT();
   const { st } = useDemoStatus();
   const [busy, setBusy] = useState(false);
   if (!st?.workspace) return null;
   return (
-    <section aria-label="Your private demo shop" className="mb-5 rounded-lg border border-rule bg-stamp-wash p-4 text-sm">
+    <section aria-label={t("ws.label")} className="mb-5 rounded-lg border border-rule bg-stamp-wash p-4 text-sm">
       <p className="m-0">
-        <b>Your private demo shop.</b> Only you see it; it is removed {st.workspace.idleHours} hours after your last visit (now {fmtRelative(st.workspace.expiresAt)}).{" "}
+        <b>{t("ws.title")}</b> {t("ws.line", { h: st.workspace.idleHours, when: fmtRelative(st.workspace.expiresAt) })}{" "}
         {st.pool?.line}
       </p>
       {st.sampleNote && <p className="m-0 mt-1 text-ink-2">{st.sampleNote}</p>}
@@ -62,15 +64,15 @@ export function WorkspaceBar() {
           }}
         >
           <RotateCcw aria-hidden="true" />
-          Reset my demo
+          {t("ws.reset")}
         </Button>
         {st.joinQr && (
           <details className="rounded-md border border-rule bg-card px-3 py-1.5">
             <summary className="flex cursor-pointer items-center gap-1.5">
               <Smartphone className="size-4" aria-hidden="true" />
-              Open on your phone
+              {t("ws.phone")}
             </summary>
-            <div className="mt-2 w-[168px]" role="img" aria-label="QR code that opens this demo shop on a second device" dangerouslySetInnerHTML={{ __html: st.joinQr }} />
+            <div className="mt-2 w-[168px]" role="img" aria-label={t("ws.qr")} dangerouslySetInnerHTML={{ __html: st.joinQr }} />
             <p className="m-0 mt-1 max-w-[40ch] break-all text-xs text-ink-2">{st.joinUrl}</p>
           </details>
         )}

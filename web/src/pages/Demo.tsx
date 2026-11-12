@@ -8,8 +8,10 @@ import { api, ApiError } from "@/lib/api";
 import { getSession } from "@/lib/session";
 import type { Session } from "@/lib/types";
 import { resetDemo, useDemoStatus } from "@/components/WorkspaceBar";
+import { useT } from "@/i18n";
 
 export default function Demo({ judge = false }: { judge?: boolean }) {
+  const { t } = useT();
   const [s, setS] = useState<Session | null>(null);
   const nav = useNavigate();
   const [busy, setBusy] = useState(false);
@@ -29,7 +31,7 @@ export default function Demo({ judge = false }: { judge?: boolean }) {
       reload();
       return fresh;
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Couldn't start your demo shop.");
+      toast.error(e instanceof ApiError ? e.message : t("demo.startFail"));
       return null;
     } finally {
       setBusy(false);
@@ -43,7 +45,7 @@ export default function Demo({ judge = false }: { judge?: boolean }) {
       await getSession(true);
       nav("/dashboard");
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Couldn't open your demo shop.");
+      toast.error(e instanceof ApiError ? e.message : t("demo.openFail"));
     } finally {
       setBusy(false);
     }
@@ -53,48 +55,48 @@ export default function Demo({ judge = false }: { judge?: boolean }) {
     if (!fresh) return;
     if (kind === "shop") nav(`/s/${fresh.demoShop}`);
     else if (fresh.demoMemberRef) nav(`/manage/${fresh.demoMemberRef}`);
-    else toast.error("Your demo shop has no member yet.");
+    else toast.error(t("demo.noMember"));
   }
 
   const personas = [
     {
       icon: Store,
-      who: "The shop owner",
-      what: "Your own private copy of the demo coffee shop. See what needs you, approve held offers, read why people leave.",
+      who: t("demo.ownerWho"),
+      what: t("demo.ownerWhat"),
       action: (
         <Button onClick={owner} disabled={busy || s?.demoMode === false}>
-          Continue as the owner
+          {t("demo.ownerGo")}
           <ArrowRight aria-hidden="true" />
         </Button>
       ),
     },
     {
       icon: User,
-      who: "A member",
-      what: "A coffee subscriber's own page: their stamp card, skip, pause, switch, and one-step cancel.",
+      who: t("demo.memberWho"),
+      what: t("demo.memberWhat"),
       action: (
         <Button variant="outline" onClick={() => go("member")} disabled={busy}>
-          {s?.workspace && s.demoMemberIsSample === false ? "Open a real member's page" : "Open a member's page"}
+          {s?.workspace && s.demoMemberIsSample === false ? t("demo.memberReal") : t("demo.memberGo")}
         </Button>
       ),
     },
     {
       icon: KeyRound,
-      who: "A new subscriber",
-      what: "Subscribe with a PayPal sandbox personal account. The shop's daily plan renews within a day, so you see a real renewal.",
+      who: t("demo.newWho"),
+      what: t("demo.newWhat"),
       action: (
         <Button variant="outline" onClick={() => go("shop")} disabled={busy}>
-          Open the shop
+          {t("demo.newGo")}
         </Button>
       ),
     },
     {
       icon: Bot,
-      who: "A member's AI assistant",
-      what: "Connect Claude or any MCP client to the shop and manage a subscription by conversation.",
+      who: t("demo.aiWho"),
+      what: t("demo.aiWhat"),
       action: (
         <Button variant="outline" asChild>
-          <a href="/agents">Connect an assistant</a>
+          <a href="/agents">{t("demo.aiGo")}</a>
         </Button>
       ),
     },
@@ -104,45 +106,45 @@ export default function Demo({ judge = false }: { judge?: boolean }) {
     <>
       <PublicHeader />
       <main id="main" className="mx-auto max-w-5xl px-4 py-12">
-        <h1 className="text-4xl font-bold">{judge ? "Judge mode" : "Try the live demo"}</h1>
+        <h1 className="text-4xl font-bold">{judge ? t("demo.judgeH") : t("demo.h")}</h1>
         <p className="mt-3 max-w-[60ch] text-lg text-ink-2">
           {judge
-            ? "One guided story across every persona, about three minutes, including a live PayPal sandbox step. Or pick a persona and explore."
-            : "Pick who to be. Everything runs on the PayPal sandbox: real PayPal calls, no real money."}
+            ? t("demo.judgeB")
+            : t("demo.b")}
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
           <Button size="lg" variant="outline" asChild>
             <a href="/judge">
               <Compass aria-hidden="true" />
-              For judges: three paths that tick themselves
+              {t("demo.paths")}
             </a>
           </Button>
         </div>
-        <section aria-label="Your private demo shop" className="mt-8 rounded-xl border border-rule bg-card p-5">
+        <section aria-label={t("ws.label")} className="mt-8 rounded-xl border border-rule bg-card p-5">
           {st?.workspace ? (
             <>
-              <h2 className="m-0 text-xl font-semibold">Your private demo shop is ready</h2>
-              <p className="m-0 mt-2 text-ink-2">Nobody else sees what you do in it. It is removed {st.workspace.idleHours} hours after your last visit. {st.pool?.line}</p>
+              <h2 className="m-0 text-xl font-semibold">{t("demo.readyH")}</h2>
+              <p className="m-0 mt-2 text-ink-2">{t("demo.readyB", { h: st.workspace.idleHours })} {st.pool?.line}</p>
               {st.sampleNote && <p className="m-0 mt-2 text-sm text-ink-2">{st.sampleNote}</p>}
               <div className="mt-4 flex flex-wrap items-start gap-4">
                 <Button variant="outline" disabled={busy} onClick={async () => { setBusy(true); if (await resetDemo()) { setS(await getSession(true)); reload(); } setBusy(false); }}>
                   <RotateCcw aria-hidden="true" />
-                  Reset my demo
+                  {t("ws.reset")}
                 </Button>
                 {st.joinQr && (
                   <div className="flex items-start gap-3">
-                    <div className="w-[120px] shrink-0 rounded bg-white p-1" role="img" aria-label="QR code that opens your demo shop on your phone" dangerouslySetInnerHTML={{ __html: st.joinQr }} />
-                    <p className="m-0 max-w-[36ch] text-sm text-ink-2">Scan to open the same shop on your phone, for example a member's page.</p>
+                    <div className="w-[120px] shrink-0 rounded bg-white p-1" role="img" aria-label={t("demo.qr")} dangerouslySetInnerHTML={{ __html: st.joinQr }} />
+                    <p className="m-0 max-w-[36ch] text-sm text-ink-2">{t("demo.scan")}</p>
                   </div>
                 )}
               </div>
             </>
           ) : (
             <>
-              <h2 className="m-0 text-xl font-semibold">Start your own private demo shop</h2>
-              <p className="m-0 mt-2 text-ink-2">A copy of the demo shop just for you, on the same PayPal sandbox plans: labelled sample members, plus real sandbox subscriptions when the pre-approved pool has them. It is removed {48} hours after your last visit.</p>
+              <h2 className="m-0 text-xl font-semibold">{t("demo.startH")}</h2>
+              <p className="m-0 mt-2 text-ink-2">{t("demo.startB", { h: 48 })}</p>
               <Button className="mt-4" onClick={ensure} disabled={busy || s?.demoMode === false}>
-                Start my demo shop
+                {t("demo.start")}
                 <ArrowRight aria-hidden="true" />
               </Button>
             </>
@@ -161,7 +163,7 @@ export default function Demo({ judge = false }: { judge?: boolean }) {
           ))}
         </ul>
         <p className="mt-8 text-sm text-ink-2">
-          Have your own owner key? <a className="text-stamp underline" href="/login">Sign in with it</a>. Want your own shop? <a className="text-stamp underline" href="/onboard">Set one up</a> on the sandbox in two minutes.
+          {t("demo.key1")} <a className="text-stamp underline" href="/login">{t("demo.key2")}</a>. {t("demo.shop1")} <a className="text-stamp underline" href="/onboard">{t("demo.shop2")}</a> {t("demo.shop3")}
         </p>
       </main>
       <PublicFooter />

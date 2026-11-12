@@ -13,6 +13,8 @@ import { TACTIC_WORDS, TACTICS } from "../safety/rules.js";
 import { KeptError, merchantById, subscriberByRef, type Merchant } from "../store.js";
 import { ownerOf } from "./guard.js";
 import { fmtDate, html, layout, raw, type Raw } from "./html.js";
+import { normLang } from "../i18n.js";
+import { clientWords, fill, pageWords, type PageWords } from "./check-i18n.js";
 
 type Page = (req: Request, res: Response) => Promise<unknown>;
 const page = (fn: Page) => (req: Request, res: Response, next: NextFunction) => fn(req, res).catch(next);
@@ -36,9 +38,9 @@ export const DEMO_FAKE_FAILED = "Kept Billing: your Morning Roast subscription p
 
 const SCRIPTS = raw(`<script async src="https://cdnjs.cloudflare.com/ajax/libs/onnxruntime-web/1.22.0/ort.min.js"></script><script type="module" src="/static/safety.js"></script>`);
 
-const checkCard = (intro: string, demo: string, prefill = "") => html`<div class="card" id="check"><h2>Check a message</h2><p class="small muted">${intro} The model scores it on this device; the words never leave your browser for the score.</p>
-<form id="scan-form" class="stack"><label for="scan-text" class="sr">Message to check</label><textarea id="scan-text" name="text" rows="6" placeholder="Paste the message here" style="width:100%">${prefill}</textarea>
-<div class="row"><button class="btn primary" type="submit" id="scan-btn" disabled aria-describedby="scan-status">Check this message</button><button class="btn" type="button" id="scan-demo">Paste the demo scam</button><span class="small muted" id="scan-status" aria-live="polite">Getting the check ready…</span><noscript><span class="small">The check needs JavaScript in this browser.</span></noscript></div></form>
+const checkCard = (intro: string, demo: string, prefill = "", w: PageWords = pageWords("en")) => html`<div class="card" id="check"><h2>${w.cardH}</h2><p class="small muted">${intro} ${w.cardNote}</p>
+<form id="scan-form" class="stack"><label for="scan-text" class="sr">${w.label}</label><textarea id="scan-text" name="text" rows="6" placeholder="${w.ph}" style="width:100%">${prefill}</textarea>
+<div class="row"><button class="btn primary" type="submit" id="scan-btn" disabled aria-describedby="scan-status">${w.btn}</button><button class="btn" type="button" id="scan-demo">${w.demo}</button><span class="small muted" id="scan-status" aria-live="polite">${w.ready}</span><noscript><span class="small">${w.noscript}</span></noscript></div></form>
 <div id="scan-result" aria-live="polite"></div>${raw(`<script type="application/json" id="demo-bec">${JSON.stringify({ text: demo }).replace(/</g, "\\u003c")}</script>`)}</div>`;
 
 const modelCard = (back: string) => html`<h1>How the scam check was tested</h1>
@@ -119,10 +121,18 @@ ${checkCard("Paste a text, email or chat message a subscriber forwarded.", DEMO_
     const s = await subscriberByRef(db, req.params.ref);
     if (!s) throw new KeptError("Subscription not found", "not_found", 404);
     const m = (await merchantById(db, s.merchant_id))!;
-    res.send(layout({ title: "Is this message really from us?", nav: "manage", scripts: SCRIPTS }, html`<h1>Is this message really from ${m.name}?</h1>
-<p data-simple="If a payment fails, it shows on your subscription page. We never send a link to pay. Paste the message below to check it.">If a payment ever fails, it shows on <a href="/manage/${s.ref}">your subscription page</a>, and only there. ${m.name} and Kept never send a "pay here" link by text or email. Paste any message you are unsure about and it is checked here, on your device.</p>
-${checkCard("Paste the text or email you received.", DEMO_FAKE_FAILED, typeof req.query.text === "string" ? req.query.text.slice(0, 4000) : "")}
-<p class="small muted"><a href="/manage/${s.ref}">Back to your subscription</a></p>`));
+    // Part B: ?lang= from the member page's link, else the language the member chose before. English is unchanged.
+    const lang = normLang(typeof req.query.lang === "string" ? req.query.lang : (s as { lang?: string | null }).lang);
+    const w = pageWords(lang);
+    const cw = clientWords(lang);
+    const back = `/manage/${s.ref}${lang === "en" ? "" : `?lang=${lang}`}`;
+    const shell = lang === "en" ? {} : { business: w.yourSub, trust: fill(w.trust, { shop: m.name }), words: { lang, skip: w.skip, read: w.read, display: w.display, testChip: w.testChip, testMode: w.testMode, footer: fill(w.footer, { brand: "Kept" }) } };
+    res.send(layout({ title: w.title, nav: "manage", scripts: SCRIPTS, ...shell }, html`<h1>${fill(w.h1, { shop: m.name })}</h1>
+${w.mt ? html`<p class="small muted" data-testid="check-mt">${w.mt}</p>` : ""}
+<p data-simple="${w.simple}">${w.p1} <a href="${back}">${w.p2}</a>${fill(w.p3, { shop: m.name })}</p>
+${checkCard(w.intro, DEMO_FAKE_FAILED, typeof req.query.text === "string" ? req.query.text.slice(0, 4000) : "", w)}
+${cw ? raw(`<script type="application/json" id="scan-words">${JSON.stringify(cw).replace(/</g, "\\u003c")}</script>`) : ""}
+<p class="small muted"><a href="${back}">${w.back}</a></p>`));
   }));
   r.post("/manage/:ref/check/scan", page(scanBody));
 

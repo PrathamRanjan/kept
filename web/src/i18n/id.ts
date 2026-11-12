@@ -1,7 +1,9 @@
 import type { Dict } from "./en";
+import { idPages } from "./pages/id";
 
 /** Bahasa Indonesia (id-ID). Machine-written; not yet reviewed by a person. */
 export const id: Dict = {
+  ...idPages,
   "shell.skip": "Langsung ke konten",
   "shell.judges": "Untuk juri",
   "shell.display": "Tampilan dan bantuan",

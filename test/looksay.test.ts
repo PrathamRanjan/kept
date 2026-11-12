@@ -233,6 +233,52 @@ describe("language switch on the server", () => {
   });
 });
 
+describe("the member's scam-check page in four languages", () => {
+  const ph = (s: string) => [...s.matchAll(/\{(\w+)\}/g)].map((x) => x[1]).sort().join(",");
+  it("English is exactly as before", async () => {
+    const x = await member("Ena Check");
+    const r = await c.get(`/manage/${x.ref}/check`);
+    expect(r.status).toBe(200);
+    expect(r.text).toContain('<html lang="en">');
+    expect(r.text).toContain("Is this message really from Look Say Roasters?");
+    expect(r.text).toContain("Skip to content");
+    expect(r.text).toContain("Payments are handled by PayPal. Powered by Kept.");
+    expect(r.text).toContain("Check this message");
+    expect(r.text).toContain(`<a href="/manage/${x.ref}">your subscription page</a>, and only there.`);
+    expect(r.text).not.toContain('id="scan-words"');
+  });
+  it("?lang= from the member page gives the page and the result words in that language", async () => {
+    const x = await member("Paula Check");
+    const r = await c.get(`/manage/${x.ref}/check?lang=pt-BR`);
+    expect(r.text).toContain('<html lang="pt-BR">');
+    expect(r.text).toContain("Esta mensagem é mesmo de Look Say Roasters?");
+    expect(r.text).toContain("Verificar esta mensagem");
+    expect(r.text).toContain(`href="/manage/${x.ref}?lang=pt-BR"`);
+    expect(r.text).toContain('data-testid="check-mt"');
+    const words = JSON.parse(/id="scan-words">([^<]*)</.exec(r.text)![1]);
+    expect(words.hold).toBe("Espere: não pague ainda");
+    expect(words.changed_details).toContain("PayPal");
+  });
+  it("with no ?lang= it follows the language the member chose", async () => {
+    const x = await member("Hema Check", "hi-IN");
+    const r = await c.get(`/manage/${x.ref}/check`);
+    expect(r.text).toContain('<html lang="hi-IN">');
+    expect(r.text).toMatch(/क्या यह संदेश सच में Look Say Roasters का है\?/);
+  });
+  it("every language has every word, with the same placeholders", async () => {
+    const { PAGE_EN, CLIENT_EN, CHECK_DICTS } = await import("../src/web/check-i18n.js");
+    for (const [en, dicts] of [[PAGE_EN, CHECK_DICTS.PAGE], [CLIENT_EN, CHECK_DICTS.CLIENT]] as const) {
+      for (const d of Object.values(dicts) as Record<string, string>[]) {
+        expect(Object.keys(d).sort()).toEqual(Object.keys(en).sort());
+        for (const k of Object.keys(en)) {
+          expect(d[k].trim(), k).not.toBe("");
+          expect(ph(d[k]), k).toBe(ph((en as Record<string, string>)[k]));
+        }
+      }
+    }
+  });
+});
+
 describe("hands-free: snapping (code)", () => {
   const A = { id: "a", rect: { x: 100, y: 100, w: 120, h: 44 } };
   const B = { id: "b", rect: { x: 400, y: 100, w: 120, h: 44 } };

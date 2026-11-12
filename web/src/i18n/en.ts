@@ -3,7 +3,10 @@
  * test/i18n.test.ts fails on any value left identical to English unless it is listed as a name or code.
  * Placeholders are {name}. Shop, plan and product names are data and never pass through here.
  */
+import { enPages } from "./pages/en";
+
 export const en = {
+  ...enPages,
   // Shell
   "shell.skip": "Skip to content",
   "shell.judges": "For judges",

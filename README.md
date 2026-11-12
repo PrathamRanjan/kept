@@ -360,7 +360,7 @@ Each item was built, tested (`npm test`: 167 of 167; `npm run e2e`: 28 of 28), p
 
 A change goes to `main` only when all of these pass. This is a checklist run by hand: there is no CI workflow that blocks a push.
 
-1. `npm test`: all suites (211 tests today), including route coverage.
+1. `npm test`: all suites (215 tests today), including route coverage.
 2. `cd web && npx tsc -b && npx vite build`.
 3. `npm run e2e`: all browser tests on phone and desktop, axe with no serious or critical issues (45 today, 3 skipped by design on the phone).
 4. When AI behaviour changes, the eval sets on real models:
@@ -419,6 +419,20 @@ Extra features on top of the core flow. The core flow (subscribe, skip, pause, r
   - No deal changes nothing. If an offer from the talk is ignored, it lapses without cancelling.
   - The transcript is in the member's language.
 
+### Every public page and the member's scam check (12 Nov, second pass)
+
+- The picker now changes every page a member or judge can reach without signing in, not only the member's pages:
+  - the landing page, demo, judges, 404 and the five proof pages (/proof, /ai, /paypal, /who-can-move-money, /accessibility)
+  - the demo notice shown on every page, the history chips, the demo-shop bar and the scam-check box
+  - the page title and description
+- On the proof pages, Kept's own words are translated. The eval cases, judge steps and other server records are shown as recorded, in English, with a note saying so.
+- The member's scam-check page (`/manage/:ref/check`, rendered by the server) follows the member's language: from `?lang=` on the member page's link, or from the language the member chose before. The page, its header and footer, and the result the check script draws are all translated. With no language set, the page is exactly as before; a test checks this word for word.
+- English is unchanged everywhere. An e2e test switches each public page to Indonesian and back, then checks that the heading, the page title and the demo notice match the English exactly.
+- New tests:
+  - four server tests for the check page: English unchanged, `?lang=`, the stored language, and every word in every language
+  - e2e: public pages follow the picker; landing, demo and proof pass axe with no sideways scroll in all three languages; the pseudo-locale fits on four more pages; the Portuguese check page runs a check and shows the result in Portuguese
+- Screenshots: `docs/screenshots/lang-{hi-IN,id-ID,pt-BR}-landing-{phone,desktop}.png`.
+
 ### Bugs found and fixed on the way
 
 - `Permissions-Policy` had `camera=()`, so the browser refused the camera on every Kept page. It is now `camera=(self), microphone=(self)`.
@@ -429,7 +443,7 @@ Extra features on top of the core flow. The core flow (subscribe, skip, pause, r
 
 ### Tests
 
-- `npm test`: **211 tests, 21 files**, including `test/looksay.test.ts` (31, one with a stubbed Decisions model) and `test/i18n.test.ts` (13):
+- `npm test`: **215 tests, 21 files**, including `test/looksay.test.ts` (35, one with a stubbed Decisions model) and `test/i18n.test.ts` (13):
   - limit and stance reading
   - the referee
   - agreed, no-deal, injection, Hindi, sample and lapse cases
@@ -437,7 +451,7 @@ Extra features on top of the core flow. The core flow (subscribe, skip, pause, r
   - PayPal locale, cancel words
   - snapping, calibration, intents, wake word, destructive labels
   - route coverage
-- `npm run e2e`: **45 passed, 3 skipped by design on the phone**. New:
+- `npm run e2e`: **55 passed, 3 skipped by design on the phone**. New:
   - the language switch keeps typed text
   - axe and no sideways scroll in hi-IN, id-ID and pt-BR on phone and desktop
   - the pseudo-locale fits
@@ -458,6 +472,7 @@ Extra features on top of the core flow. The core flow (subscribe, skip, pause, r
   - the local-currency estimate (it needs a real exchange-rate source; no rates were invented)
   - the phone line with language choice (the Twilio number belongs to another app)
   - the multiparty talk (scheduled after StockSure)
-- Owner pages and the timeline history stay in English. Some server error messages are still English.
+- The owner dashboard stays in English, and says so in every language. Each history entry is written in English when it happens; a member reading in another language is told so. Some server error messages are still English.
+- On the member's scam-check page, the demo scam message and the detailed reasons from the server checks stay in English, and the page says so.
 - Speech recognition in Chrome runs on Google's servers, so voice needs the network. Firefox has none.
 - Large file: the face model `public/handsfree/face_landmarker.task` (3.76 MB, from Google's MediaPipe model bucket, Apache 2.0) is committed. The 21 MB WebAssembly runtime is copied from the npm package at build time.

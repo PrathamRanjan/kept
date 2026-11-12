@@ -406,7 +406,7 @@ export default function Manage() {
             </h2>
             <p className="mt-1 text-sm text-ink-2">{t("m.scamB", { shop: data.shop.name })}</p>
             <Button variant="outline" asChild className="h-auto min-h-9 max-w-full whitespace-normal py-2 text-left">
-              <a href={`/manage/${ref}/check`}>{t("m.scamBtn")}</a>
+              <a href={`/manage/${ref}/check${lang === "en" || lang === "qps" ? "" : `?lang=${lang}`}`}>{t("m.scamBtn")}</a>
             </Button>
           </section>
         </div>

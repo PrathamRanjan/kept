@@ -76,6 +76,9 @@ const I18n = createContext<Ctx>({ lang: "en", setLang: () => undefined, t: (k, v
 function applyDocument(lang: Lang) {
   document.documentElement.lang = BCP[lang];
   document.documentElement.dataset.lang = lang;
+  // Page title and description in the chosen language (the English values are the ones in index.html).
+  document.title = translate(lang, "meta.title");
+  document.querySelector('meta[name="description"]')?.setAttribute("content", translate(lang, "meta.desc"));
   // Noto Sans Devanagari, self-hosted, only when Hindi is chosen (and cached by the browser after that).
   if (lang === "hi-IN") void import("@fontsource/noto-sans-devanagari/400.css").then(() => import("@fontsource/noto-sans-devanagari/600.css")).catch(() => undefined);
 }
