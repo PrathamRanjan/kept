@@ -71,6 +71,7 @@ async function build(steps: DriveStep[], opts: { name: TourName; onClose: () => 
 
 /** Start a page's tour. Only ever called from a button. */
 export function startTour(name: TourName, _o: { force?: boolean } = {}) {
+  void import("./story").then((s) => s.endStory());
   const steps = name === "owner" ? ownerSteps : name === "member" ? memberSteps : shopSteps;
   // Wait a frame so the page's targets exist.
   requestAnimationFrame(() => void build(steps.filter((s) => !s.element || document.querySelector(String(s.element))), { name, onClose: () => undefined }).then((d) => d.drive()));

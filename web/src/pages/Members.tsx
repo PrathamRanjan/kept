@@ -148,7 +148,7 @@ export default function Members({ d, reload }: { d: Today; reload: () => void })
             <AgGridReact<Member> theme={theme} rowData={rows} columnDefs={cols} getRowId={(p) => p.data.ref} animateRows={false} suppressCellFocus={false} ensureDomOrder enableCellTextSelection />
           </div>
           {/* Phones: cards. */}
-          <ul className="mt-4 grid list-none gap-3 p-0 md:hidden">
+          <ul data-tour="grid-m" className="mt-4 grid list-none gap-3 p-0 md:hidden">
             {rows.slice(0, 60).map((m) => (
               <li key={m.ref} className="rounded-xl border border-rule bg-card p-4">
                 <div className="flex items-start justify-between gap-2">

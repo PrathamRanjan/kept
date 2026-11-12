@@ -6,6 +6,7 @@ import { PublicFooter, PublicHeader } from "@/components/Shell";
 import { Button } from "@/components/ui/button";
 import { api, ApiError } from "@/lib/api";
 import { getSession } from "@/lib/session";
+import { startStory, storyContext } from "@/story";
 import type { Session } from "@/lib/types";
 import { resetDemo, useDemoStatus } from "@/components/WorkspaceBar";
 import { useT } from "@/i18n";
@@ -38,22 +39,25 @@ export default function Demo({ judge = false }: { judge?: boolean }) {
     }
   }
 
-  async function owner() {
+  /** guided: the walkthrough opens with "You are the owner of …" and walks every use case (story.ts). */
+  async function owner(guided = true) {
     setBusy(true);
     try {
       await api.post("/ui/demo/owner");
       await getSession(true);
-      nav("/dashboard");
+      if (guided) startStory("owner", await storyContext());
+      else nav("/dashboard");
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : t("demo.openFail"));
     } finally {
       setBusy(false);
     }
   }
-  async function go(kind: "member" | "shop") {
+  async function go(kind: "member" | "shop", guided = false) {
     const fresh = await ensure();
     if (!fresh) return;
-    if (kind === "shop") nav(`/s/${fresh.demoShop}`);
+    if (kind === "member" && guided && fresh.demoMemberRef) startStory("member", await storyContext());
+    else if (kind === "shop") nav(`/s/${fresh.demoShop}`);
     else if (fresh.demoMemberRef) nav(`/manage/${fresh.demoMemberRef}`);
     else toast.error(t("demo.noMember"));
   }
@@ -63,21 +67,33 @@ export default function Demo({ judge = false }: { judge?: boolean }) {
       icon: Store,
       who: t("demo.ownerWho"),
       what: t("demo.ownerWhat"),
+      badge: t("demo.guided3"),
       action: (
-        <Button onClick={owner} disabled={busy || s?.demoMode === false}>
-          {t("demo.ownerGo")}
-          <ArrowRight aria-hidden="true" />
-        </Button>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <Button onClick={() => owner()} disabled={busy || s?.demoMode === false}>
+            {t("demo.ownerStart")}
+            <ArrowRight aria-hidden="true" />
+          </Button>
+          <Button variant="link" className="h-auto min-h-11 px-0" onClick={() => owner(false)} disabled={busy || s?.demoMode === false}>
+            {t("demo.skip")}
+          </Button>
+        </div>
       ),
     },
     {
       icon: User,
       who: t("demo.memberWho"),
       what: t("demo.memberWhat"),
+      badge: t("demo.guided1"),
       action: (
-        <Button variant="outline" onClick={() => go("member")} disabled={busy}>
-          {s?.workspace && s.demoMemberIsSample === false ? t("demo.memberReal") : t("demo.memberGo")}
-        </Button>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <Button variant="outline" onClick={() => go("member", true)} disabled={busy}>
+            {t("demo.memberStart")}
+          </Button>
+          <Button variant="link" className="h-auto min-h-11 px-0" onClick={() => go("member")} disabled={busy}>
+            {s?.workspace && s.demoMemberIsSample === false ? t("demo.memberReal") : t("demo.memberGo")}
+          </Button>
+        </div>
       ),
     },
     {
@@ -157,6 +173,7 @@ export default function Demo({ judge = false }: { judge?: boolean }) {
                 <p.icon className="size-5" aria-hidden="true" />
               </span>
               <h2 className="mt-4 text-xl font-semibold">{p.who}</h2>
+              {"badge" in p && p.badge ? <p className="m-0 mt-1 text-sm font-medium text-stamp">{p.badge}</p> : null}
               <p className="mt-1 flex-1 text-ink-2">{p.what}</p>
               <div className="mt-5">{p.action}</div>
             </li>

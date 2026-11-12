@@ -16,6 +16,6 @@ export default defineConfig({
     command: "tsx e2e/server.ts",
     url: "http://localhost:4199/ui/session",
     reuseExistingServer: !process.env.CI,
-    env: { PORT: "4199", APP_URL: "http://localhost:4199", KEPT_BRAIN: "local", KEPT_DEMO_MODE: "true", KEPT_INLINE_WORKER: "false", PAYPAL_CLIENT_ID: "", PAYPAL_CLIENT_SECRET: "", OPENAI_API_KEY: "", DATABASE_URL: "" },
+    env: { PORT: "4199", APP_URL: "http://localhost:4199", KEPT_BRAIN: "local", KEPT_DEMO_MODE: "true", KEPT_WORKSPACES_PER_IP_HOUR: "1000", KEPT_INLINE_WORKER: "false", PAYPAL_CLIENT_ID: "", PAYPAL_CLIENT_SECRET: "", OPENAI_API_KEY: "", DATABASE_URL: "" },
   },
 });

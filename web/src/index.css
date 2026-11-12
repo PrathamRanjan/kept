@@ -269,3 +269,18 @@ html[data-lang="hi-IN"] body { font-family: "Noto Sans Devanagari", var(--font-s
 html[data-lang="hi-IN"] :is(h1, h2, h3) { line-height: 1.35; }
 /* Longer languages (Portuguese runs about 30% longer): buttons wrap instead of clipping. */
 html[data-lang]:not([data-lang="en"]) [data-slot="button"]:not([data-size^="icon"]) { white-space: normal; height: auto; min-height: 2.5rem; text-align: center; }
+
+/* The guided walkthrough (story.ts): the opening "who you are" card, and the corner button for steps you act in. */
+.driver-popover.kept-tour.kept-story-card { max-width: min(520px, calc(100vw - 32px)); padding: 24px; }
+.driver-popover.kept-tour.kept-story-card .driver-popover-title { font-size: 1.5rem; line-height: 1.2; }
+.driver-popover.kept-tour.kept-story-card .driver-popover-description { font-size: 1.02rem; }
+.kept-story-pill {
+  position: fixed; right: 16px; bottom: 16px; z-index: 1000000;
+  display: flex; align-items: center; gap: 8px; padding: 8px 8px 8px 14px;
+  background: var(--card-stock); color: var(--ink); border: 1px solid var(--rule); border-radius: 999px;
+  box-shadow: var(--shadow-float); font: 500 0.875rem var(--font-sans);
+}
+.kept-story-pill .kept-story-next { background: var(--ink); color: var(--paper); border-radius: 999px; padding: 8px 14px; min-height: 40px; font-weight: 600; }
+.kept-story-pill .kept-story-close { color: var(--ink-2); width: 40px; height: 40px; border-radius: 999px; font-size: 1.25rem; }
+.kept-story-pill button:focus-visible { outline: 2px solid var(--stamp); outline-offset: 2px; }
+@media (max-width: 640px) { .kept-story-pill { left: 16px; right: 16px; justify-content: space-between; } }

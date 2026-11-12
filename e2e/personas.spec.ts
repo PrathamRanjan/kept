@@ -15,7 +15,7 @@ test("landing: hero, live cycle card, illustrative pricing, FAQ, persona picker"
   await page.getByRole("link", { name: /Try the live demo/ }).first().click();
   await expect(page).toHaveURL(/\/demo$/);
   await expect(page.getByRole("heading", { name: "Try the live demo" })).toBeVisible();
-  await expect(page.getByRole("button", { name: /Continue as the owner/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Start as the owner" })).toBeVisible();
   await noSideScroll(page);
 });
 
@@ -76,7 +76,7 @@ test("member: asking for an offer shows one offer; declining cancels at once", a
 
 test("owner: today, ask, approvals and members", async ({ page, isMobile }) => {
   await page.goto("/demo");
-  await page.getByRole("button", { name: /Continue as the owner/ }).click();
+  await page.getByRole("button", { name: "Skip the walkthrough" }).click();
   await expect(page).toHaveURL(/\/dashboard$/);
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Today at Ember & Oak");
   await expect(page.locator("[data-tour='kpis']")).toContainText("Live members");

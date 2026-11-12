@@ -51,7 +51,7 @@ export function AssistantPanel({ memberRef, sample, initial, onChanged }: { memb
   }
 
   return (
-    <section id="assistant" className="mt-8 scroll-mt-20 rounded-xl border border-rule bg-card p-6" aria-labelledby="assistant-h">
+    <section id="assistant" data-tour="assistant" className="mt-8 scroll-mt-20 rounded-xl border border-rule bg-card p-6" aria-labelledby="assistant-h">
       <h2 id="assistant-h" className="m-0 flex items-center gap-2 text-2xl font-bold">
         <Bot className="size-6 text-stamp" aria-hidden="true" />
         {t("a.title")}
