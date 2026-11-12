@@ -127,6 +127,14 @@ describe("A1 private workspaces and A2.2 the approval pool", () => {
     fake.approve(waiting[0].paypal_id);
     expect((await c.req("POST", "/admin/pool/sync", { headers: { accept: "application/json" } })).json.ready).toBe(2);
     expect((await c.get("/admin/pool.json")).json.counts).toMatchObject({ ready: 2, awaiting: 1 });
+    // PayPal's sandbox drops one nobody approved: the read-back retires it and the page stops offering its dead link.
+    const dead = waiting[1];
+    fake.subs.delete(dead.paypal_id);
+    expect((await c.req("POST", "/admin/pool/sync", { headers: { accept: "application/json" } })).json).toMatchObject({ ready: 2, spent: 1, errors: 0 });
+    expect((await c.get("/admin/pool.json")).json.counts).toMatchObject({ ready: 2, awaiting: 0, spent: 1 });
+    const page = (await c.get("/admin/pool")).text;
+    expect(page).not.toContain(dead.approve_url);
+    expect(page).toMatch(/approval link is dead/);
     expect((await c.get("/demo/pool/approved?id=x")).text).toMatch(/Thank you/);
     expect((await c.get("/admin")).text).toMatch(/Approval pool/);
   });

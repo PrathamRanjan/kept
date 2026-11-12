@@ -15,6 +15,7 @@ import { config } from "../config.js";
 import { getDb } from "../db.js";
 import { newId, requestKey } from "../lib/ids.js";
 import { paypalFor } from "../paypal/index.js";
+import { PayPalError } from "../paypal/types.js";
 import { logEvent, merchantById, planByPayPalId, plansFor, subscriberByPayPalId } from "../store.js";
 import { POOL_PER_WORKSPACE, showcase, workspaceById, type Workspace } from "./workspaces.js";
 
@@ -85,6 +86,13 @@ export async function syncPool(): Promise<{ checked: number; ready: number; spen
         await db.query("UPDATE approval_pool SET status = 'awaiting_approval', note = $2, updated_at = now() WHERE id = $1", [it.id, `PayPal reads back ${pp.status}`]);
       }
     } catch (e) {
+      // PayPal's sandbox removes a subscription nobody approved; its approval link is dead from then on. Retire it
+      // so the admin page stops offering a link that can't work. Any other failure stays as it was, with its reason.
+      if (e instanceof PayPalError && (e.status === 404 || e.name_ === "INVALID_RESOURCE_ID" || /INVALID_RESOURCE_ID|RESOURCE_NOT_FOUND/.test(e.message))) {
+        await db.query("UPDATE approval_pool SET status = 'spent', note = $2, updated_at = now() WHERE id = $1", [it.id, "PayPal no longer has this subscription (not approved in time), so its approval link is dead"]);
+        out.spent++;
+        continue;
+      }
       out.errors++;
       await db.query("UPDATE approval_pool SET note = $2, updated_at = now() WHERE id = $1", [it.id, `read failed: ${(e as Error).message.slice(0, 160)}`]);
     }
