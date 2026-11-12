@@ -19,6 +19,9 @@ import type { CycleCardData, PlanJson, TimelineRun } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { startTour } from "@/tours";
 import { AssistantPanel } from "@/components/AssistantPanel";
+import { VoiceButton } from "@/components/VoiceButton";
+import { NegotiatePanel } from "@/components/NegotiatePanel";
+import { everyWords, serverLang, useT } from "@/i18n";
 
 interface ManageData {
   view: {
@@ -35,7 +38,9 @@ interface ManageData {
     available_actions: string[];
     is_sample?: boolean;
   };
-  member: { name: string | null; first: string | null; channel: string; agent_id: string | null; sample: boolean; started_at: string | null; cancel_requested_at: string | null; kept_state: string | null };
+  member: { name: string | null; first: string | null; channel: string; agent_id: string | null; sample: boolean; started_at: string | null; cancel_requested_at: string | null; kept_state: string | null; lang?: string | null };
+  billing?: string | null;
+  interval?: { unit: string; count: number } | null;
   shop: { name: string; slug: string; currency: string };
   switchTo: PlanJson[];
   pauseMax: number;
@@ -48,17 +53,18 @@ interface ManageData {
   mcp: string;
 }
 
-const STATUS: Record<string, { word: string; cls: string }> = {
-  ACTIVE: { word: "Active", cls: "bg-paid-wash text-paid border-paid/30" },
-  SUSPENDED: { word: "Paused", cls: "bg-pause-wash text-pause border-pause/30" },
-  CANCELLED: { word: "Ended", cls: "bg-muted text-ink border-rule" },
-  APPROVAL_PENDING: { word: "Waiting for PayPal approval", cls: "bg-stamp-wash text-stamp border-stamp/30" },
+const STATUS: Record<string, { word: "st.ACTIVE" | "st.SUSPENDED" | "st.CANCELLED" | "st.APPROVAL_PENDING"; cls: string }> = {
+  ACTIVE: { word: "st.ACTIVE", cls: "bg-paid-wash text-paid border-paid/30" },
+  SUSPENDED: { word: "st.SUSPENDED", cls: "bg-pause-wash text-pause border-pause/30" },
+  CANCELLED: { word: "st.CANCELLED", cls: "bg-muted text-ink border-rule" },
+  APPROVAL_PENDING: { word: "st.APPROVAL_PENDING", cls: "bg-stamp-wash text-stamp border-stamp/30" },
 };
 
 export default function Manage() {
   const { ref = "" } = useParams();
   const [params, setParams] = useSearchParams();
-  const { data, error, loading, reload } = useData<ManageData>(`/ui/manage/${ref}`);
+  const { lang, t } = useT();
+  const { data, error, loading, reload } = useData<ManageData>(`/ui/manage/${ref}${serverLang() === "en" ? "" : `?lang=${serverLang()}`}`);
   const [busy, setBusy] = useState<string | null>(null);
   const [status, setStatus] = useState<string>("");
   const [approval, setApproval] = useState<string | null>(null);
@@ -90,17 +96,17 @@ export default function Manage() {
 
   async function act(name: string, url: string, body: Record<string, unknown> = {}) {
     setBusy(name);
-    setStatus("Working… Kept is asking PayPal and will confirm when PayPal reads it back.");
+    setStatus(t("m.working"));
     try {
       const out = await api.post<{ message: string; approvalUrl?: string | null }>(url, { ...body, key: newKey() });
       setStatus(out.message);
       if (out.approvalUrl) {
         setApproval(out.approvalUrl);
-        toast.message(out.message, { action: { label: "Approve on PayPal", onClick: () => location.assign(out.approvalUrl!) } });
+        toast.message(out.message, { action: { label: t("m.approvePP"), onClick: () => location.assign(out.approvalUrl!) } });
       } else toast.success(out.message);
       await reload();
     } catch (e) {
-      const msg = e instanceof ApiError ? e.message : "That didn't work. Nothing was changed.";
+      const msg = e instanceof ApiError ? e.message : t("m.failed");
       setStatus(msg);
       toast.error(msg);
     } finally {
@@ -113,7 +119,7 @@ export default function Manage() {
       <>
         <PublicHeader />
         <main id="main" className="mx-auto max-w-5xl px-4 py-10">
-          <PageSkeleton label="Loading your subscription" />
+          <PageSkeleton label={t("m.loading")} />
         </main>
       </>
     );
@@ -122,7 +128,7 @@ export default function Manage() {
       <>
         <PublicHeader />
         <main id="main" className="mx-auto max-w-3xl px-4 py-10">
-          <h1 className="sr-only">Your subscription</h1>
+          <h1 className="sr-only">{t("m.yours")}</h1>
           <ErrorState error={error} onRetry={reload} />
         </main>
       </>
@@ -131,39 +137,43 @@ export default function Manage() {
   const v = data.view;
   const can = (a: string) => v.available_actions.includes(a);
   const cur = data.shop.currency;
-  const st = STATUS[v.status] ?? { word: v.status.toLowerCase(), cls: "bg-muted text-ink border-rule" };
+  const st0 = STATUS[v.status];
+  const st = st0 ? { word: t(st0.word), cls: st0.cls } : { word: v.status.toLowerCase(), cls: "bg-muted text-ink border-rule" };
+  // The card caption and pause picker use the plan's own interval, in the member's language.
+  const every = data.interval ? everyWords(t, data.interval.unit, data.interval.count) : data.card.every;
+  const unitWord = (n: number) => (data.interval ? everyWords(t, data.interval.unit, n * data.interval.count) : `${n} ${data.card.every.replace(/s$/, "")}${n > 1 ? "s" : ""}`);
   const pending = Boolean(data.member.cancel_requested_at) && v.status !== "CANCELLED";
   const approveUrl = approval ?? v.approval_url ?? null;
 
   return (
     <>
-      <PublicHeader />
+      <PublicHeader translated />
       <main id="main" className="mx-auto max-w-5xl px-4 py-8 sm:py-10">
         <p className="m-0 text-sm font-medium text-ink-2">{data.shop.name}</p>
-        <h1 className="mt-1 text-3xl font-bold sm:text-4xl">{data.member.first ? `Hi ${data.member.first}, here's your subscription` : "Your subscription"}</h1>
-        <p className="mt-2 max-w-[62ch] text-ink-2">Skip, pause, switch or cancel here, any time. Every change is made in PayPal and checked before we confirm it.</p>
+        <h1 className="mt-1 text-3xl font-bold sm:text-4xl">{data.member.first ? t("m.hi", { name: data.member.first }) : t("m.yours")}</h1>
+        <p className="mt-2 max-w-[62ch] text-ink-2">{t("m.intro")}</p>
 
         <p className="sr-only" role="status" aria-live="polite">{status}</p>
 
         {data.member.sample && (
           <div className="mt-5 rounded-lg border border-dashed border-pause bg-pause-wash p-4 text-sm" role="note">
-            <b>Sample member.</b> This labelled demo row has no PayPal subscription behind it, so the buttons are view-only. Subscribe on the <a className="underline" href={`/s/${data.shop.slug}`}>shop page</a> to try a live one.
+            <b>{t("m.sample1")}</b> {t("m.sample2")} <a className="underline" href={`/s/${data.shop.slug}`}>{t("m.sample3")}</a> {t("m.sample4")}
           </div>
         )}
         {pending && (
           <div className="mt-5 rounded-lg border border-pause/40 bg-pause-wash p-4" role="status">
-            <p className="m-0 font-semibold">Cancellation requested</p>
-            <p className="m-0 mt-1 text-sm">You asked to cancel {fmtDate(data.member.cancel_requested_at, { time: true })}. PayPal hasn't confirmed it yet; Kept keeps retrying and will show it here. You won't be charged for a renewal you asked to stop.</p>
+            <p className="m-0 font-semibold">{t("m.cancelReq")}</p>
+            <p className="m-0 mt-1 text-sm">{t("m.cancelReqBody", { when: fmtDate(data.member.cancel_requested_at, { time: true }) })}</p>
           </div>
         )}
         {approveUrl && (
           <div className="mt-5 flex flex-wrap items-center gap-3 rounded-lg border border-stamp/40 bg-stamp-wash p-4" role="status">
             <p className="m-0 min-w-0 flex-1">
-              <b>PayPal needs your OK.</b> Approve the change on PayPal's page; nothing changes until you do.
+              <b>{t("m.needOk")}</b> {t("m.needOkBody")}
             </p>
             <Button asChild>
-              <a href={approveUrl}>
-                Approve on PayPal
+              <a href={approveUrl} data-paypal-handoff>
+                {t("m.approvePP")}
                 <ExternalLink aria-hidden="true" />
               </a>
             </Button>
@@ -174,13 +184,13 @@ export default function Manage() {
           <section className="mt-5 rounded-xl border-2 border-fail/50 bg-fail-wash p-5" role="alert" aria-labelledby="failed">
             <h2 id="failed" className="m-0 flex items-center gap-2 text-xl font-semibold text-fail">
               <AlertTriangle className="size-5" aria-hidden="true" />
-              Your last payment didn't go through
+              {t("m.payFailed")}
             </h2>
             <p className="mt-2 mb-0">{v.notice}</p>
-            <p className="mt-1 mb-0 text-sm">Outstanding: <b className="num">{fmtMoney(v.outstanding_balance, cur)}</b>. We only ever show this here, never by a text or email with a "pay here" link.</p>
+            <p className="mt-1 mb-0 text-sm">{t("m.outstanding")} <b className="num">{fmtMoney(v.outstanding_balance, cur)}</b>. {t("m.onlyHere")}</p>
             <div className="mt-4 flex flex-wrap gap-2">
               <Button onClick={() => act("fixed", `/ui/manage/${ref}/payment-fixed`)} disabled={!!busy}>
-                {busy === "fixed" ? "Collecting…" : "I've updated my payment method, retry now"}
+                {busy === "fixed" ? t("m.collecting") : t("m.fixedRetry")}
               </Button>
             </div>
             <form
@@ -191,10 +201,10 @@ export default function Manage() {
               }}
             >
               <div className="grid gap-1.5">
-                <Label htmlFor="promise">Can't fix it today? I'll sort it by</Label>
+                <Label htmlFor="promise">{t("m.promiseLabel")}</Label>
                 <Input id="promise" type="date" required value={promise} onChange={(e) => setPromise(e.target.value)} className="h-11 w-auto" min={new Date().toISOString().slice(0, 10)} max={new Date(Date.now() + 14 * 864e5).toISOString().slice(0, 10)} />
               </div>
-              <Button variant="outline" type="submit" disabled={!!busy}>Pause reminders until then</Button>
+              <Button variant="outline" type="submit" disabled={!!busy}>{t("m.promiseBtn")}</Button>
             </form>
           </section>
         )}
@@ -203,11 +213,11 @@ export default function Manage() {
         <section className="mt-6 rounded-2xl border border-rule bg-card p-5 sm:p-7" aria-labelledby="plan" data-tour="card">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <p className="m-0 text-sm text-ink-2">Your plan</p>
-              <h2 id="plan" className="m-0 text-2xl font-bold sm:text-3xl">{v.plan?.name ?? "Plan"}</h2>
+              <p className="m-0 text-sm text-ink-2">{t("m.yourPlan")}</p>
+              <h2 id="plan" className="m-0 text-2xl font-bold sm:text-3xl">{v.plan?.name ?? t("m.plan")}</h2>
               {v.plan && (
                 <p className="m-0 mt-1 font-display text-2xl font-bold num" data-money>
-                  {fmtMoney(v.plan.price, cur)} <span className="font-sans text-base font-normal text-ink-2">{v.plan.billing}</span>
+                  {fmtMoney(v.plan.price, cur)} <span className="font-sans text-base font-normal text-ink-2">{data.billing ?? v.plan.billing}</span>
                 </p>
               )}
             </div>
@@ -217,17 +227,17 @@ export default function Manage() {
             <CalendarClock className="mt-1 size-4 shrink-0 text-ink-2" aria-hidden="true" />
             <span>
             {v.status === "CANCELLED"
-              ? "Ended. You won't be charged again."
+              ? t("m.ended")
               : v.status === "SUSPENDED" && v.resumes_at
-                ? <>Paused. Starts again <time dateTime={v.resumes_at}>{fmtDate(v.resumes_at, { year: true })}</time> ({fmtRelative(v.resumes_at)}).</>
+                ? t("m.pausedUntil", { date: fmtDate(v.resumes_at, { year: true }), rel: fmtRelative(v.resumes_at) })
                 : v.next_billing_time
-                  ? <>Next payment <time dateTime={v.next_billing_time}>{fmtDate(v.next_billing_time, { year: true })}</time> ({fmtRelative(v.next_billing_time)}).</>
-                  : v.status === "APPROVAL_PENDING" ? "Waiting for you to approve on PayPal." : "No payment scheduled."}
+                  ? t("m.next", { date: fmtDate(v.next_billing_time, { year: true }), rel: fmtRelative(v.next_billing_time) })
+                  : v.status === "APPROVAL_PENDING" ? t("m.waitApprove") : t("m.noPayment")}
             </span>
           </p>
-          {v.returns_to_plan && <p className="m-0 mt-1 text-sm text-ink-2">Discount until {fmtDate(v.discount_until, { year: true })}, then back to {v.returns_to_plan}.</p>}
+          {v.returns_to_plan && <p className="m-0 mt-1 text-sm text-ink-2">{t("m.discountUntil", { date: fmtDate(v.discount_until, { year: true }), plan: v.returns_to_plan })}</p>}
           <div className="mt-6 border-t border-dashed border-rule pt-5">
-            <CycleCard card={data.card} currency={cur} size="lg" caption={`One stamp per billing cycle, every ${data.card.every}.`} />
+            <CycleCard card={data.card} currency={cur} size="lg" caption={t("m.caption", { every })} />
             <StampLegend className="mt-4" />
           </div>
         </section>
@@ -235,35 +245,35 @@ export default function Manage() {
         {/* Change it */}
         {(can("skip_next") || can("pause") || can("resume") || can("switch_plan")) && (
           <section className="mt-8" aria-labelledby="change" data-tour="change">
-            <h2 id="change" className="text-2xl font-bold">Change it</h2>
-            <p className="mt-1 text-ink-2">Within {data.shop.name}'s rules. Nothing here charges you extra.</p>
+            <h2 id="change" className="text-2xl font-bold">{t("m.change")}</h2>
+            <p className="mt-1 text-ink-2">{t("m.changeBody", { shop: data.shop.name })}</p>
             <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {can("skip_next") && (
                 <div className="flex flex-col rounded-xl border border-rule bg-card p-5">
                   <SkipForward className="size-5 text-stamp" aria-hidden="true" />
-                  <h3 className="mt-3 text-lg font-semibold">Skip the next one</h3>
-                  <p className="mt-1 flex-1 text-sm text-ink-2">Away, or still have plenty? Skip one payment; it carries on after.</p>
+                  <h3 className="mt-3 text-lg font-semibold">{t("m.skipT")}</h3>
+                  <p className="mt-1 flex-1 text-sm text-ink-2">{t("m.skipB")}</p>
                   <Button variant="outline" className="mt-4" onClick={() => act("skip", `/ui/manage/${ref}/skip`)} disabled={!!busy}>
-                    {busy === "skip" ? "Skipping…" : "Skip next payment"}
+                    {busy === "skip" ? t("m.skipping") : t("m.skipBtn")}
                   </Button>
                 </div>
               )}
               {can("pause") && data.pauseMax > 0 && (
                 <div className="flex flex-col rounded-xl border border-rule bg-card p-5">
                   <Pause className="size-5 text-pause" aria-hidden="true" />
-                  <h3 className="mt-3 text-lg font-semibold">Pause for a while</h3>
-                  <p className="mt-1 flex-1 text-sm text-ink-2">Nothing ships or bills until it starts again on its own.</p>
+                  <h3 className="mt-3 text-lg font-semibold">{t("m.pauseT")}</h3>
+                  <p className="mt-1 flex-1 text-sm text-ink-2">{t("m.pauseB")}</p>
                   <div className="mt-4 flex gap-2">
-                    <Label htmlFor="cycles" className="sr-only">How long</Label>
+                    <Label htmlFor="cycles" className="sr-only">{t("m.howLong")}</Label>
                     <select id="cycles" value={cycles} onChange={(e) => setCycles(e.target.value)} className="h-11 min-w-0 flex-1 rounded-md border border-input bg-card px-3">
                       {Array.from({ length: data.pauseMax }, (_, i) => (
                         <option key={i} value={i + 1}>
-                          {i + 1} {data.card.every.replace(/s$/, "")}{i ? "s" : ""}
+                          {lang === "en" ? <>{i + 1} {data.card.every.replace(/s$/, "")}{i ? "s" : ""}</> : unitWord(i + 1)}
                         </option>
                       ))}
                     </select>
                     <Button variant="outline" onClick={() => act("pause", `/ui/manage/${ref}/pause`, { cycles: Number(cycles) })} disabled={!!busy}>
-                      {busy === "pause" ? "Pausing…" : "Pause"}
+                      {busy === "pause" ? t("m.pausing") : t("m.pauseBtn")}
                     </Button>
                   </div>
                 </div>
@@ -271,20 +281,20 @@ export default function Manage() {
               {can("resume") && (
                 <div className="flex flex-col rounded-xl border border-rule bg-card p-5">
                   <Play className="size-5 text-paid" aria-hidden="true" />
-                  <h3 className="mt-3 text-lg font-semibold">Start again now</h3>
-                  <p className="mt-1 flex-1 text-sm text-ink-2">Don't wait for the date; payments start again from today.</p>
+                  <h3 className="mt-3 text-lg font-semibold">{t("m.resumeT")}</h3>
+                  <p className="mt-1 flex-1 text-sm text-ink-2">{t("m.resumeB")}</p>
                   <Button className="mt-4" onClick={() => act("resume", `/ui/manage/${ref}/resume`)} disabled={!!busy}>
-                    {busy === "resume" ? "Resuming…" : "Resume now"}
+                    {busy === "resume" ? t("m.resuming") : t("m.resumeBtn")}
                   </Button>
                 </div>
               )}
               {can("switch_plan") && data.switchTo.length > 0 && (
                 <div className="flex flex-col rounded-xl border border-rule bg-card p-5">
                   <Repeat className="size-5 text-stamp" aria-hidden="true" />
-                  <h3 className="mt-3 text-lg font-semibold">Switch plan</h3>
-                  <p className="mt-1 flex-1 text-sm text-ink-2">More or less, from your next payment. PayPal may ask you to approve a new price.</p>
+                  <h3 className="mt-3 text-lg font-semibold">{t("m.switchT")}</h3>
+                  <p className="mt-1 flex-1 text-sm text-ink-2">{t("m.switchB")}</p>
                   <div className="mt-4 grid gap-2">
-                    <Label htmlFor="planTo" className="sr-only">New plan</Label>
+                    <Label htmlFor="planTo" className="sr-only">{t("m.newPlan")}</Label>
                     <select id="planTo" value={planTo} onChange={(e) => setPlanTo(e.target.value)} className="h-11 rounded-md border border-input bg-card px-3">
                       {data.switchTo.map((p) => (
                         <option key={p.id} value={p.id}>
@@ -293,7 +303,7 @@ export default function Manage() {
                       ))}
                     </select>
                     <Button variant="outline" onClick={() => act("switch", `/ui/manage/${ref}/switch`, { plan_id: planTo })} disabled={!!busy || !planTo}>
-                      {busy === "switch" ? "Switching…" : "Switch plan"}
+                      {busy === "switch" ? t("m.switching") : t("m.switchBtn")}
                     </Button>
                   </div>
                 </div>
@@ -305,18 +315,18 @@ export default function Manage() {
         {/* The one offer, if they asked for it */}
         {data.offer && (
           <section className="mt-8 rounded-2xl border-2 border-stamp/50 bg-stamp-wash p-6" aria-labelledby="offer">
-            <h2 id="offer" className="m-0 text-2xl font-bold">One offer before you go</h2>
+            <h2 id="offer" className="m-0 text-2xl font-bold">{t("m.offerT")}</h2>
             <p className="mt-2 text-lg">{data.offer.message}</p>
-            {data.offer.worded_by === "code" && <p className="m-0 text-xs text-ink-2">Worded by Kept's own template; the model did not answer. The offer itself was chosen by the shop's rules.</p>}
+            {data.offer.worded_by === "code" && <p className="m-0 text-xs text-ink-2">{t("m.offerCode")}</p>}
             <p className="m-0 text-sm text-ink-2">
-              Open until {fmtDate(data.offer.expires_at, { time: true })}. If you don't answer, your subscription is cancelled as you asked. No timer, no second offer.
+              {t("m.offerOpen", { when: fmtDate(data.offer.expires_at, { time: true }) })}
             </p>
             <div className="mt-5 flex flex-wrap gap-3">
-              <Button onClick={() => act("accept", `/ui/offer/${data.offer!.id}/accept`)} disabled={!!busy}>
-                {busy === "accept" ? "Applying…" : "Take the offer"}
+              <Button onClick={() => act("accept", `/ui/offer/${data.offer!.id}/accept`)} disabled={!!busy} data-hf-confirm="true" data-hf-what={`${t("m.take")}: ${data.offer.label ?? ""}`} data-hf-amount={(data.offer as any).terms?.newPrice ? `${fmtMoney((data.offer as any).terms.newPrice, cur)} ${data.billing ?? ""}` : "—"} data-hf-to={data.shop.name}>
+                {busy === "accept" ? t("m.applying") : t("m.take")}
               </Button>
-              <Button variant="outline" onClick={() => act("decline", `/ui/offer/${data.offer!.id}/decline`)} disabled={!!busy}>
-                {busy === "decline" ? "Cancelling…" : "No thanks, cancel now"}
+              <Button variant="outline" onClick={() => act("decline", `/ui/offer/${data.offer!.id}/decline`)} disabled={!!busy} data-hf-confirm="true" data-hf-what={t("m.noThanks")} data-hf-amount={v.plan ? `${fmtMoney(v.plan.price, cur)} ${data.billing ?? v.plan.billing}` : "—"} data-hf-to={data.shop.name}>
+                {busy === "decline" ? t("m.cancelling") : t("m.noThanks")}
               </Button>
             </div>
           </section>
@@ -325,8 +335,8 @@ export default function Manage() {
         {/* Cancel: one step, never hidden, never red */}
         {!data.offer && can("cancel_subscription") && (
           <section className="mt-8 rounded-xl border border-rule bg-card p-6" aria-labelledby="cancel" data-tour="cancel">
-            <h2 id="cancel" className="m-0 text-2xl font-bold">Cancel your subscription</h2>
-            <p className="mt-1 text-ink-2">One step. No reason needed. You won't be asked twice.</p>
+            <h2 id="cancel" className="m-0 text-2xl font-bold">{t("m.cancelT")}</h2>
+            <p className="mt-1 text-ink-2">{t("m.cancelB")}</p>
             <form
               className="mt-4 grid gap-4"
               onSubmit={(e) => {
@@ -335,29 +345,38 @@ export default function Manage() {
               }}
             >
               <div className="grid gap-1.5">
-                <Label htmlFor="reason">Anything you'd like {data.shop.name} to know? (optional)</Label>
-                <Textarea id="reason" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} rows={2} placeholder="For example: too much coffee piling up" />
+                <Label htmlFor="reason">{t("m.reason", { shop: data.shop.name })}</Label>
+                <div className="flex items-start gap-2">
+                  <Textarea id="reason" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} rows={2} placeholder={t("m.reasonPh")} className="flex-1" />
+                  {!data.member.sample && <VoiceButton onText={(x) => setReason(x)} memberRef={ref} />}
+                </div>
               </div>
               <label className="flex min-h-11 cursor-pointer items-center gap-3">
                 <Checkbox checked={hear} onCheckedChange={(c) => setHear(c === true)} className="size-5" aria-labelledby="hear-offer" />
-                <span id="hear-offer">Show me one offer before cancelling (optional)</span>
+                <span id="hear-offer">{t("m.hear")}</span>
               </label>
               <div>
-                <Button type="submit" variant="outline" disabled={!!busy}>
-                  {busy === "cancel" ? "Cancelling…" : hear ? "See one offer, or cancel" : "Cancel subscription"}
+                <Button type="submit" variant="outline" disabled={!!busy} data-hf-confirm="true" data-hf-what={hear ? t("m.seeOffer") : t("m.cancelBtn")} data-hf-amount={v.plan ? `${fmtMoney(v.plan.price, cur)} ${data.billing ?? v.plan.billing}` : "—"} data-hf-to={data.shop.name}>
+                  {busy === "cancel" ? t("m.cancelling") : hear ? t("m.seeOffer") : t("m.cancelBtn")}
                 </Button>
               </div>
             </form>
+          </section>
+        )}
+        {/* Outside the cancel card, so the transcript stays on screen when the agreed offer card appears above. */}
+        {v.status !== "CANCELLED" && (can("cancel_subscription") || data.offer) && (
+          <section className="mt-4 rounded-xl border border-rule bg-card px-6 pb-6" aria-label={t("n.title")}>
+            <NegotiatePanel memberRef={ref!} shop={data.shop.name} sample={data.member.sample} onChanged={reload} />
           </section>
         )}
         {v.status === "CANCELLED" && (
           <section className="mt-8 rounded-xl border border-rule bg-card p-6">
             <h2 className="m-0 flex items-center gap-2 text-xl font-semibold">
               <CheckCircle2 className="size-5 text-paid" aria-hidden="true" />
-              Changed your mind?
+              {t("m.mind")}
             </h2>
             <p className="mt-1 mb-0 text-ink-2">
-              You can subscribe again on <a className="text-stamp underline" href={`/s/${data.shop.slug}`}>{data.shop.name}'s page</a> whenever you like.
+              {t("m.again1")} <a className="text-stamp underline" href={`/s/${data.shop.slug}`}>{t("m.again2", { shop: data.shop.name })}</a> {t("m.again3")}
             </p>
           </section>
         )}
@@ -366,15 +385,15 @@ export default function Manage() {
           <section className="rounded-xl border border-rule bg-card p-6" aria-labelledby="reminders">
             <h2 id="reminders" className="m-0 flex items-center gap-2 text-xl font-semibold">
               <MessageCircle className="size-5 text-stamp" aria-hidden="true" />
-              Reminders on your phone
+              {t("m.remind")}
             </h2>
             <p className="mt-1 text-sm text-ink-2">
-              {data.telegram.ready ? "A note before each payment: in Telegram with Skip and Keep buttons, or by text with a link back here." : "A text before each payment, with a link back here."} {data.telegram.ready && data.telegram.linked ? "Telegram connected." : ""}
+              {data.telegram.ready ? t("m.remindTg") : t("m.remindSms")} {data.telegram.ready && data.telegram.linked ? t("m.tgOn") : ""}
             </p>
             {!data.member.sample && data.telegram.ready && (
               <form method="post" action={`/manage/${ref}/connect/telegram`} target="_blank">
                 <Button type="submit" variant={data.telegram.linked ? "outline" : "default"}>
-                  {data.telegram.linked ? "Connect another chat" : "Get reminders on Telegram"}
+                  {data.telegram.linked ? t("m.tgAnother") : t("m.tgGet")}
                 </Button>
               </form>
             )}
@@ -383,11 +402,11 @@ export default function Manage() {
           <section className="rounded-xl border border-rule bg-card p-6" aria-labelledby="scam">
             <h2 id="scam" className="m-0 flex items-center gap-2 text-xl font-semibold">
               <ShieldCheck className="size-5 text-paid" aria-hidden="true" />
-              Got a message about this?
+              {t("m.scamT")}
             </h2>
-            <p className="mt-1 text-sm text-ink-2">{data.shop.name} bills only through PayPal and never sends a "pay here" link or asks for a card number or a code.</p>
+            <p className="mt-1 text-sm text-ink-2">{t("m.scamB", { shop: data.shop.name })}</p>
             <Button variant="outline" asChild className="h-auto min-h-9 max-w-full whitespace-normal py-2 text-left">
-              <a href={`/manage/${ref}/check`}>Check a message for scam signs</a>
+              <a href={`/manage/${ref}/check`}>{t("m.scamBtn")}</a>
             </Button>
           </section>
         </div>
@@ -395,20 +414,20 @@ export default function Manage() {
         <AssistantPanel memberRef={ref!} sample={data.member.sample} initial={assistantInit} onChanged={reload} />
 
         <section className="mt-8" aria-labelledby="history" data-tour="history">
-          <h2 id="history" className="text-2xl font-bold">What happened</h2>
-          <p className="mt-1 mb-4 text-ink-2">Every change, and who did each step: AI, Rule or PayPal.</p>
-          <Timeline runs={data.timeline} empty="No changes yet. Anything you do here will be listed, step by step." />
+          <h2 id="history" className="text-2xl font-bold">{t("m.history")}</h2>
+          <p className="mt-1 mb-4 text-ink-2">{t("m.historyB")}{lang !== "en" && lang !== "qps" ? ` ${t("m.historyEn")}` : ""}</p>
+          <Timeline runs={data.timeline} empty={t("m.historyEmpty")} />
         </section>
 
         <details className="mt-8 rounded-xl border border-rule bg-card p-5">
           <summary className="flex min-h-11 cursor-pointer items-center gap-2 font-medium">
             <Bot className="size-5 text-stamp" aria-hidden="true" />
-            Let your AI assistant manage this
+            {t("m.letAi")}
           </summary>
-          <p className="mt-2 text-sm text-ink-2">Give Claude, or any MCP client, this reference and the shop's endpoint. It can skip, pause, switch or cancel for you, with the same rules.</p>
+          <p className="mt-2 text-sm text-ink-2">{t("m.letAiB")}</p>
           <pre className="mt-2 overflow-x-auto rounded-lg bg-paper p-3 font-mono text-sm">{`subscription_ref: ${ref}\nendpoint: ${data.mcp}`}</pre>
         </details>
-        <Button variant="ghost" className="mt-6" onClick={() => startTour("member", { force: true })}>Take the tour</Button>
+        <Button variant="ghost" className="mt-6" onClick={() => startTour("member", { force: true })}>{t("m.tour")}</Button>
       </main>
       <PublicFooter />
     </>

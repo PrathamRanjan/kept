@@ -1,14 +1,15 @@
 import { fmtDate, fmtMoney } from "@/lib/format";
 import type { CycleCardData, Stamp, StampKind } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { useT, type T } from "@/i18n";
 
-const WORDS: Record<StampKind, string> = {
-  paid: "Paid",
-  discount: "Paid at a discount",
-  skipped: "Skipped",
-  paused: "Paused",
-  failed: "Payment failed",
-  upcoming: "Upcoming",
+const WORDS: Record<StampKind, "c.paid" | "c.discount" | "c.skipped" | "c.paused" | "c.failed" | "c.upcoming"> = {
+  paid: "c.paid",
+  discount: "c.discount",
+  skipped: "c.skipped",
+  paused: "c.paused",
+  failed: "c.failed",
+  upcoming: "c.upcoming",
 };
 
 /** One stamp. Drawn in SVG so it stays crisp at any size and needs no colour to be understood. */
@@ -62,8 +63,8 @@ export function StampMark({ kind, next, size = 28, animate = false, delay = 0 }:
   );
 }
 
-function stampLabel(s: Stamp, currency: string): string {
-  const what = s.kind === "upcoming" ? (s.next ? "Next payment" : "Upcoming") : s.scheduled ? `${WORDS[s.kind]} (scheduled)` : WORDS[s.kind];
+function stampLabel(s: Stamp, currency: string, t: T): string {
+  const what = s.kind === "upcoming" ? (s.next ? t("c.nextPay") : t("c.upcoming")) : s.scheduled ? `${t(WORDS[s.kind])} ${t("c.scheduled")}` : t(WORDS[s.kind]);
   return `${what}, ${fmtDate(s.date, { year: true })}${s.amount ? `, ${fmtMoney(s.amount, currency)}` : ""}`;
 }
 
@@ -74,30 +75,31 @@ function stampLabel(s: Stamp, currency: string): string {
 export function CycleCard({ card, currency = "USD", size = "md", animate = false, caption, className }: { card: CycleCardData; currency?: string; size?: "sm" | "md" | "lg"; animate?: boolean; caption?: string; className?: string }) {
   const px = size === "lg" ? 40 : size === "sm" ? 18 : 28;
   const showDates = size !== "sm";
-  if (!card.stamps.length && !card.end) return <p className="text-sm text-ink-2">No billing cycles yet.</p>;
+  const { t } = useT();
+  if (!card.stamps.length && !card.end) return <p className="text-sm text-ink-2">{t("c.none")}</p>;
   return (
     <figure className={cn("m-0", className)}>
-      <ol className={cn("list-none p-0 m-0", size === "sm" ? "flex items-end gap-1" : "grid grid-cols-4 justify-items-start gap-x-2 gap-y-3 sm:flex sm:flex-wrap sm:items-end sm:gap-3")} aria-label={caption ?? `Billing cycles, every ${card.every}`}>
+      <ol className={cn("list-none p-0 m-0", size === "sm" ? "flex items-end gap-1" : "grid grid-cols-4 justify-items-start gap-x-2 gap-y-3 sm:flex sm:flex-wrap sm:items-end sm:gap-3")} aria-label={caption ?? t("c.cycles", { every: card.every })}>
         {card.stamps.map((s, i) => (
-          <li key={`${s.date}-${i}`} className="flex flex-col items-center gap-1" title={size === "sm" ? stampLabel(s, currency) : undefined}>
-            <span className="sr-only">{stampLabel(s, currency)}</span>
+          <li key={`${s.date}-${i}`} className="flex flex-col items-center gap-1" title={size === "sm" ? stampLabel(s, currency, t) : undefined}>
+            <span className="sr-only">{stampLabel(s, currency, t)}</span>
             <StampMark kind={s.kind} next={s.next} size={px} animate={animate} delay={i * 90} />
             {showDates && (
               <span aria-hidden="true" className={cn("num text-[0.6875rem] leading-none", s.next ? "font-semibold text-stamp" : "text-ink-2")}>
-                {s.next ? "next" : fmtDate(s.date).replace(/,.*/, "")}
+                {s.next ? t("c.next") : fmtDate(s.date).replace(/,.*/, "")}
               </span>
             )}
           </li>
         ))}
         {card.end && (
           <li className="flex flex-col items-center gap-1">
-            <span className="sr-only">{card.end.kind === "cancelled" ? `Cancelled${card.end.date ? `, ${fmtDate(card.end.date, { year: true })}` : ""}` : "Cancellation requested, waiting for PayPal"}</span>
+            <span className="sr-only">{card.end.kind === "cancelled" ? `${t("c.cancelled")}${card.end.date ? `, ${fmtDate(card.end.date, { year: true })}` : ""}` : t("c.pending")}</span>
             <span
               aria-hidden="true"
               className={cn("grid place-items-center rounded-[3px] font-mono font-semibold uppercase tracking-wide", card.end.kind === "cancelled" ? "bg-ink text-paper" : "border-2 border-dashed border-ink text-ink")}
               style={{ height: px, minWidth: px * 1.6, fontSize: Math.max(8, px / 3.6), padding: "0 4px" }}
             >
-              {size === "sm" ? "end" : card.end.kind === "cancelled" ? "ended" : "ending"}
+              {size === "sm" ? t("c.end") : card.end.kind === "cancelled" ? t("c.endedTag") : t("c.endingTag")}
             </span>
             {showDates && <span aria-hidden="true" className="num text-[0.6875rem] leading-none text-ink-2">{card.end.date ? fmtDate(card.end.date).replace(/,.*/, "") : ""}</span>}
           </li>
@@ -109,16 +111,17 @@ export function CycleCard({ card, currency = "USD", size = "md", animate = false
 }
 
 export function StampLegend({ className }: { className?: string }) {
+  const { t } = useT();
   const items: [StampKind, string, boolean?][] = [
-    ["paid", "Paid"],
-    ["discount", "Discounted"],
-    ["skipped", "Skipped"],
-    ["paused", "Paused"],
-    ["failed", "Failed"],
-    ["upcoming", "Next", true],
+    ["paid", t("c.paid")],
+    ["discount", t("c.lDiscounted")],
+    ["skipped", t("c.skipped")],
+    ["paused", t("c.paused")],
+    ["failed", t("c.lFailed")],
+    ["upcoming", t("c.lNext"), true],
   ];
   return (
-    <ul className={cn("flex flex-wrap gap-x-4 gap-y-2 p-0 m-0 list-none text-sm text-ink-2", className)} aria-label="What the stamps mean">
+    <ul className={cn("flex flex-wrap gap-x-4 gap-y-2 p-0 m-0 list-none text-sm text-ink-2", className)} aria-label={t("c.legend")}>
       {items.map(([k, l, next]) => (
         <li key={k} className="flex items-center gap-1.5">
           <StampMark kind={k} next={next} size={16} />
@@ -127,7 +130,7 @@ export function StampLegend({ className }: { className?: string }) {
       ))}
       <li className="flex items-center gap-1.5">
         <span aria-hidden="true" className="inline-block h-4 w-6 rounded-[2px] bg-ink" />
-        Ended
+        {t("c.lEnded")}
       </li>
     </ul>
   );

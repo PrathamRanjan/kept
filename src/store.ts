@@ -45,6 +45,8 @@ export interface Subscriber {
   kept_state: string | null;
   subscriber_name: string | null;
   subscriber_email: string | null;
+  /** The member's language for words Kept sends them (en, hi-IN, id-ID, pt-BR); null means English. */
+  lang?: string | null;
   channel: string;
   agent_id: string | null;
   approval_url: string | null;

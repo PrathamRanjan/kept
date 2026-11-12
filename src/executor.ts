@@ -1,4 +1,5 @@
 import type { Queryable } from "./db.js";
+import { normLang, PAYPAL_LOCALE } from "./i18n.js";
 import { config } from "./config.js";
 import { requestKey } from "./lib/ids.js";
 import { paypalFor, PayPalError, PayPalSubscription } from "./paypal/index.js";
@@ -85,6 +86,7 @@ export async function createSubscription(
         cancelUrl: `${config.appUrl}/r/${s.ref}?cancelled=1`,
         subscriberEmail: s.subscriber_email ?? undefined,
         subscriberName: s.subscriber_name ?? undefined,
+        locale: PAYPAL_LOCALE[normLang(s.lang)] ?? undefined,
       },
       requestKey("create-sub", s.id, key),
     );

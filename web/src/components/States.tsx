@@ -2,8 +2,11 @@ import { AlertTriangle, RefreshCw, WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ApiError } from "@/lib/api";
+import { useT } from "@/i18n";
 
-export function PageSkeleton({ label = "Loading" }: { label?: string }) {
+export function PageSkeleton({ label }: { label?: string }) {
+  const { t } = useT();
+  label ??= t("state.loading");
   return (
     <div className="space-y-4" role="status" aria-live="polite">
       <span className="sr-only">{label}…</span>
@@ -22,21 +25,22 @@ export function ErrorState({ error, onRetry }: { error: unknown; onRetry?: () =>
   const e = error instanceof ApiError ? error : null;
   const offline = e?.code === "offline";
   const Icon = offline ? WifiOff : AlertTriangle;
+  const { t } = useT();
   return (
     <div className="rounded-xl border border-rule bg-card p-6" role="alert">
       <Icon className="size-6 text-fail" aria-hidden="true" />
-      <h2 className="mt-3 text-xl font-semibold">{offline ? "You're offline" : e?.status === 404 ? "Not found" : e?.status === 401 ? "Sign in first" : "That didn't load"}</h2>
-      <p className="mt-1 text-ink-2">{e?.message ?? "Something went wrong. Nothing was changed."}</p>
+      <h2 className="mt-3 text-xl font-semibold">{offline ? t("state.offline") : e?.status === 404 ? t("state.notFound") : e?.status === 401 ? t("state.signIn") : t("state.failed")}</h2>
+      <p className="mt-1 text-ink-2">{e?.message ?? t("state.wrong")}</p>
       <div className="mt-4 flex flex-wrap gap-2">
         {onRetry && (
           <Button onClick={onRetry}>
             <RefreshCw aria-hidden="true" />
-            Try again
+            {t("state.retry")}
           </Button>
         )}
         {e?.status === 401 && (
           <Button variant="outline" asChild>
-            <a href="/demo">Choose who to be</a>
+            <a href="/demo">{t("state.who")}</a>
           </Button>
         )}
       </div>

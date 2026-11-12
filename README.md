@@ -360,10 +360,103 @@ Each item was built, tested (`npm test`: 167 of 167; `npm run e2e`: 28 of 28), p
 
 A change goes to `main` only when all of these pass. This is a checklist run by hand: there is no CI workflow that blocks a push.
 
-1. `npm test`: all suites (167 tests today), including route coverage.
+1. `npm test`: all suites (210 tests today), including route coverage.
 2. `cd web && npx tsc -b && npx vite build`.
-3. `npm run e2e`: all browser tests on phone and desktop, axe with no serious or critical issues (28 today).
+3. `npm run e2e`: all browser tests on phone and desktop, axe with no serious or critical issues (45 today, 3 skipped by design on the phone).
 4. When AI behaviour changes, the eval sets on real models:
    - `eval:b5` 8/8, `eval:fairness` 19/19, `eval:adversarial` 26/26 and `eval:exchange` 17/17, none worse than before.
    - `eval:reasons` is at 32/36 today, with h10, r06, r14 and r18 missed.
 5. After the deploy, `npm run robot:judge` on the live site, every step passing.
+
+## Look and Say, four languages and the talk before cancelling (12 Nov 2026)
+
+Extra features on top of the core flow. The core flow (subscribe, skip, pause, resume, switch, cancel, offers) is unchanged in English: same text, same routes, and the existing tests still pass. Their only edits add the two new routes to the route-coverage exclusions, because `test/looksay.test.ts` walks them.
+
+### What was built
+
+- **Hands-free mode ("Look and Say").** A header button or Alt+H turns it on. The camera indicator and the off switch stay on screen while it runs.
+  - Pointing: MediaPipe Face Landmarker (Apache 2.0) runs in the browser from files Kept serves itself (`/static/handsfree`). No frame leaves the device.
+  - Snapping, in code (`web/src/handsfree/snap.ts`): votes that fade, hysteresis, saccade reset, drift correction from clicks. Head mode or eye mode.
+  - Calibration (`calib.ts`): 9 dots fitted by ridge regression, with λ chosen by leave-one-dot-out error. Accuracy in px is measured on 4 held-out dots and saved per device. A 3-dot top-up is offered when the head moves. Below 120 px of eye accuracy, it switches to head mode.
+  - Clicking: dwell ring, saying "click" or "this one", or a wink. A blink freezes the pointer.
+  - Stopping: Esc, "stop" (all four languages, no wake word needed) or looking away for 2 s. Moving the mouse or touching hands control back.
+  - Controls grow to at least 44 px while it is on.
+  - Voice (`voice.ts`, `intents.ts`):
+    - the browser's speech recognition in the chosen language
+    - a fuzzy "Kept" wake word (never "keep"), or hold Space to talk
+    - a noise gate, and a playback gate (only "stop" gets through while Kept is speaking)
+    - fixed commands are parsed in code; anything else goes to the member's assistant (MCP tools, signed mandate, at most 10 steps)
+  - Confirm card, enforced in code: any pay, refund, cancel, delete, send, approve, decline or take-offer control shows what, how much and to whom, and needs "yes" or the Confirm button. Anything else is a no.
+  - Before pressing a control, Kept reads its state: a control that is turned off or already selected is not pressed.
+  - PayPal links say "Approve on PayPal's page; I'll wait here."
+  - With no camera, voice only: Tab to a control, then say "click". Offline, voice says it is unavailable and pointing carries on.
+  - `/accessibility` has a camera-free simulation, its recording, and this device's own measured accuracy. `/proof` says what is code and what is a model, and repeats Peek's published 100–200 px figure (not a Kept measurement).
+  - Holding Space to talk never presses the focused button.
+- **Four languages: English, हिन्दी (hi-IN), Bahasa Indonesia (id-ID), Português (pt-BR).**
+  - Choosing a language:
+    - a picker in every header, with native names
+    - detection, `?lang=`, and a remembered choice
+    - switching is instant, with no reload and nothing typed lost
+  - All member and shop strings are translated, with a "machine-translated" notice. Owner pages stay in English and say so.
+  - Server text and AI output:
+    - the server answers in the member's language (`x-kept-lang` header, stored on the member)
+    - offers, reminders, payment-failure notes and action messages are localised
+    - AI wording is asked for in that language with Western digits
+    - cancel words in Hindi, Hinglish, Indonesian and Portuguese count as cancel requests
+  - Formatting and PayPal:
+    - numbers, money and dates go through Intl; lakh grouping is optional for Hindi
+    - PayPal's page opens in `pt-BR` or `id-ID`, and in `en-IN` for Hindi (PayPal has no Hindi page, and the shop page says so)
+  - Fonts: Noto Sans Devanagari loads only for Hindi, and buttons wrap for longer Portuguese text.
+  - Checks:
+    - a pseudo-locale (`?lang=qps`: accents and about 30% longer)
+    - a vitest check that fails on any missing key, lost placeholder or string left in English
+    - screenshots in `docs/screenshots/lang-*`
+- **The talk before cancelling (Kept item 1).**
+  - On the member page, "Let your assistant talk to the shop". The member's assistant and the shop's agent get at most two moves each, and a code referee checks every move.
+  - Code reads the member's limit ("under $15") in all four languages. Code picks every offer from the shop's rules. Every number in a line must come from the offer's own terms.
+  - A model (Decisions), when one is configured, only reads what kind of thing the member wants; "nothing" from either side wins.
+  - An agreed offer becomes the ordinary offer card, through the same gate, and the member has to take it.
+  - No deal changes nothing. If an offer from the talk is ignored, it lapses without cancelling.
+  - The transcript is in the member's language.
+
+### Bugs found and fixed on the way
+
+- `Permissions-Policy` had `camera=()`, so the browser refused the camera on every Kept page. It is now `camera=(self), microphone=(self)`.
+- The member's language from sign-up was never saved. A test caught it.
+- A slow first frame from the tracker counted as "looked away" and stopped hands-free at once. The look-away stop now counts only after a face has been seen.
+- The simulation's glance at the first button lasted long enough to click it.
+
+### Tests
+
+- `npm test`: **210 tests, 21 files**, including `test/looksay.test.ts` (30) and `test/i18n.test.ts` (13):
+  - limit and stance reading
+  - the referee
+  - agreed, no-deal, injection, Hindi, sample and lapse cases
+  - the language routes
+  - PayPal locale, cancel words
+  - snapping, calibration, intents, wake word, destructive labels
+  - route coverage
+- `npm run e2e`: **45 passed, 3 skipped by design on the phone**. New:
+  - the language switch keeps typed text
+  - axe and no sideways scroll in hi-IN, id-ID and pt-BR on phone and desktop
+  - the pseudo-locale fits
+  - the talk changes nothing
+  - the simulation clicks the right button
+  - voice-only confirm card (only "yes" confirms, "stop" stops)
+  - Alt+H and Esc
+  - the real face tracker loading from Kept's own files with Chrome's fake camera
+- `npx tsx e2e/record-sim.ts` records `public/handsfree/sim.webm`.
+
+### Not done, or not verified
+
+- **Not verified with a real person:**
+  - pointing accuracy on a real camera and face (there is no measured figure, and none is shown)
+  - voice commands spoken aloud
+  - a native speaker's review of the Hindi, Indonesian and Portuguese
+- **Not done:**
+  - the local-currency estimate (it needs a real exchange-rate source; no rates were invented)
+  - the phone line with language choice (the Twilio number belongs to another app)
+  - the multiparty talk (scheduled after StockSure)
+- Owner pages and the timeline history stay in English. Some server error messages are still English.
+- Speech recognition in Chrome runs on Google's servers, so voice needs the network. Firefox has none.
+- Large file: the face model `public/handsfree/face_landmarker.task` (3.76 MB, from Google's MediaPipe model bucket, Apache 2.0) is committed. The 21 MB WebAssembly runtime is copied from the npm package at build time.

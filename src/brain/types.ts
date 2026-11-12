@@ -1,6 +1,7 @@
 import type { Rules } from "../policy/rules.js";
 import type { EligibleOffer } from "../policy/eligibility.js";
 import type { IntervalUnit } from "../paypal/types.js";
+import type { Lang } from "../i18n.js";
 
 export interface DraftPlan {
   name: string;
@@ -55,8 +56,8 @@ export interface Brain {
   classifyReason(text: string): Promise<ReasonCategory>;
   /** Deterministic in every implementation: a model never chooses among offers (eligibility and money are code). */
   pickOffer(eligible: EligibleOffer[], category: ReasonCategory): OfferChoice;
-  wordOffer(offer: EligibleOffer, ctx: { merchantName: string; currency: string; category: ReasonCategory; subscriberName?: string | null }): Promise<string>;
-  explainPaymentFailure(ctx: { merchantName: string; amount: number; currency: string; attempts: number; manageUrl: string }): Promise<string>;
+  wordOffer(offer: EligibleOffer, ctx: { merchantName: string; currency: string; category: ReasonCategory; subscriberName?: string | null; lang?: Lang }): Promise<string>;
+  explainPaymentFailure(ctx: { merchantName: string; amount: number; currency: string; attempts: number; manageUrl: string; lang?: Lang }): Promise<string>;
   /** `facts` (spec K3) are plain-word lines computed by code; when given, the model sees them instead of `stats`. */
   answer(question: string, stats: ShopStats, facts?: string[]): Promise<string>;
   /** Who produced the last output: "model" (primary), "backup" (second model), "code" (code's own template for a decision code made), "failed", or "rules" (the offline test brain). */

@@ -4,6 +4,7 @@ import { PublicFooter, PublicHeader } from "@/components/Shell";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { HandsFreeSim } from "@/handsfree/Sim";
 
 type PageId = "proof" | "ai" | "paypal" | "roles" | "accessibility";
 const TITLES: Record<PageId, [string, string]> = {
@@ -33,6 +34,31 @@ function Table({ head, rows, min = 640, label = "Table" }: { head: string[]; row
 function cases(s: any): { id: string; split?: string; input: string; expected: string; actual: string; pass: boolean; note?: string }[] {
   const list: any[] = s.cases ?? s.results ?? [];
   return list.map((c) => ({ id: String(c.id ?? c.case_id ?? ""), split: c.split, input: String(c.input ?? c.text ?? ""), expected: String(c.expected ?? ""), actual: String(c.actual ?? c.level ?? c.outcome ?? ""), pass: Boolean(c.pass ?? c.correct), note: c.top_reason ?? c.note ?? undefined }));
+}
+
+/** The hands-free block shared by /proof and /accessibility: published limits, code versus model, credits. */
+function HandsFreeFacts({ h, mine }: { h: any; mine?: boolean }) {
+  if (!h) return null;
+  let local: { eyesPx?: number; headPx?: number; n?: number; at?: string } | null = null;
+  try {
+    local = mine ? JSON.parse(localStorage.getItem("kept-hf-cal") ?? "null") : null;
+  } catch { /* storage blocked */ }
+  return (
+    <section className="mt-10" aria-labelledby="hf-facts">
+      <h2 id="hf-facts" className="text-2xl font-bold">Hands-free mode</h2>
+      <p className="max-w-[70ch] text-ink-2">{h.what}</p>
+      <h3 className="mt-4 text-lg font-semibold">Accuracy</h3>
+      <ul>{h.published.map((x: string) => <li key={x}>{x}</li>)}</ul>
+      <p className="rounded-lg bg-pause-wash p-3 text-sm">{h.measured ?? h.measuredNote}</p>
+      {mine && <p className="text-sm" data-testid="hf-local">{local?.eyesPx !== undefined ? `This device: eyes about ${local.eyesPx} px, head about ${local.headPx} px, on ${local.n} check dots (${when(local.at)}).` : "This device has not been calibrated yet."}</p>}
+      <div className="mt-4 grid gap-4 md:grid-cols-2">
+        <div><h3 className="m-0 text-lg font-semibold">Enforced in code</h3><ul>{h.inCode.map((x: string) => <li key={x}>{x}</li>)}</ul></div>
+        <div><h3 className="m-0 text-lg font-semibold">Left to a model</h3><ul>{h.byModel.map((x: string) => <li key={x}>{x}</li>)}</ul></div>
+      </div>
+      <h3 className="mt-2 text-lg font-semibold">Credits</h3>
+      <ul className="text-sm">{h.credits.map((x: string) => <li key={x}>{x}</li>)}</ul>
+    </section>
+  );
 }
 
 function Proof({ d }: { d: any }) {
@@ -65,6 +91,7 @@ function Proof({ d }: { d: any }) {
         <p className="text-ink-2">From {d.modelCard.source}. {d.modelCard.risk}</p>
         <Table label="Model card" head={["Test set", "Messages", "AUC", "Caught at 1% genuine held", "What it is"]} rows={d.modelCard.text.map((r: any) => [r.set, r.n.toLocaleString(), r.auc ?? "—", r.caught_at_1pct, r.what])} />
       </section>
+      <HandsFreeFacts h={d.handsfree} />
       <section className="mt-10" aria-labelledby="nm">
         <h2 id="nm" className="text-2xl font-bold">Not measured</h2>
         <ul>{d.notMeasured.map((x: string) => <li key={x}>{x}</li>)}</ul>
@@ -111,6 +138,14 @@ function A11y({ d }: { d: any }) {
       <h2 className="mt-8 text-2xl font-bold">Not tested</h2>
       <ul>{(d.notTested ?? []).map((x: string) => <li key={x}>{x}</li>)}</ul>
       {d.features && (<><h2 className="mt-8 text-2xl font-bold">What is built</h2><ul>{d.features.map((x: string) => <li key={x}>{x}</li>)}</ul></>)}
+      <HandsFreeSim />
+      {d.handsfree?.recording && (
+        <figure className="mt-6">
+          <video src={d.handsfree.recording} controls muted playsInline preload="metadata" className="w-full max-w-2xl rounded-xl border border-rule" aria-describedby="hf-rec-cap" />
+          <figcaption id="hf-rec-cap" className="mt-1 text-sm text-ink-2">A screen recording of the simulation above (simulated gaze, no camera), recorded by the automated browser run.</figcaption>
+        </figure>
+      )}
+      <HandsFreeFacts h={d.handsfree} mine />
     </>
   );
 }

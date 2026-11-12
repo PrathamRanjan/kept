@@ -89,3 +89,7 @@ export const isWave2Route = (r: string) => WAVE2_ROUTE.test(r);
 /** Wave 3 routes (the cancel widget); walked in wave3.test.ts. */
 export const WAVE3_ROUTE = /^(GET \/widget\.js|POST \/ui\/voice\/session)$/;
 export const isWave3Route = (r: string) => WAVE3_ROUTE.test(r);
+
+/** Look and Say and the language switch: the member's language and the talk before cancelling; walked in looksay.test.ts. */
+export const LOOKSAY_ROUTE = /^POST \/ui\/manage\/:ref\/(lang|negotiate)$/;
+export const isLookSayRoute = (r: string) => LOOKSAY_ROUTE.test(r);

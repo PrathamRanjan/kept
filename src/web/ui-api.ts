@@ -10,6 +10,7 @@ import { config } from "../config.js";
 import { getDb } from "../db.js";
 import { sign, unsign } from "../lib/crypto.js";
 import { describeRules } from "../policy/rules.js";
+import { billingIn, describeRulesIn, msg, normLang, NO_RULES_PROMISE, type Lang } from "../i18n.js";
 import { money } from "../policy/eligibility.js";
 import * as svc from "../service.js";
 import { currentPolicy, intervalWords, KeptError, listMerchants, Merchant, merchantById, merchantBySlug, openOfferFor, plansFor, subscriberByRef, subscribersFor, toOffer, type Plan } from "../store.js";
@@ -56,7 +57,10 @@ function setOwner(res: Response, m: Merchant) {
   res.cookie(COOKIE, sign(m.id), { httpOnly: true, sameSite: "lax", secure: config.appUrl.startsWith("https"), maxAge: 30 * 864e5 });
 }
 
-const planJson = (p: Plan, currency: string) => ({ id: p.id, name: p.name, description: p.description, price: money(p.price), currency, billing: intervalWords(p), kind: p.kind, paypal_plan_id: p.paypal_plan_id });
+const planJson = (p: Plan, currency: string, lang: Lang = "en") => ({ id: p.id, name: p.name, description: p.description, price: money(p.price), currency, billing: lang === "en" ? intervalWords(p) : billingIn(p, lang), kind: p.kind, paypal_plan_id: p.paypal_plan_id });
+/** The member's language: the web app sends it on every call (x-kept-lang); ?lang= also works. */
+export const langOf = (req: Request): Lang => normLang(req.get("x-kept-lang") ?? (typeof req.query.lang === "string" ? req.query.lang : ""));
+const promiseIn = (policy: { rules: any } | null, lang: Lang) => (policy ? describeRulesIn(policy.rules, lang, () => describeRules(policy.rules)) : [NO_RULES_PROMISE[lang]]);
 
 /** Who did a trace step, in the three words the UI uses for its trust strip. */
 function actorWord(actor: string): "AI" | "Rule" | "PayPal" | "Person" | "Agent" {
@@ -163,12 +167,13 @@ export function uiApi(): Router {
     if (!m) throw new KeptError("Shop not found.", "not_found", 404);
     const plans = (await plansFor(db, m.id)).filter((p) => p.kind !== "promo");
     const policy = await currentPolicy(db, m.id);
+    const lang = langOf(req);
     return {
       shop: { name: m.name, slug: m.slug, tagline: m.tagline, currency: m.currency },
       // The showcase is read-only: a visitor subscribes in their own private copy (/demo).
       showcase: await isShowcase(m.id, db),
-      plans: plans.map((p) => planJson(p, m.currency)),
-      promise: policy ? describeRules(policy.rules) : ["Cancelling always works in one step."],
+      plans: plans.map((p) => planJson(p, m.currency, lang)),
+      promise: promiseIn(policy, lang),
       mcp: `${config.appUrl}/s/${m.slug}/mcp`,
       llms: `/s/${m.slug}/llms.txt`,
       paypalClientId: m.paypal_credentials ? null : config.paypal.clientId || null,
@@ -181,7 +186,7 @@ export function uiApi(): Router {
     const name = String(req.body?.name ?? "").trim().slice(0, 80) || null;
     const email = String(req.body?.email ?? "").trim().slice(0, 120) || null;
     if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new KeptError("That email doesn't look right.", "invalid_email", 422);
-    const out = await svc.startSubscription(m, String(req.body?.plan_id ?? ""), { name, email }, { kind: "web" }, String(req.body?.key ?? "").slice(0, 80) || undefined);
+    const out = await svc.startSubscription(m, String(req.body?.plan_id ?? ""), { name, email, lang: langOf(req) }, { kind: "web" }, String(req.body?.key ?? "").slice(0, 80) || undefined);
     return { ref: out.ref, approval_url: out.approvalUrl, paypal_subscription_id: out.paypalSubscriptionId };
   }));
 
@@ -195,15 +200,18 @@ export function uiApi(): Router {
     const all = await plansFor(db, m.id, true);
     const policy = await currentPolicy(db, m.id);
     const offer = await openOfferFor(db, s.id);
+    const lang = langOf(req);
     const tg = Number((await db.query<any>("SELECT count(*)::int AS n FROM party_links WHERE channel = 'telegram' AND party = 'subscriber' AND party_id = $1", [s.id])).rows[0]?.n ?? 0) > 0;
     if (!s.is_sample) await tick(m.id, "member_opened", db);
     return {
       view: v,
-      member: { name: s.subscriber_name, first: (s.subscriber_name ?? "").split(" ")[0] || null, channel: s.channel, agent_id: s.agent_id, sample: s.is_sample, started_at: s.started_at, cancel_requested_at: s.cancel_requested_at ?? null, kept_state: s.kept_state },
+      member: { name: s.subscriber_name, first: (s.subscriber_name ?? "").split(" ")[0] || null, channel: s.channel, agent_id: s.agent_id, sample: s.is_sample, started_at: s.started_at, cancel_requested_at: s.cancel_requested_at ?? null, kept_state: s.kept_state, lang: (s as any).lang ?? null },
       shop: { name: m.name, slug: m.slug, currency: m.currency },
-      switchTo: all.filter((p) => p.active && p.kind !== "promo" && p.id !== s.plan_id).map((p) => planJson(p, m.currency)),
+      switchTo: all.filter((p) => p.active && p.kind !== "promo" && p.id !== s.plan_id).map((p) => planJson(p, m.currency, lang)),
       pauseMax: policy?.rules.pause.enabled ? policy.rules.pause.maxCycles : 0,
-      promise: policy ? describeRules(policy.rules) : ["Cancelling always works in one step."],
+      promise: promiseIn(policy, lang),
+      billing: (() => { const cur = all.find((p) => p.id === s.plan_id); return cur ? (lang === "en" ? intervalWords(cur) : billingIn(cur, lang)) : null; })(),
+      interval: (() => { const cur = all.find((p) => p.id === s.plan_id); return cur ? { unit: cur.interval_unit, count: cur.interval_count } : null; })(),
       offer: offer ? { id: offer.id, message: offer.message, label: toOffer(offer).terms?.label ?? null, type: offer.type, terms: offer.terms, expires_at: offer.expires_at, worded_by: (toOffer(offer).terms as any)?.wordedBy === "code" ? "code" : "model" } : null,
       telegram: { linked: tg, ready: telegramReady() },
       sms: { ready: smsReady(), linked: await smsLinks("subscriber", s.id), pending: await smsPending("subscriber", s.id) },
@@ -223,7 +231,7 @@ export function uiApi(): Router {
     await spendAllowance(merchantId, "voice", 40);
     res.setHeader("cache-control", "no-store");
     try {
-      return await voiceSession(merchantId);
+      return await voiceSession(merchantId, langOf(req));
     } catch (e) {
       if (e instanceof NoModelError) throw new KeptError("Voice isn't available right now. Typing works as usual.", "voice_unavailable", 503);
       throw e;
@@ -244,7 +252,7 @@ export function uiApi(): Router {
     };
     try {
       await spendAllowance(s.merchant_id);
-      const r = await runAssistant(s.ref, msg, (st) => send("step", st));
+      const r = await runAssistant(s.ref, msg, (st) => send("step", st), langOf(req));
       send("answer", { answer: r.answer, sentences: r.sentences, facts: r.facts, model: r.model, runId: r.runId, readBack: r.readBack, toolCalls: r.toolCalls, mandate: r.mandate, ms: r.ms });
     } catch (e) {
       send("failed", { error: e instanceof KeptError ? e.code : "internal_error", message: e instanceof KeptError ? e.message : "The assistant hit a problem and stopped. Check the steps above for anything it changed." });
@@ -268,36 +276,60 @@ export function uiApi(): Router {
     return { ok: true, message: "Texts are off." };
   }));
 
-  const act = (path: string, fn: (ref: string, b: any) => Promise<Record<string, unknown>>) =>
-    r.post(`/ui/manage/:ref/${path}`, j(async (req) => ({ ok: true, ...(await fn(req.params.ref, req.body ?? {})) })));
+  // The member's language is remembered from the page they act on, so offers and reminders use it too.
+  const rememberLang = async (req: Request) => {
+    if (!req.get("x-kept-lang")) return;
+    await (await getDb()).query("UPDATE subscribers SET lang = $1 WHERE ref = $2 AND lang IS DISTINCT FROM $1", [langOf(req), req.params.ref]);
+  };
+  const act = (path: string, fn: (ref: string, b: any, lang: Lang) => Promise<Record<string, unknown>>) =>
+    r.post(`/ui/manage/:ref/${path}`, j(async (req) => {
+      await rememberLang(req);
+      return { ok: true, ...(await fn(req.params.ref, req.body ?? {}, langOf(req))) };
+    }));
+  r.post("/ui/manage/:ref/lang", j(async (req) => {
+    const s = await subscriberByRef(await getDb(), req.params.ref);
+    if (!s) throw new KeptError("Subscription not found", "not_found", 404);
+    const lang = normLang(req.body?.lang);
+    await (await getDb()).query("UPDATE subscribers SET lang = $1 WHERE id = $2", [lang, s.id]);
+    return { ok: true, lang };
+  }));
   const web = { kind: "web" as const };
   const key = (b: any) => (typeof b.key === "string" && b.key ? b.key.slice(0, 80) : undefined);
-  act("skip", async (ref, b) => { const out = await svc.skipNext(ref, web, key(b)); return { message: "Next delivery skipped.", resumeAt: out.resumeAt }; });
-  act("pause", async (ref, b) => { const out = await svc.pause(ref, Number(b.cycles ?? 1), web, key(b)); return { message: "Paused.", resumeAt: out.resumeAt }; });
-  act("resume", async (ref, b) => { await svc.resume(ref, web, key(b)); return { message: "Resumed. Your next payment is back on." }; });
-  act("switch", async (ref, b) => {
+  act("skip", async (ref, b, lang) => { const out = await svc.skipNext(ref, web, key(b)); return { message: msg("skipped", lang), resumeAt: out.resumeAt }; });
+  act("pause", async (ref, b, lang) => { const out = await svc.pause(ref, Number(b.cycles ?? 1), web, key(b)); return { message: msg("paused", lang), resumeAt: out.resumeAt }; });
+  act("resume", async (ref, b, lang) => { await svc.resume(ref, web, key(b)); return { message: msg("resumed", lang) }; });
+  act("switch", async (ref, b, lang) => {
     const out = await svc.switchPlan(ref, String(b.plan_id ?? ""), web, key(b));
-    return out.approvalUrl ? { message: "PayPal needs you to approve the new price.", approvalUrl: out.approvalUrl } : { message: out.confirmed ? `Switched to ${out.plan.name}.` : `Switch to ${out.plan.name} accepted; it starts from your next payment.` };
+    return out.approvalUrl ? { message: msg("switch_approve", lang), approvalUrl: out.approvalUrl } : { message: msg(out.confirmed ? "switched" : "switch_next", lang, { plan: out.plan.name }) };
   });
-  act("cancel", async (ref, b) => {
+  act("cancel", async (ref, b, lang) => {
     const hear = b.hear_offer === true || b.hear_offer === "1";
     const out = await svc.requestCancel(ref, { reason: b.reason ? String(b.reason) : undefined, hearOffer: hear }, web, key(b));
     const mid = (await subscriberByRef(await getDb(), ref))?.merchant_id;
     await tick(mid, out.status === "offer_open" ? "offer_shown" : "cancel_answered");
-    if (out.status === "offer_open") return { status: out.status, message: "Here is one offer. Take it, or cancel now." };
-    if (out.status === "cancel_pending") return { status: out.status, message: (out as any).note ?? "Cancellation requested. PayPal hasn't confirmed yet; Kept keeps retrying." };
-    return { status: "cancelled", message: hear ? "No offer applies to you right now, so we cancelled as you asked. You won't be charged again." : "Cancelled. You won't be charged again." };
+    if (out.status === "offer_open") return { status: out.status, message: msg("offer_open", lang) };
+    if (out.status === "cancel_pending") return { status: out.status, message: lang === "en" ? (out as any).note ?? msg("cancel_pending", lang) : msg("cancel_pending", lang) };
+    return { status: "cancelled", message: msg(hear ? "cancelled_no_offer" : "cancelled", lang) };
   });
   act("payment-fixed", async (ref, b) => ({ message: (await svc.paymentFixed(ref, web, key(b))).note }));
-  act("promise", async (ref, b) => {
+  act("promise", async (ref, b, lang) => {
     await svc.promisePayment(ref, String(b.date ?? ""), web);
-    return { message: `No reminders until ${String(b.date)}. A promise doesn't move any money.` };
+    return { message: msg("promise", lang, { date: String(b.date) }) };
+  });
+
+  // Kept per-app item 1: the talk between the member's assistant and the shop's agent. Proposes only.
+  act("negotiate", async (ref, b, lang) => {
+    const s0 = await subscriberByRef(await getDb(), ref);
+    if (s0) await spendAllowance(s0.merchant_id);
+    const out = await svc.negotiateCancel(ref, String(b.words ?? ""), lang, web);
+    return out;
   });
 
   r.post("/ui/offer/:id/:choice(accept|decline)", j(async (req) => {
     const out = await svc.respondToOffer(req.params.id, req.params.choice === "accept", web);
     await tick((await (await getDb()).query<{ merchant_id: string }>("SELECT merchant_id FROM offers WHERE id = $1", [req.params.id])).rows[0]?.merchant_id, "cancel_answered");
-    return { ok: true, status: out.status, message: out.status === "kept" ? "Done. Thanks for staying." : out.status === "cancel_pending" ? "Cancellation requested. PayPal hasn't confirmed yet; we keep retrying." : "Cancelled. You won't be charged again.", approvalUrl: (out as any).approvalUrl ?? null };
+    const lang = langOf(req);
+    return { ok: true, status: out.status, message: msg(out.status === "kept" ? "kept" : out.status === "cancel_pending" ? "cancel_pending_short" : "cancelled", lang), approvalUrl: (out as any).approvalUrl ?? null };
   }));
 
   /* ---------------- owner ---------------- */

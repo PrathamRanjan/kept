@@ -1,4 +1,5 @@
 import { DEFAULT_RULES, refundCapFrom, Rules } from "../policy/rules.js";
+import { offerTemplate, paymentFailureTemplate, type Lang } from "../i18n.js";
 import { FORBIDDEN_PHRASES } from "../policy/compliance.js";
 import type { EligibleOffer } from "../policy/eligibility.js";
 import type { IntervalUnit } from "../paypal/types.js";
@@ -256,11 +257,12 @@ export class LocalBrain implements Brain {
     return { key: null, rationale: eligible.length ? RATIONALE[category] : "No offer is allowed for this subscriber right now." };
   }
 
-  async wordOffer(offer: EligibleOffer, ctx: { merchantName: string; currency: string; category: ReasonCategory; subscriberName?: string | null }): Promise<string> {
+  async wordOffer(offer: EligibleOffer, ctx: { merchantName: string; currency: string; category: ReasonCategory; subscriberName?: string | null; lang?: Lang }): Promise<string> {
     return this.wordOfferSync(offer, ctx);
   }
 
-  wordOfferSync(offer: EligibleOffer, ctx: { merchantName: string; currency: string; category: ReasonCategory; subscriberName?: string | null }): string {
+  wordOfferSync(offer: EligibleOffer, ctx: { merchantName: string; currency: string; category: ReasonCategory; subscriberName?: string | null; lang?: Lang }): string {
+    if (ctx.lang && ctx.lang !== "en") return offerTemplate(offer, ctx, ctx.lang, () => "");
     const hi = ctx.subscriberName ? `${ctx.subscriberName.split(" ")[0]}, ` : "";
     const lead: Record<ReasonCategory, string> = {
       price: "Understood, money matters.",
@@ -287,11 +289,12 @@ export class LocalBrain implements Brain {
     return `${lead[ctx.category]} ${hi}${body} If you'd rather cancel, say no and it's cancelled straight away.`;
   }
 
-  async explainPaymentFailure(ctx: { merchantName: string; amount: number; currency: string; attempts: number; manageUrl: string }): Promise<string> {
+  async explainPaymentFailure(ctx: { merchantName: string; amount: number; currency: string; attempts: number; manageUrl: string; lang?: Lang }): Promise<string> {
     return this.explainPaymentFailureSync(ctx);
   }
 
-  explainPaymentFailureSync(ctx: { merchantName: string; amount: number; currency: string; attempts: number; manageUrl: string }): string {
+  explainPaymentFailureSync(ctx: { merchantName: string; amount: number; currency: string; attempts: number; manageUrl: string; lang?: Lang }): string {
+    if (ctx.lang && ctx.lang !== "en") return paymentFailureTemplate(ctx, ctx.lang, () => "");
     return `Your ${ctx.merchantName} renewal of ${fmt(ctx.amount, ctx.currency)} didn't go through (attempt ${ctx.attempts}). This usually means the card or bank linked to PayPal has expired or changed. Update your payment method in your PayPal account, then use ${ctx.manageUrl} to retry. Nothing else changes; if you'd rather stop, you can cancel from the same page.`;
   }
 

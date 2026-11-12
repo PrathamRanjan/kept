@@ -1,3 +1,5 @@
+import { serverLang } from "@/i18n";
+
 export class ApiError extends Error {
   constructor(public status: number, public code: string, message: string) {
     super(message);
@@ -10,7 +12,8 @@ async function call<T>(method: string, url: string, body?: unknown): Promise<T> 
     res = await fetch(url, {
       method,
       credentials: "same-origin",
-      headers: body === undefined ? { accept: "application/json" } : { "content-type": "application/json", accept: "application/json" },
+      // The member's language travels with every call, so the server words its replies, offers and reminders in it.
+      headers: body === undefined ? { accept: "application/json", "x-kept-lang": serverLang() } : { "content-type": "application/json", accept: "application/json", "x-kept-lang": serverLang() },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
@@ -39,7 +42,7 @@ export const newKey = () => (crypto?.randomUUID ? crypto.randomUUID() : `${Date.
 export async function streamPost(url: string, body: unknown, onEvent: (event: string, data: any) => void): Promise<void> {
   let res: Response;
   try {
-    res = await fetch(url, { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json", accept: "text/event-stream" }, body: JSON.stringify(body) });
+    res = await fetch(url, { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json", accept: "text/event-stream", "x-kept-lang": serverLang() }, body: JSON.stringify(body) });
   } catch {
     throw new ApiError(0, "offline", "Kept didn't answer. Check your connection and try again.");
   }

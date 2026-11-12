@@ -9,6 +9,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { config } from "../config.js";
 import { getDb } from "../db.js";
 import { newId } from "../lib/ids.js";
+import { saysCancel } from "../i18n.js";
 
 export interface Mandate {
   id: string;
@@ -23,7 +24,6 @@ export interface Mandate {
   expires_at: string;
 }
 
-const CANCEL_WORDS = /\b(cancel|cancell?ing|stop|end|quit|unsubscribe|close (it|my)|leave)\b/i;
 const READS = ["get_subscription", "list_plans"];
 const CHANGES = ["skip_next", "pause", "resume", "switch_plan"];
 const ENDS = ["cancel_subscription", "respond_to_offer"];
@@ -32,7 +32,8 @@ const canonical = (m: Mandate) => JSON.stringify(m, Object.keys(m).sort());
 const mac = (m: Mandate) => createHmac("sha256", "kept-mandate:" + config.sessionSecret).update(canonical(m)).digest("base64url");
 
 export async function issueMandate(o: { merchantId: string; shopName: string; subscriberId: string; memberName: string; agent: string; message: string; pauseMaxCycles: number; minutes?: number }) {
-  const mayCancel = CANCEL_WORDS.test(o.message);
+  // In any of the four languages, including mixed Hindi-English ("cancel kar do").
+  const mayCancel = saysCancel(o.message);
   const now = new Date();
   const m: Mandate = {
     id: newId("mdt"),

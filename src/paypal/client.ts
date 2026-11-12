@@ -137,6 +137,7 @@ export class PayPalClient implements PayPalApi {
         brand_name: input.brandName.slice(0, 127),
         shipping_preference: "NO_SHIPPING",
         user_action: "SUBSCRIBE_NOW",
+        ...(input.locale ? { locale: input.locale } : {}),
         return_url: input.returnUrl,
         cancel_url: input.cancelUrl,
       },

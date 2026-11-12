@@ -332,6 +332,7 @@ CREATE TABLE IF NOT EXISTS approval_pool (
 CREATE TABLE IF NOT EXISTS paypal_refs (resource_id TEXT PRIMARY KEY, ws_id TEXT, merchant_id TEXT NOT NULL, kind TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now());
 CREATE TABLE IF NOT EXISTS usage_counters (scope TEXT NOT NULL, day TEXT NOT NULL, kind TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (scope, day, kind));
 ALTER TABLE offers ADD COLUMN IF NOT EXISTS is_sample BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS lang TEXT;
 ALTER TABLE audit_chain ADD COLUMN IF NOT EXISTS merchant_id TEXT;
 -- Every workspace clones the showcase's PayPal plans, so a PayPal plan id is unique per shop, not globally.
 ALTER TABLE plans DROP CONSTRAINT IF EXISTS plans_paypal_plan_id_key;

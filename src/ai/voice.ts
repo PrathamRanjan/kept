@@ -7,12 +7,13 @@
  * leaves the server. With no key there is no voice: the button says so, and typing always works.
  */
 import { config } from "../config.js";
+import type { Lang } from "../i18n.js";
 import { audit, hasOpenAI, NoModelError, providerFetch } from "./provider.js";
 
 export const VOICE_MODEL = "gpt-live-1";
 export const VOICE_TRANSCRIBE = "gpt-4o-transcribe";
 
-export async function voiceSession(merchantId: string | null): Promise<{ secret: string; expiresAt: number; model: string; transcribe: string; callsUrl: string }> {
+export async function voiceSession(merchantId: string | null, lang: Lang = "en"): Promise<{ secret: string; expiresAt: number; model: string; transcribe: string; callsUrl: string }> {
   if (!hasOpenAI()) throw new NoModelError("AI_PROVIDER is not openai or OPENAI_API_KEY is unset");
   const t0 = Date.now();
   const res = await providerFetch()(`${config.ai.openaiBaseUrl}/v1/realtime/client_secrets`, {
@@ -25,7 +26,7 @@ export async function voiceSession(merchantId: string | null): Promise<{ secret:
         model: VOICE_MODEL,
         output_modalities: ["text"],
         instructions: "Dictation only. Never reply to the user.",
-        audio: { input: { transcription: { model: VOICE_TRANSCRIBE, language: "en" }, turn_detection: null } },
+        audio: { input: { transcription: { model: VOICE_TRANSCRIBE, language: lang.slice(0, 2) }, turn_detection: null } },
       },
     }),
   });

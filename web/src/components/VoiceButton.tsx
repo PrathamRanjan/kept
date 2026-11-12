@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { Mic, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api, ApiError } from "@/lib/api";
+import { useT } from "@/i18n";
 
 /**
  * Spec A7: push-to-talk on the main text boxes. Press to start, press again to stop. The browser opens a
@@ -12,7 +13,9 @@ import { api, ApiError } from "@/lib/api";
 interface Session { secret: string; callsUrl: string; model: string; transcribe: string }
 type State = "idle" | "connecting" | "listening" | "finishing";
 
-export function VoiceButton({ onText, memberRef, label = "Speak instead of typing" }: { onText: (t: string) => void; memberRef?: string; label?: string }) {
+export function VoiceButton({ onText, memberRef, label }: { onText: (t: string) => void; memberRef?: string; label?: string }) {
+  const { t } = useT();
+  label ??= t("v.speak");
   const [state, setState] = useState<State>("idle");
   const [live, setLive] = useState("");
   const [note, setNote] = useState<string | null>(null);
@@ -32,7 +35,8 @@ export function VoiceButton({ onText, memberRef, label = "Speak instead of typin
     setNote(null);
     setLive("");
     text.current = "";
-    if (!navigator.mediaDevices?.getUserMedia || typeof RTCPeerConnection === "undefined") return setNote("This browser can't record here. Typing works as usual.");
+    if (!navigator.mediaDevices?.getUserMedia || typeof RTCPeerConnection === "undefined") return setNote(t("v.cant"));
+    if (!navigator.onLine) return setNote(t("v.offline"));
     setState("connecting");
     try {
       const s = await api.post<Session>("/ui/voice/session", memberRef ? { ref: memberRef } : {});
@@ -49,7 +53,7 @@ export function VoiceButton({ onText, memberRef, label = "Speak instead of typin
           text.current = String(ev.transcript ?? "").trim();
           if (text.current) onText(text.current);
           setLive(text.current);
-          setNote(text.current ? `Heard by ${s.model} (words by ${s.transcribe}). Check it, then send.` : "Nothing was heard. Try again, or type.");
+          setNote(text.current ? t("v.heard", { model: s.model, tx: s.transcribe }) : t("v.nothing"));
           setState("idle");
           stopAll();
         }
@@ -71,7 +75,7 @@ export function VoiceButton({ onText, memberRef, label = "Speak instead of typin
     } catch (e) {
       stopAll();
       setState("idle");
-      setNote(e instanceof ApiError ? e.message : (e as Error).name === "NotAllowedError" ? "The microphone was not allowed. Typing works as usual." : `Voice isn't working here (${(e as Error).message}). Typing works as usual.`);
+      setNote(e instanceof ApiError ? e.message : (e as Error).name === "NotAllowedError" ? t("v.denied") : `Voice isn't working here (${(e as Error).message}). Typing works as usual.`);
     }
   }
 
@@ -87,7 +91,7 @@ export function VoiceButton({ onText, memberRef, label = "Speak instead of typin
       if (pc.current) {
         stopAll();
         setState("idle");
-        setNote("No words came back. Try again, or type.");
+        setNote(t("v.none"));
       }
     }, 15_000);
   }
@@ -95,11 +99,11 @@ export function VoiceButton({ onText, memberRef, label = "Speak instead of typin
   const on = state === "listening" || state === "finishing";
   return (
     <span className="inline-flex flex-col">
-      <Button type="button" variant={on ? "default" : "outline"} size="icon" className="size-11" aria-pressed={on} aria-label={on ? "Stop and use what I said" : label} title={on ? "Stop" : label} disabled={state === "connecting" || state === "finishing"} onClick={() => (on ? stop() : start())}>
+      <Button type="button" variant={on ? "default" : "outline"} size="icon" className="size-11" aria-pressed={on} aria-label={on ? t("v.stop") : label} title={on ? t("v.stopShort") : label} disabled={state === "connecting" || state === "finishing"} onClick={() => (on ? stop() : start())}>
         {on ? <Square aria-hidden="true" /> : <Mic aria-hidden="true" />}
       </Button>
-      <span className="sr-only" aria-live="polite">{state === "listening" ? "Listening. Press again to stop." : state === "connecting" ? "Starting the microphone." : ""}</span>
-      {(live || note) && <span className="mt-1 max-w-[18rem] text-xs text-ink-2" aria-live="polite">{state === "listening" && live ? `Hearing: ${live}` : note}</span>}
+      <span className="sr-only" aria-live="polite">{state === "listening" ? t("v.listening") : state === "connecting" ? t("v.starting") : ""}</span>
+      {(live || note) && <span className="mt-1 max-w-[18rem] text-xs text-ink-2" aria-live="polite">{state === "listening" && live ? t("v.hearing", { t: live }) : note}</span>}
     </span>
   );
 }

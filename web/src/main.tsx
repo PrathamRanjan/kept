@@ -6,6 +6,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { PageSkeleton } from "@/components/States";
 import Landing from "@/pages/Landing";
 import { endTour } from "./tours";
+import { I18nProvider } from "@/i18n";
+import { HandsFreeRoot } from "@/handsfree/HandsFree";
 import "./index.css";
 
 const Demo = lazy(() => import("@/pages/Demo"));
@@ -59,9 +61,12 @@ function App() {
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <TooltipProvider delayDuration={300}>
-      <App />
-      <Toaster position="top-center" richColors={false} closeButton />
-    </TooltipProvider>
+    <I18nProvider>
+      <TooltipProvider delayDuration={300}>
+        <App />
+        <HandsFreeRoot />
+        <Toaster position="top-center" richColors={false} closeButton />
+      </TooltipProvider>
+    </I18nProvider>
   </StrictMode>,
 );

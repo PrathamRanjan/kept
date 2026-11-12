@@ -39,7 +39,7 @@ export function createApp() {
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
     // PayPal's button frames ask for the Payment Request feature; delegate it to PayPal only.
-    res.setHeader("Permissions-Policy", 'payment=(self "https://www.paypal.com" "https://www.sandbox.paypal.com"), camera=(), geolocation=()');
+    res.setHeader("Permissions-Policy", 'payment=(self "https://www.paypal.com" "https://www.sandbox.paypal.com"), camera=(self), microphone=(self), geolocation=()');
     next();
   });
   // Spec B5 (5): the cancel widget any shop can embed. Cross-origin by design; it reads nothing and sets nothing.

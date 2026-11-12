@@ -13,6 +13,8 @@
     "@fontsource-variable/schibsted-grotesk": "^5.3.0",
     "@fontsource/ibm-plex-mono": "^5.3.0",
     "@fontsource/ibm-plex-sans": "^5.3.0",
+    "@fontsource/noto-sans-devanagari": "^5.3.0",
+    "@mediapipe/tasks-vision": "^0.10.35",
     "ag-grid-community": "^36.3.0",
     "ag-grid-react": "^36.3.0",
     "class-variance-authority": "^0.7.1",

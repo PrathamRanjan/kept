@@ -179,6 +179,7 @@ export function publicRouter(): Router {
       suites: [readJson("eval/scam/results.json"), readJson("eval/b5.json"), readJson("eval/reasons.json"), readJson("eval/adversarial.json"), readJson("eval/fairness.json"), readJson("eval/exchange.json"), readJson("eval/robot-judge.json")].filter(Boolean),
       thresholds: Object.values(th),
       nightly: await latestNightly(),
+      handsfree: readJson("docs/accessibility.json")?.handsfree ?? null,
       modelCard: {
         text: [
           { set: "ScamShield SMS test", n: 8188, auc: 0.988, caught_at_1pct: "75%", what: "real Singapore SMS, in-distribution" },

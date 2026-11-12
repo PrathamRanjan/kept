@@ -1,100 +1,163 @@
 {
- "updated": "2026-11-11T16:05:00Z",
- "checks": [
-  {
-   "check": "axe, WCAG 2.2 AA",
-   "how": "axe-core in the Playwright run (npm run e2e), on the real app with the fake PayPal",
-   "where": "Landing, shop, member page, owner pages, judge, proof, agents, not-found; phone 360 px and desktop 1440 px",
-   "date": "2026-11-11",
-   "result": "No serious or critical issues (28 of 28 browser tests)",
-   "ok": true
-  },
-  {
-   "check": "axe, WCAG 2.2 AA, live",
-   "how": "The robot judge (npm run robot:judge): axe-core in a browser against the live site",
-   "where": "/, /judge, /proof, /ai, /paypal, /who-can-move-money, /accessibility, /agents at 1440 px",
-   "date": "2026-11-11",
-   "result": "0 serious or critical issues on all 8 pages",
-   "ok": true
-  },
-  {
-   "check": "axe, WCAG 2.2 AA, live",
-   "how": "axe-core run in a browser against the live site",
-   "where": "Guard, Safety and Compliance pages at 800 px",
-   "date": "2026-11-11",
-   "result": "0 violations",
-   "ok": true
-  },
-  {
-   "check": "Text at 200%",
-   "how": "Root font size 200% in Playwright (e2e/a11y.spec.ts) and on the live site by the robot judge",
-   "where": "/, /manage, /judge, /proof locally; the 8 public pages live",
-   "date": "2026-11-11",
-   "result": "No sideways scroll on any of them",
-   "ok": true
-  },
-  {
-   "check": "Keyboard only",
-   "how": "Playwright presses Tab and Enter only, no mouse (e2e/a11y.spec.ts)",
-   "where": "Member page: Tab to Cancel, press Enter, see the result (fake PayPal)",
-   "date": "2026-11-11",
-   "result": "Cancel is reached and completed from the keyboard; the focused Cancel button shows a focus ring; the result is in a live region",
-   "ok": true
-  },
-  {
-   "check": "Reduced motion",
-   "how": "prefers-reduced-motion: reduce in Playwright",
-   "where": "Landing page marquee",
-   "date": "2026-11-11",
-   "result": "The marquee stops; its repeated copies are hidden from screen readers",
-   "ok": true
-  },
-  {
-   "check": "Named switches",
-   "how": "Playwright reads the accessibility tree of the Display and help panel",
-   "where": "Display and help panel",
-   "date": "2026-11-11",
-   "result": "Every switch has role=switch, a name and a description, and its state is announced",
-   "ok": true
-  },
-  {
-   "check": "Voice input fallback",
-   "how": "Playwright with no microphone and no model key",
-   "where": "Owner Ask and the member's assistant",
-   "date": "2026-11-11",
-   "result": "The voice button says plainly why voice is off; typing works",
-   "ok": true
-  },
-  {
-   "check": "Voice session, live",
-   "how": "POST /ui/voice/session on the live site",
-   "where": "Member page",
-   "date": "2026-11-11",
-   "result": "A 120-second gpt-live-1 session secret is issued (Kept's own key never reaches the browser); 403 without a member or owner",
-   "ok": true
-  },
-  {
-   "check": "Narrow screens",
-   "how": "Live pages at 800 px and 360 px wide",
-   "where": "Guard, Safety, Compliance, member page",
-   "date": "2026-11-11",
-   "result": "No sideways scroll",
-   "ok": true
+  "updated": "2026-11-12",
+  "checks": [
+    {
+      "check": "axe, WCAG 2.2 AA",
+      "how": "axe-core in the Playwright run (npm run e2e), on the real app with the fake PayPal",
+      "where": "Landing, shop, member page, owner pages, judge, proof, agents, not-found; phone 360 px and desktop 1440 px",
+      "date": "2026-11-11",
+      "result": "No serious or critical issues (28 of 28 browser tests)",
+      "ok": true
+    },
+    {
+      "check": "axe, WCAG 2.2 AA, live",
+      "how": "The robot judge (npm run robot:judge): axe-core in a browser against the live site",
+      "where": "/, /judge, /proof, /ai, /paypal, /who-can-move-money, /accessibility, /agents at 1440 px",
+      "date": "2026-11-11",
+      "result": "0 serious or critical issues on all 8 pages",
+      "ok": true
+    },
+    {
+      "check": "axe, WCAG 2.2 AA, live",
+      "how": "axe-core run in a browser against the live site",
+      "where": "Guard, Safety and Compliance pages at 800 px",
+      "date": "2026-11-11",
+      "result": "0 violations",
+      "ok": true
+    },
+    {
+      "check": "Text at 200%",
+      "how": "Root font size 200% in Playwright (e2e/a11y.spec.ts) and on the live site by the robot judge",
+      "where": "/, /manage, /judge, /proof locally; the 8 public pages live",
+      "date": "2026-11-11",
+      "result": "No sideways scroll on any of them",
+      "ok": true
+    },
+    {
+      "check": "Keyboard only",
+      "how": "Playwright presses Tab and Enter only, no mouse (e2e/a11y.spec.ts)",
+      "where": "Member page: Tab to Cancel, press Enter, see the result (fake PayPal)",
+      "date": "2026-11-11",
+      "result": "Cancel is reached and completed from the keyboard; the focused Cancel button shows a focus ring; the result is in a live region",
+      "ok": true
+    },
+    {
+      "check": "Reduced motion",
+      "how": "prefers-reduced-motion: reduce in Playwright",
+      "where": "Landing page marquee",
+      "date": "2026-11-11",
+      "result": "The marquee stops; its repeated copies are hidden from screen readers",
+      "ok": true
+    },
+    {
+      "check": "Named switches",
+      "how": "Playwright reads the accessibility tree of the Display and help panel",
+      "where": "Display and help panel",
+      "date": "2026-11-11",
+      "result": "Every switch has role=switch, a name and a description, and its state is announced",
+      "ok": true
+    },
+    {
+      "check": "Voice input fallback",
+      "how": "Playwright with no microphone and no model key",
+      "where": "Owner Ask and the member's assistant",
+      "date": "2026-11-11",
+      "result": "The voice button says plainly why voice is off; typing works",
+      "ok": true
+    },
+    {
+      "check": "Voice session, live",
+      "how": "POST /ui/voice/session on the live site",
+      "where": "Member page",
+      "date": "2026-11-11",
+      "result": "A 120-second gpt-live-1 session secret is issued (Kept's own key never reaches the browser); 403 without a member or owner",
+      "ok": true
+    },
+    {
+      "check": "Narrow screens",
+      "how": "Live pages at 800 px and 360 px wide",
+      "where": "Guard, Safety, Compliance, member page",
+      "date": "2026-11-11",
+      "result": "No sideways scroll",
+      "ok": true
+    },
+    {
+      "check": "Hands-free, voice only, in a browser",
+      "how": "Playwright (e2e/looksay.spec.ts) with a stand-in for the browser's speech recognition and no camera",
+      "where": "Member page, desktop 1440 px",
+      "date": "2026-11-12",
+      "result": "Tab to Cancel and say \"click\": the confirm card opens; anything but \"yes\" closes it with nothing changed; \"yes\" cancels; \"stop\" with no wake word turns hands-free off; holding Space never pressed the focused button",
+      "ok": true
+    },
+    {
+      "check": "Face tracker loads on the device",
+      "how": "Playwright with Chrome's fake camera (e2e/tracker.spec.ts)",
+      "where": "Landing page, desktop",
+      "date": "2026-11-12",
+      "result": "MediaPipe runtime and model served from /static/handsfree, no request to another host; camera indicator shown; the off switch released the camera. The fake camera has no face, so pointing accuracy is not measured here",
+      "ok": true
+    },
+    {
+      "check": "Camera-free simulation",
+      "how": "Playwright clicks Run on /accessibility",
+      "where": "/accessibility, phone and desktop",
+      "date": "2026-11-12",
+      "result": "A short glance at one button does not click it; dwelling on Pause clicks Pause",
+      "ok": true
+    },
+    {
+      "check": "Four languages and the pseudo-locale",
+      "how": "Playwright: axe and the sideways-scroll check per language; vitest (test/i18n.test.ts) fails on any missing key, lost placeholder or string left in English",
+      "where": "Member page in hi-IN, id-ID, pt-BR; pseudo-locale (accents, about 30% longer) on the member page and landing",
+      "date": "2026-11-12",
+      "result": "No serious or critical axe issues, no sideways scroll at 360 px; every key translated",
+      "ok": true
+    }
+  ],
+  "notTested": [
+    "A screen-reader walk-through by a person (VoiceOver or NVDA): only automated checks have run.",
+    "Speaking into a real microphone: the voice session is issued live, but no one has dictated into it from a browser yet.",
+    "Voice control software (Voice Control, Dragon).",
+    "Testing with disabled people: none has been done.",
+    "Hands-free mode with a real camera and a real face: the face tracker loads and runs in an automated browser with a fake camera (no face), but no person has pointed, calibrated or winked with it.",
+    "Hands-free voice commands spoken aloud: the command parser is unit-tested in all four languages, but no one has spoken them into a browser.",
+    "Hindi, Indonesian and Portuguese wording read by a native speaker: every translation is machine-written."
+  ],
+  "features": [
+    "A 'Display and help' panel in every header: larger text, more contrast, reduced motion, simpler words.",
+    "Skip link to the main content on every page; focus moves to the page heading on navigation.",
+    "Touch targets at least 44 px; every icon-only button has a name.",
+    "Status and errors are announced (role=status, role=alert); the AI work rail is a live region.",
+    "Nothing depends on colour alone: pass and fail carry words and icons.",
+    "Push-to-talk on the owner's Ask and the member's assistant (gpt-live-1 session, words by gpt-4o-transcribe); typing always works.",
+    "Scrolling tables and code boxes can be reached and scrolled with the keyboard."
+  ],
+  "handsfree": {
+    "what": "Hands-free mode (header button or Alt+H): point with the head or the eyes through the webcam, click by looking for a moment, by saying \"click\" or with a wink; voice commands in English, Hindi, Bahasa Indonesia and Brazilian Portuguese. The camera picture is processed on the device by MediaPipe Face Landmarker and never uploaded.",
+    "published": [
+      "Webcam eye tracking is accurate to about 100 to 200 px. That figure is Peek's own published one (the deixis-main README), not a Kept measurement.",
+      "At that accuracy a 30 px row is too small to hit reliably, so hands-free mode raises every control to at least 44 px and spaces lists out.",
+      "Kept switches to head pointing when eye pointing measures worse than 120 px on the check dots."
+    ],
+    "measured": null,
+    "measuredNote": "No person has calibrated Kept's hands-free mode on a real camera yet, so there is no published accuracy. Each device shows its own figure, in pixels, after its calibration (9 dots fitted, 4 check dots measured).",
+    "inCode": [
+      "Which control is outlined: votes weighted by distance and jitter, fading within a fraction of a second, hysteresis, saccade reset, drift correction from clicks (web/src/handsfree/snap.ts)",
+      "When a dwell or wink clicks, and the blink freeze",
+      "\"Stop\" in all four languages, Esc, and looking away for 2 seconds",
+      "Reading a control's state (turned off, already selected) before pressing it",
+      "The confirm card: any pay, refund, cancel, delete, send, approve, decline or dispute waits for a spoken or clicked \"yes\" with the amount and recipient shown; anything else cancels",
+      "The 10-step cap on a spoken request",
+      "Handing back to the mouse or touch the moment it moves"
+    ],
+    "byModel": [
+      "Nothing in hands-free mode itself.",
+      "A spoken request that is not a fixed command goes to the member's assistant on the page, which uses the shop's MCP tools under a signed mandate (the same as typing it)."
+    ],
+    "credits": [
+      "MediaPipe Face Landmarker (Google, Apache 2.0), served from Kept itself",
+      "Approach described in the READMEs of Peek (deixis-main) and movo (head pointing). Neither repository has a licence file, so no code was copied; Kept's version is written from scratch."
+    ],
+    "recording": "/static/handsfree/sim.webm"
   }
- ],
- "notTested": [
-  "A screen-reader walk-through by a person (VoiceOver or NVDA): only automated checks have run.",
-  "Speaking into a real microphone: the voice session is issued live, but no one has dictated into it from a browser yet.",
-  "Voice control software (Voice Control, Dragon).",
-  "Testing with disabled people: none has been done."
- ],
- "features": [
-  "A 'Display and help' panel in every header: larger text, more contrast, reduced motion, simpler words.",
-  "Skip link to the main content on every page; focus moves to the page heading on navigation.",
-  "Touch targets at least 44 px; every icon-only button has a name.",
-  "Status and errors are announced (role=status, role=alert); the AI work rail is a live region.",
-  "Nothing depends on colour alone: pass and fail carry words and icons.",
-  "Push-to-talk on the owner's Ask and the member's assistant (gpt-live-1 session, words by gpt-4o-transcribe); typing always works.",
-  "Scrolling tables and code boxes can be reached and scrolled with the keyboard."
- ]
 }

@@ -18,6 +18,8 @@ export interface SubscriptionInput {
   cancelUrl: string;
   subscriberEmail?: string;
   subscriberName?: string;
+  /** PayPal's approval page language (BCP 47, e.g. pt-BR). Left out, PayPal picks from the buyer's browser. */
+  locale?: string;
 }
 
 /** The subset of a PayPal subscription Kept relies on. */

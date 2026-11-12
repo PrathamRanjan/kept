@@ -106,12 +106,12 @@ function ApprovalCard({ a, currency, onDone }: { a: Approval; currency: string; 
             <a href="/dashboard/guard#approvals">Approve with your passkey</a>
           </Button>
         ) : (
-          <Button onClick={() => decide("approve")} disabled={!!busy}>
+          <Button onClick={() => decide("approve")} disabled={!!busy} data-hf-confirm="true" data-hf-what={`Approve: ${what}`} data-hf-amount={a.amount ? fmtMoney(a.amount, currency) : "No money now"} data-hf-to={a.member?.name ?? "this shop"}>
             <Check aria-hidden="true" />
             {busy === "approve" ? "Approving…" : "Approve"}
           </Button>
         )}
-        <Button variant="outline" onClick={() => decide("decline")} disabled={!!busy}>
+        <Button variant="outline" onClick={() => decide("decline")} disabled={!!busy} data-hf-confirm="true" data-hf-what={`Decline: ${what}`} data-hf-amount="Nothing moves" data-hf-to={a.member?.name ?? "this shop"}>
           <X aria-hidden="true" />
           {busy === "decline" ? "Declining…" : "Decline, nothing moves"}
         </Button>
