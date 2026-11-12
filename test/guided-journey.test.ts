@@ -2,7 +2,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
 import { openDb, setDb, type Db } from "../src/db.js";
 import { ensureShowcase } from "../src/demo/workspaces.js";
-import { START, STEPS } from "../src/demo/journey.js";
+import { STEPS, TAGS, activeSteps, startOf } from "../src/demo/journey.js";
+import { config } from "../src/config.js";
 import { waitForClaims } from "../src/web/demo.js";
 import * as svc from "../src/service.js";
 import { setPayPalFactory } from "../src/paypal/index.js";
@@ -52,7 +53,13 @@ describe("the guided journey", () => {
     const j = r.json;
     expect(j.on).toBe(true);
     expect(j.i).toBe(0);
-    expect(j.n).toBe(STEPS.length);
+    expect(j.n).toBe(activeSteps().length);
+    // Telegram is off on this test server, so its step is left out rather than shown broken.
+    expect(stepOf(j, "telegram")).toBeUndefined();
+    // Each step shows what it really uses as small tags, and the card ends with one judging criterion.
+    expect(stepOf(j, "shop").tags.map((t: any) => t.kind)).toContain("paypal");
+    expect(stepOf(j, "scam").tags.map((t: any) => t.label)).toContain("Scam model in your browser");
+    expect(stepOf(j, "shop").crit).toMatchObject({ k: "tech", label: "Technological implementation" });
     expect(j.steps[0].role).toBe("owner");
     expect(j.steps[0].who).toBe("You are the owner of Ember & Oak Coffee Club");
     // The member is a labelled sample (no pool in this test), so steps that change PayPal say so.
@@ -62,6 +69,9 @@ describe("the guided journey", () => {
     expect(new RegExp(stepOf(j, "card").match).test(`/manage/${j.member.ref}`)).toBe(true);
     expect(stepOf(j, "change").sample).toMatch(/labelled sample member.*nothing reaches PayPal/);
     expect(stepOf(j, "card").sample).toBeNull();
+    // Every step's page match accepts its own link (the shop step fills in the visitor's shop).
+    for (const s of j.steps) if (s.href && s.match) expect(new RegExp(s.match).test(s.href.split(/[?#]/)[0]), s.id).toBe(true);
+    expect(stepOf(j, "join").href).toMatch(/^\/s\/[a-z0-9-]+$/);
     // Same place for the same workspace on the next read; a stranger has none.
     expect((await journey(c)).i).toBe(0);
     expect((await journey(new Client(srv.base))).on).toBe(false);
@@ -74,7 +84,7 @@ describe("the guided journey", () => {
     expect(a.i).toBe(3);
     expect(a.steps[3].id).toBe("rules");
     expect((await journey(c)).i).toBe(3);
-    expect((await c.postJson("/ui/journey", { action: "go", i: 999 })).json.i).toBe(STEPS.length - 1);
+    expect((await c.postJson("/ui/journey", { action: "go", i: 999 })).json.i).toBe(activeSteps().length - 1);
     expect((await c.postJson("/ui/journey", { action: "go", i: -4 })).json.i).toBe(0);
     expect((await c.postJson("/ui/journey", { action: "go", i: "x" })).status).toBe(400);
     const stop = await c.postJson("/ui/journey", { action: "stop" });
@@ -84,10 +94,10 @@ describe("the guided journey", () => {
   });
 
   it("starts at the member, or at the member's AI assistant", async () => {
-    expect((await start(new Client(srv.base), "member")).i).toBe(START.member);
-    expect((await start(new Client(srv.base), "assistant")).i).toBe(START.assistant);
-    expect(STEPS[START.member].role).toBe("member");
-    expect(STEPS[START.assistant].role).toBe("assistant");
+    expect((await start(new Client(srv.base), "member")).i).toBe(startOf("member"));
+    expect((await start(new Client(srv.base), "assistant")).i).toBe(startOf("assistant"));
+    expect(activeSteps()[startOf("member")].id).toBe("join");
+    expect(activeSteps()[startOf("assistant")].role).toBe("assistant");
     expect((await start(new Client(srv.base), "nonsense")).i).toBe(0);
   });
 
@@ -155,14 +165,31 @@ describe("the guided journey", () => {
     expect(guard.text).toContain('id="policy"');
     const safety = await c.get("/dashboard/safety");
     expect(safety.text).toContain('id="check"');
-    const agents = await c.get("/agents");
-    const slug = (await c.get("/ui/session")).json.demoShop;
-    expect(agents.text).toContain(`/s/${slug}/mcp`);
-    expect(stepOf(await journey(c), "byo").done).toBe(true);
     expect(stepOf(await journey(c), "rules").done).toBe(true);
+    // Something done before this journey started doesn't count: a fresh start shows the rule step undone again.
+    await new Promise((r) => setTimeout(r, 1100));
+    await start(c, "owner");
+    expect(stepOf(await journey(c), "rules").done).toBe(false);
     const js = await c.get("/static/journey.js");
     expect(js.status).toBe(200);
     expect(js.text).toContain("window.keptJourney");
+  });
+
+  it("shows the Telegram step only when Kept's own bot is on", async () => {
+    const saved = { on: config.channels.telegramOn, token: config.channels.telegramToken };
+    (config.channels as any).telegramOn = true;
+    (config.channels as any).telegramToken = saved.token || "test-bot-token";
+    try {
+      expect(activeSteps().length).toBe(STEPS.length);
+      const c = new Client(srv.base);
+      const j = await start(c, "owner");
+      expect(j.n).toBe(STEPS.length);
+      expect(stepOf(j, "telegram").href).toBe(`/manage/${j.member.ref}#telegram`);
+    } finally {
+      (config.channels as any).telegramOn = saved.on;
+      (config.channels as any).telegramToken = saved.token;
+    }
+    for (const s of STEPS) for (const t of s.tags ?? []) expect(TAGS[t]).toBeTruthy();
   });
 
   it("used both journey routes with no server error", () => {

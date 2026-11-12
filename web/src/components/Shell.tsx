@@ -138,7 +138,7 @@ export function PublicHeader({ right, translated = false }: { right?: React.Reac
           <Logo />
           <div className="ml-auto flex flex-wrap items-center justify-end gap-1">
             <Button variant="ghost" size="sm" asChild className="min-h-11">
-              <a href="/judge">{t("shell.judges")}</a>
+              <a href="/demo">{t("shell.judges")}</a>
             </Button>
             {right}
             <LangPicker />

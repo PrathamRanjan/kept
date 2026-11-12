@@ -260,9 +260,9 @@ describe("Kept foundation", () => {
     /* ---- evidence and judge mode ---- */
     expect((await owner.get("/dashboard/evidence")).text).toMatch(/what is real/i);
     const judge = new Client(base);
-    expect((await judge.get("/judge")).status).toBeLessThan(500);
+    expect((await judge.get("/judge")).location).toBe("/demo");
     expect((await judge.get("/api/public/judge")).json.paths).toHaveLength(3); // the judge page is the React app now (wave2.test.ts)
-    expect((await judge.get("/judge/reset")).location).toBe("/judge");
+    expect((await judge.get("/judge/reset")).location).toBe("/demo");
 
     /* ---- MCP additions: buyer get_trace with ownership; owner read-only tools ---- */
     const mcp = async (path: string, headers: Record<string, string>, name: string, args: Record<string, unknown>) => {

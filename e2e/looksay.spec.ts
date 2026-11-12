@@ -74,7 +74,7 @@ test("language: the pseudo-locale (accents, 30% longer) still fits", async ({ pa
   await page.goto(`/manage/${ref}?lang=qps`);
   await expect(page.locator("[data-tour='card'] li").first()).toBeVisible();
   await noSideScroll(page);
-  for (const p of ["/", "/demo", "/judge", "/proof"]) {
+  for (const p of ["/", "/demo", "/proof"]) {
     await page.goto(`${p}?lang=qps`);
     await expect(page.getByRole("heading", { level: 1 })).toContainText("[");
     await noSideScroll(page);
@@ -83,7 +83,7 @@ test("language: the pseudo-locale (accents, 30% longer) still fits", async ({ pa
 
 test("language: every public page follows the picker, and English comes back word for word", async ({ page }) => {
   await noTours(page);
-  for (const p of ["/", "/demo", "/judge", "/proof", "/accessibility"]) {
+  for (const p of ["/", "/demo", "/proof", "/accessibility"]) {
     await page.goto(p);
     const h1 = page.getByRole("heading", { level: 1 });
     await expect(h1).toBeVisible();

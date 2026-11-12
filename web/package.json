@@ -10,9 +10,11 @@
     "typecheck": "tsc -b --noEmit"
   },
   "dependencies": {
+    "@fontsource-variable/geist": "^5.3.0",
     "@fontsource-variable/schibsted-grotesk": "^5.3.0",
     "@fontsource/ibm-plex-mono": "^5.3.0",
     "@fontsource/ibm-plex-sans": "^5.3.0",
+    "@fontsource/instrument-serif": "^5.3.0",
     "@fontsource/noto-sans-devanagari": "^5.3.0",
     "@mediapipe/tasks-vision": "^0.10.35",
     "ag-grid-community": "^36.3.0",

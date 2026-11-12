@@ -14,7 +14,7 @@ import { KeptError, merchantById, type Merchant } from "../store.js";
 import { addAdminSection, adminBack, isAdmin } from "./admin.js";
 import { runNightly } from "../eval/nightly.js";
 import { html, layout } from "./html.js";
-import { journeyOf, journeyView, pickMember, saveJourney, START, STEPS, type StartAs } from "../demo/journey.js";
+import { activeSteps, journeyOf, journeyView, pickMember, saveJourney, startOf, type StartAs } from "../demo/journey.js";
 import { normLang } from "../i18n.js";
 
 type H = (req: Request, res: Response) => Promise<unknown>;
@@ -153,7 +153,7 @@ export function demoRouter(): Router {
       // Starting the journey makes the visitor's demo shop if they have none, exactly as "Start my demo shop" does.
       const { ws } = await ensureWorkspace(req, res);
       const as = (["owner", "member", "assistant"].includes(req.body?.as) ? req.body.as : "owner") as StartAs;
-      await saveJourney(ws, { on: true, i: START[as], member: await pickMember(ws.tenant_id), startedAt: new Date().toISOString() });
+      await saveJourney(ws, { on: true, i: startOf(as), member: await pickMember(ws.tenant_id), startedAt: new Date().toISOString() });
       flag(res, true);
       return journeyView(ws, jlang(req));
     }
@@ -169,7 +169,7 @@ export function demoRouter(): Router {
       return { on: false };
     }
     if (action !== "go") throw new KeptError("Unknown journey action.", "bad_request", 400);
-    const i = Math.max(0, Math.min(STEPS.length - 1, Math.floor(Number(req.body?.i))));
+    const i = Math.max(0, Math.min(activeSteps().length - 1, Math.floor(Number(req.body?.i))));
     if (!Number.isFinite(i)) throw new KeptError("Which step?", "bad_request", 400);
     await saveJourney(ws, { ...cur, i });
     return journeyView(ws, jlang(req));

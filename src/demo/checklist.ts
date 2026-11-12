@@ -29,13 +29,24 @@ export async function tick(merchantId: string | null | undefined, key: Tick, q?:
   try {
     const db = q ?? (await getDb());
     await db.query(
-      `UPDATE workspaces SET checklist = jsonb_set(coalesce(checklist, '{}'::jsonb), '{ticks}', coalesce(checklist->'ticks', '{}'::jsonb) || jsonb_build_object($2::text, to_jsonb(now()::text)))
-        WHERE tenant_id = $1 AND kind = 'visitor' AND NOT coalesce(checklist->'ticks', '{}'::jsonb) ? $2`,
+      // "ticks" keeps the first time (the judge page's paths); "last" keeps the latest time (the guided journey).
+      `UPDATE workspaces SET checklist = jsonb_set(
+          jsonb_set(coalesce(checklist, '{}'::jsonb), '{ticks}',
+            CASE WHEN coalesce(checklist->'ticks', '{}'::jsonb) ? $2 THEN checklist->'ticks'
+                 ELSE coalesce(checklist->'ticks', '{}'::jsonb) || jsonb_build_object($2::text, to_jsonb(now()::text)) END),
+          '{last}', coalesce(checklist->'last', '{}'::jsonb) || jsonb_build_object($2::text, to_jsonb(now())))
+        WHERE tenant_id = $1 AND kind = 'visitor'`,
       [merchantId, key],
     );
   } catch {
     /* ticks are a convenience for the judge page; never block the action */
   }
+}
+
+/** The latest time each tick happened (ISO strings). */
+export function lastTicksOf(checklist: unknown): Record<string, string> {
+  const t = (checklist as any)?.last;
+  return t && typeof t === "object" ? t : {};
 }
 
 export function ticksOf(checklist: unknown): Record<string, string> {

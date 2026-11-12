@@ -382,7 +382,7 @@ export default function Manage() {
         )}
 
         <div className="mt-8 grid gap-4 md:grid-cols-2">
-          <section className="rounded-xl border border-rule bg-card p-6" aria-labelledby="reminders">
+          <section id="telegram" data-tour="telegram" className="scroll-mt-20 rounded-xl border border-rule bg-card p-6" aria-labelledby="reminders">
             <h2 id="reminders" className="m-0 flex items-center gap-2 text-xl font-semibold">
               <MessageCircle className="size-5 text-stamp" aria-hidden="true" />
               {t("m.remind")}
@@ -390,13 +390,7 @@ export default function Manage() {
             <p className="mt-1 text-sm text-ink-2">
               {data.telegram.ready ? t("m.remindTg") : t("m.remindSms")} {data.telegram.ready && data.telegram.linked ? t("m.tgOn") : ""}
             </p>
-            {!data.member.sample && data.telegram.ready && (
-              <form method="post" action={`/manage/${ref}/connect/telegram`} target="_blank">
-                <Button type="submit" variant={data.telegram.linked ? "outline" : "default"}>
-                  {data.telegram.linked ? t("m.tgAnother") : t("m.tgGet")}
-                </Button>
-              </form>
-            )}
+            {!data.member.sample && data.telegram.ready && <TelegramConnect memberRef={ref!} linked={data.telegram.linked} />}
             {!data.member.sample && <SmsOptIn memberRef={ref!} sms={data.sms ?? { ready: false, linked: [] }} onChange={reload} />}
           </section>
           <section className="rounded-xl border border-rule bg-card p-6" aria-labelledby="scam">
@@ -431,5 +425,39 @@ export default function Manage() {
       </main>
       <PublicFooter />
     </>
+  );
+}
+
+/** Connect Telegram: one tap on a phone, or a QR code to scan from a desktop. The link works once, for 15 minutes. */
+function TelegramConnect({ memberRef, linked }: { memberRef: string; linked: boolean }) {
+  const { t } = useT();
+  const [link, setLink] = useState<{ url: string; qr: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  async function open() {
+    setBusy(true);
+    try {
+      setLink(await api.post<{ url: string; qr: string }>(`/ui/manage/${memberRef}/telegram`));
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : t("m.tgFail"));
+    } finally {
+      setBusy(false);
+    }
+  }
+  if (!link)
+    return (
+      <Button onClick={open} disabled={busy} variant={linked ? "outline" : "default"}>
+        {linked ? t("m.tgAnother") : t("m.tgGet")}
+      </Button>
+    );
+  return (
+    <div className="mt-2 flex flex-wrap items-start gap-4">
+      <div className="w-[132px] shrink-0 rounded-lg bg-white p-1" role="img" aria-label={t("m.tgQr")} dangerouslySetInnerHTML={{ __html: link.qr }} />
+      <div className="min-w-[12rem] flex-1">
+        <Button asChild>
+          <a href={link.url} target="_blank" rel="noopener">{t("m.tgOpen")}</a>
+        </Button>
+        <p className="mt-2 mb-0 text-sm text-ink-2">{t("m.tgScan")}</p>
+      </div>
+    </div>
   );
 }

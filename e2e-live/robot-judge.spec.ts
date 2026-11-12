@@ -2,8 +2,8 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
-// Spec A12: the robot judge. It does what the /judge page asks, on production, and records each step with how long
-// it took. Paths that need a real PayPal subscription (pause, resume, cancel) are not run, because each run would
+// Spec A12: the robot judge. It follows the guided journey from /demo on production, doing what each step's card asks,
+// and records each step with how long it took. Paths that need a real PayPal subscription (pause, resume, cancel) are not run, because each run would
 // use up one of the pre-approved sandbox subscriptions only the owner can make; the file says so for each.
 type Step = { path: string; step: string; ok: boolean; seconds: number; saw: string };
 const steps: Step[] = [];
@@ -37,8 +37,8 @@ test.afterAll(() => {
   mkdirSync("eval", { recursive: true });
   writeFileSync("eval/robot-judge.json", JSON.stringify({
     suite: "robot-judge",
-    title: "Robot judge: the /judge paths, followed by a browser on the live site",
-    about: `A Playwright browser opened ${base}, started a demo shop with no real PayPal subscriptions, and did what each /judge step says. Seconds per path: ${Object.entries(perPath).map(([k, v]) => `${k} ${v} s`).join(", ")}. Total ${Math.round((Date.now() - started) / 1000)} s.`,
+    title: "Robot judge: the guided journey, followed by a browser on the live site",
+    about: `A Playwright browser opened ${base}, started a demo shop with no real PayPal subscriptions, started the guided journey and did what each step's card asks. Seconds per path: ${Object.entries(perPath).map(([k, v]) => `${k} ${v} s`).join(", ")}. Total ${Math.round((Date.now() - started) / 1000)} s.`,
     model: null,
     runner: process.env.GITHUB_ACTIONS ? "GitHub Actions, robot-judge workflow" : "Playwright, run by hand",
     run_at: new Date().toISOString(),
@@ -54,14 +54,15 @@ test.afterAll(() => {
   console.log(`robot judge: ${passed} of ${steps.length} steps passed`);
 });
 
-test("robot judge follows the /judge paths on the live site", async ({ page }) => {
+test("robot judge follows the guided journey on the live site", async ({ page }) => {
   await page.addInitScript(() => ["owner", "member", "shop"].forEach((t) => localStorage.setItem(`kept-tour-seen-${t}`, "never")));
 
-  for (const [p, h] of [["/", null], ["/judge", "For judges"], ["/proof", "Proof"], ["/ai", "What the AI did"], ["/paypal", "PayPal in Kept"], ["/who-can-move-money", "Who can move money"], ["/accessibility", "Accessibility"], ["/agents", null]] as const) {
+  for (const [p, h] of [["/", null], ["/demo", null], ["/proof", "Proof"], ["/ai", "What the AI did"], ["/paypal", "PayPal in Kept"], ["/who-can-move-money", "Who can move money"], ["/accessibility", "Accessibility"], ["/agents", null]] as const) {
     await run("public", `open ${p}, axe, no sideways scroll at 1440px and at 200% text`, async () => {
       const r = await page.goto(p);
       if (!r || r.status() !== 200) throw new Error(`HTTP ${r?.status()}`);
       if (h) await expect(page.getByRole("heading", { name: h, exact: true }).first()).toBeVisible({ timeout: 20_000 });
+      else await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 20_000 });
       const passes = await axe(page);
       await sideways(page);
       await page.evaluate(() => { document.documentElement.style.fontSize = "200%"; });
@@ -70,23 +71,27 @@ test("robot judge follows the /judge paths on the live site", async ({ page }) =
     });
   }
 
-  await run("start", "start a demo shop (no pool subscriptions)", async () => {
+  // The journey's own steps say where to go and what to type, so the robot reads them instead of copying them.
+  let j: any = null;
+  const step = (id: string) => {
+    const s = j?.steps?.find((x: any) => x.id === id);
+    if (!s) throw new Error(`the journey has no "${id}" step`);
+    return s;
+  };
+  await run("start", "start a demo shop (no pool subscriptions) and the guided journey as the owner", async () => {
     const r = await page.request.post("/demo/start", { data: { pool: false }, headers: { accept: "application/json" } });
     if (r.status() !== 200) throw new Error(`HTTP ${r.status()}: ${(await r.text()).slice(0, 160)}`);
-    const j = await r.json();
-    await page.goto("/judge");
-    await expect(page.getByRole("heading", { name: "Your private demo shop" })).toBeVisible({ timeout: 20_000 });
-    return `workspace ${j.workspace.id}, ${j.counts.samples} sample members, pool ${j.pool.state}`;
+    const st = await r.json();
+    j = await (await page.request.post("/ui/journey", { data: { action: "start", as: "owner" } })).json();
+    if (!j.on) throw new Error("the journey did not start");
+    await page.goto("/dashboard");
+    await expect(page.locator("#kept-journey")).toContainText("Step 1 of", { timeout: 20_000 });
+    return `workspace ${st.workspace.id}, ${st.counts.samples} sample members, pool ${st.pool.state}, ${j.n} steps`;
   });
 
-  const owner = async (label: string) => {
-    await page.goto("/judge");
-    const link = page.getByRole("link", { name: label });
-    await expect(link).toBeVisible({ timeout: 20_000 });
-    await link.click();
-  };
   await run("owner", "Ask the AI why people are cancelling", async () => {
-    await owner("Ask: Why are people cancelling?");
+    await page.goto(step("ask").href);
+    await page.locator(step("ask").fill.sel).fill(step("ask").fill.value);
     await page.getByRole("button", { name: "Ask", exact: true }).click();
     await expect(page.getByText(/Answered by|The AI stopped|couldn't answer/i).first()).toBeVisible({ timeout: 150_000 });
     const answered = await page.getByText(/Answered by/).first().textContent().catch(() => null);
@@ -94,42 +99,43 @@ test("robot judge follows the /judge paths on the live site", async ({ page }) =
     return answered.replace(/\s+/g, " ").slice(0, 120);
   });
   await run("owner", "Write a rule the law forbids; it is refused with the citation", async () => {
-    await owner("Try: three retention offers before cancel");
+    await page.goto(step("rules").href);
+    await page.locator(step("rules").fill.sel).fill(step("rules").fill.value);
+    await page.getByRole("button", { name: "Check these rules" }).click();
     await expect(page.getByText(/ROSCA|16 CFR|refused/i).first()).toBeVisible({ timeout: 90_000 });
     return ((await page.getByText(/ROSCA|16 CFR/).first().textContent()) ?? "").replace(/\s+/g, " ").slice(0, 140);
   });
-  await run("owner", "Check the 10 Nov scam message; it is held", async () => {
-    await owner("Check the 10 Nov message");
+  await run("owner", "Check the fake new-account message; it is held", async () => {
+    await page.goto(step("scam").href);
+    await page.locator(step("scam").fill.sel).fill(step("scam").fill.value);
     const res = page.waitForResponse((r) => r.url().endsWith("/dashboard/safety/scan") && r.request().method() === "POST", { timeout: 90_000 });
     await page.getByRole("button", { name: "Check this message" }).click();
-    const j = await (await res).json();
-    if (j.level !== "hold") throw new Error(`level ${j.level}`);
-    return `hold; rules ${j.readers.rules.level}, code ${j.readers.code.level}, Decisions ${j.readers.decisions.level ?? j.readers.decisions.status}`;
+    const out = await (await res).json();
+    if (out.level !== "hold") throw new Error(`level ${out.level}`);
+    return `hold; rules ${out.readers.rules.level}, code ${out.readers.code.level}, Decisions ${out.readers.decisions.level ?? out.readers.decisions.status}`;
   });
-  await run("owner", "Open /proof", async () => {
-    await owner("Open /proof");
-    await expect(page.getByText(/passed · model/).first()).toBeVisible({ timeout: 20_000 });
-    return `${await page.getByText(/passed · model/).count()} suites listed`;
-  });
-  await run("owner", "the judge page ticked all four owner steps by itself", async () => {
-    await page.goto("/judge");
-    const sec = page.locator("section", { has: page.getByRole("heading", { name: "Run the shop" }) });
-    await expect(sec.getByText(/4 of 4 done/)).toBeVisible({ timeout: 20_000 });
-    return "4 of 4 done";
+  await run("owner", "the journey ticked the Ask, rule and scam steps by itself", async () => {
+    j = await (await page.request.get("/ui/journey")).json();
+    const missing = ["ask", "rules", "scam"].filter((id) => !step(id).done);
+    if (missing.length) throw new Error(`not ticked: ${missing.join(", ")}`);
+    return "3 of 3 ticked";
   });
 
   await run("assistant", "open the member page and ask the assistant what's next (sample member: read only)", async () => {
-    await page.goto("/judge");
-    await expect(page.getByRole("heading", { name: "Let your AI handle it" })).toBeVisible({ timeout: 20_000 });
-    const link = page.getByRole("link", { name: "Ask: What's my next payment?" }).first();
-    await expect(link).toBeVisible({ timeout: 20_000 });
-    await link.click();
+    await page.goto(step("assistant").href);
+    await page.locator(step("assistant").fill.sel).fill("What's my next payment?");
     await page.getByRole("button", { name: "Send to the assistant" }).click();
     await expect(page.getByText(/^Your assistant$|The assistant stopped/).first()).toBeVisible({ timeout: 150_000 });
     if (await page.getByText("The assistant stopped").count()) throw new Error(((await page.getByRole("alert").first().textContent()) ?? "stopped").slice(0, 160));
     const by = (await page.getByText(/^By .* in [\d.]+ s/).first().textContent()) ?? "";
     return `answered; ${by.replace(/\s+/g, " ").slice(0, 100)}`;
   });
+  await run("proof", "Open /proof", async () => {
+    await page.goto(step("proof").href);
+    await expect(page.getByText(/passed · model/).first()).toBeVisible({ timeout: 20_000 });
+    return `${await page.getByText(/passed · model/).count()} suites listed`;
+  });
+  await page.request.post("/ui/journey", { data: { action: "stop" } }).catch(() => undefined);
 
   expect(steps.filter((s) => !s.ok).map((s) => `${s.path}: ${s.step}: ${s.saw}`)).toEqual([]);
 });

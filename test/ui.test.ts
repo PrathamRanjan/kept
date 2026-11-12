@@ -8,6 +8,7 @@ import * as svc from "../src/service.js";
 import { plansFor, type Merchant } from "../src/store.js";
 import { cycleCard } from "../src/web/cycles.js";
 import { Client } from "./client.js";
+import { config } from "../src/config.js";
 import { stubAgent } from "./agent-stub.js";
 import { isGuidedRoute, isLookSayRoute, isSmsRoute, isWave1Route, isWave2Route, isWave3Route, serveTracked } from "./journey-coverage.js";
 
@@ -71,6 +72,35 @@ describe("UI JSON API", () => {
     expect(v.card.stamps.some((x: any) => x.next)).toBe(true);
     expect(v.pauseMax).toBe(2);
     expect((await c.get("/ui/manage/ref_nope")).status).toBe(404);
+
+    // Telegram reminders: off without Kept's own bot; on, the member gets a one-time link and its QR code, and
+    // pressing Start in Telegram links the chat and sends the first reminder with Skip and Keep buttons.
+    expect((await c.postJson(`/ui/manage/${ref}/telegram`, {})).status).toBe(404);
+    const savedTg = { on: config.channels.telegramOn, token: config.channels.telegramToken };
+    (config.channels as any).telegramOn = true;
+    (config.channels as any).telegramToken = savedTg.token || "test-bot-token";
+    try {
+      const tg = await c.postJson(`/ui/manage/${ref}/telegram`, {});
+      expect(tg.status).toBe(200);
+      expect(tg.headers.get("cache-control")).toMatch(/no-store/);
+      expect(tg.json.url).toMatch(/^https:\/\/t\.me\/.+\?start=kept-/);
+      expect(tg.json.qr).toMatch(/^<svg/);
+      expect((await c.postJson("/ui/manage/ref_nope/telegram", {})).status).toBe(404);
+      const code = String(tg.json.url).split("start=")[1];
+      await c.postJson("/webhooks/telegram", { message: { chat: { id: 5151 }, text: "/start " + code } });
+      const out = (await db.query<any>("SELECT body, buttons FROM channel_messages WHERE channel = 'telegram' AND address = '5151' AND direction = 'out' ORDER BY created_at")).rows;
+      const first = out.find((m) => /renews on/.test(m.body));
+      expect(first, JSON.stringify(out)).toBeTruthy();
+      const ids = (typeof first.buttons === "string" ? JSON.parse(first.buttons) : first.buttons).map((b: any) => b.id);
+      expect(ids).toEqual([`skip:${ref}`, `keep:${ref}`]);
+      // Telegram's command menu sends "/status@bot"; it is read as the word "status".
+      await c.postJson("/webhooks/telegram", { message: { chat: { id: 5151 }, text: "/status@kept_paypal_demo_bot" } });
+      const replies = (await db.query<any>("SELECT body FROM channel_messages WHERE channel = 'telegram' AND address = '5151' AND direction = 'out'")).rows.map((r) => r.body);
+      expect(replies.some((b: string) => /Manage: .*\/manage\//.test(b)), JSON.stringify(replies)).toBe(true);
+    } finally {
+      (config.channels as any).telegramOn = savedTg.on;
+      (config.channels as any).telegramToken = savedTg.token;
+    }
 
     expect((await c.postJson(`/ui/manage/${ref}/skip`, { key: "s1" })).json.ok).toBe(true);
     v = (await c.get(`/ui/manage/${ref}`)).json;
@@ -156,13 +186,17 @@ describe("UI JSON API", () => {
   it.skipIf(!spaBuilt)("serves the app shell with per-page titles, noindex on private pages, and a 404 for unknown members", async () => {
     const c = new Client(srv.base);
     const ref = await member("Eve");
-    for (const p of ["/", "/demo", "/judge", `/s/${m.slug}`, `/manage/${ref}`, "/dashboard", "/dashboard/members", "/dashboard/approvals"]) {
+    for (const p of ["/", "/demo", `/s/${m.slug}`, `/manage/${ref}`, "/dashboard", "/dashboard/members", "/dashboard/approvals"]) {
       const r = await c.get(p);
       expect(r.status, p).toBe(200);
       expect(r.text, p).toMatch(/<div id="root">/);
     }
     expect((await c.get(`/s/${m.slug}`)).text).toMatch(/application\/ld\+json/);
     expect((await c.get(`/manage/${ref}`)).text).toMatch(/noindex/);
+    // The old judge page is gone; old links land on the live demo.
+    const old = await c.get("/judge");
+    expect(old.status).toBe(301);
+    expect(old.location).toBe("/demo");
     expect((await c.get("/manage/ref_nope")).status).toBe(404);
     for (const f of ["/favicon.svg", "/robots.txt"]) expect((await c.get(f)).status).toBeLessThan(400);
   });

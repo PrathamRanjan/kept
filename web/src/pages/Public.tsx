@@ -165,12 +165,21 @@ function A11y({ d }: { d: any }) {
 
 export default function Public({ page }: { page: PageId }) {
   const { t, lang } = useT();
-  const [d, setD] = useState<any>(null);
+  // Data is kept with the page it belongs to: moving between these pages never draws one page with another's data.
+  const [got, setGot] = useState<{ page: PageId; data: any } | null>(null);
   const [err, setErr] = useState<string | null>(null);
   useEffect(() => {
-    setD(null);
-    api.get(`/api/public/${API[page]}`).then(setD, (e) => setErr(e instanceof ApiError ? e.message : translate(getLang(), "pub.loadFail")));
+    let live = true;
+    setErr(null);
+    api.get(`/api/public/${API[page]}`).then(
+      (data) => live && setGot({ page, data }),
+      (e) => live && setErr(e instanceof ApiError ? e.message : translate(getLang(), "pub.loadFail")),
+    );
+    return () => {
+      live = false;
+    };
   }, [page]);
+  const d = got?.page === page ? got.data : null;
   const [title, intro] = TITLES[page];
   return (
     <>
@@ -179,7 +188,7 @@ export default function Public({ page }: { page: PageId }) {
         <h1 className="text-4xl font-bold">{t(title)}</h1>
         <p className="mt-3 max-w-[66ch] text-lg text-ink-2">{t(intro)}</p>
         {lang !== "en" && <p className="rounded-lg bg-muted p-3 text-sm" data-testid="pub-recorded">{t("pub.recorded")}</p>}
-        <p className="text-sm"><a href="/judge" className="underline">{t("pub.back")}</a></p>
+        <p className="text-sm"><a href="/demo" className="underline">{t("pub.back")}</a></p>
         {err && <p role="alert" className="text-fail">{err}</p>}
         {!d && !err ? <Skeleton className="mt-6 h-64" /> : d && (page === "proof" ? <Proof d={d} /> : page === "ai" ? <Ai d={d} /> : page === "paypal" ? <PayPal d={d} /> : page === "roles" ? <Roles d={d} /> : <A11y d={d} />)}
       </main>

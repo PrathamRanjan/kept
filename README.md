@@ -6,17 +6,13 @@ Kept gives a small subscription business (a coffee club, meal-prep kitchen, farm
 
 Built for the PayPal AI Hackathon. Runs on the **PayPal sandbox**; no real money moves.
 
-## For judges: try it in 60 seconds
+## Try it
 
-Open **https://pph-kept.onrender.com/judge** and press **Start my demo shop**. You get a private copy of the demo coffee shop, with no sign-in. It has real PayPal sandbox subscriptions while the approval pool has some, and about 40 labelled sample members. Then pick a path. Each step ticks itself when the server sees you do it.
+Open **https://pph-kept.onrender.com** and press **Start the guided demo** (or open **/demo** and press **Start the guided journey**). You get a private copy of the demo coffee shop, with no sign-in. It has real PayPal sandbox subscriptions from the pre-approved pool while the pool has some, and about 40 labelled sample members.
 
-Quicker still: open **https://pph-kept.onrender.com/demo** and press **Start the guided journey**. A card in the corner walks you through one story across the three people (the owner, a member, and the member's AI assistant), in a different colour for each. It outlines the part of the page each step is about and never covers the page, so you can click anything. When the story moves to another person, a full-screen card says who you are now. Some steps say why the feature exists, with a sourced figure and a link. See "The guided journey" near the end.
+A card in the corner then walks you through one story, in about 8 minutes, across three people: the owner, a member and the member's AI assistant, each in their own colour. It outlines the part of the page each step is about and never covers the page. Each step shows small tags for what it really uses (PayPal Subscriptions API, PayPal MCP server, the in-browser scam model, AG Grid, Bryntum, Telegram and so on) and ends with the judging criterion it answers. See "The guided journey" near the end.
 
-| Path | Time | PayPal login | What you see |
-|---|---|---|---|
-| Let your AI handle it (you're the member) | 2 min | no | An AI assistant calls Kept's MCP tools to read, pause and resume a real member's subscription. Each call and its rule appear on the work rail, and code reads PayPal back after each change. |
-| Cancel in one step (you're the member) | 1 min | no | At most one offer, and only if you ask for one. Code decides whether an offer applies. Saying no cancels the subscription on PayPal at once. |
-| Run the shop (you're the owner) | 2 min | no | The owner's Ask runs as an agent with read tools, one of them PayPal's own MCP server. A rule the law forbids is refused with its citation. The 10 Nov scam message is held by all three checks. |
+The old `/judge` page (three paths with ticks) is gone; `/judge` now redirects to `/demo`.
 
 | Judging criterion | Where to look |
 |---|---|
@@ -479,87 +475,50 @@ Extra features on top of the core flow. The core flow (subscribe, skip, pause, r
 - Speech recognition in Chrome runs on Google's servers, so voice needs the network. Firefox has none.
 - Large file: the face model `public/handsfree/face_landmarker.task` (3.76 MB, from Google's MediaPipe model bucket, Apache 2.0) is committed. The 21 MB WebAssembly runtime is copied from the npm package at build time.
 
-## The guided journey (13 Nov 2026)
+## The guided journey (13 Nov 2026, redone the same day)
 
-The old "guided walkthrough" (`web/src/story.ts`) is gone. In its place is one journey across the three people.
+The old "guided walkthrough" (`web/src/story.ts`) and the `/judge` page are gone. In their place is one journey across the three people, started from the landing page or `/demo`.
 
 ### How it works
 
-- **Where it starts.** `/demo` explains what Kept does and names the three people: the owner, the member and the member's AI assistant. Three buttons start the journey as the owner (the full story), as the member, or as the AI assistant. `/judge` has the same start button at the top.
-- **Where the journey's place is kept.** On the server, in the visitor's own demo workspace (`checklist.journey`), through `GET`/`POST /ui/journey`. The browser holds no state for it except a readable `kept_journey=1` flag cookie, which only tells the script to ask the server. Another browser with the same workspace cookie picks up the same step (`e2e/journey.spec.ts`).
-- **The card.** `public/journey.js` and `public/journey.css` are plain script and CSS, loaded on every page: the React pages through `web/index.html`, the server pages through the shell tail. So the card follows the visitor onto `/dashboard/guard`, `/dashboard/safety`, `/agents`, `/paypal` and `/proof`.
-  - It is a fixed card in the corner (on a phone, at the bottom), with no overlay. The page keeps taking clicks and typing.
-  - The part of the page a step is about gets an outline.
-  - The card shrinks to one line, and the × ends the journey.
-  - **Fill it in for me** types the example question or request, and the visitor presses the page's own button.
-- **The steps.** There are 19, in `src/demo/journey.ts`:
-  - **The owner:**
-    - today's numbers
-    - the move Kept held
-    - Ask
-    - a rule the law forbids
-    - the 10 Nov scam message
-    - the members
-  - **The member:**
-    - the stamp card
-    - a change they make themself
-  - **The member's AI assistant:**
-    - pause through the assistant
-    - undo the pause
-  - **The member again:**
-    - history
-    - language
-    - cancel in one step
-  - **The owner again:** the activity log
-  - **The assistant:** any MCP client on `/agents`, with this visitor's own shop endpoint
-  - **Proof:**
-    - the PayPal calls
-    - who can move money
-    - accessibility
-    - `/proof`
-- **Ticks.** A step is marked done from what the server records (the existing first-time ticks, plus four new ones: `approval_decided`, `member_changed`, `agents_opened`, `paypal_opened`), never from a click on the card.
-- **The member.** The journey follows the newest real (sandbox PayPal) member in the workspace, or else a labelled sample. On steps that would change PayPal, a sample member's card says plainly that nothing reaches PayPal, and says whether the approval pool has real members ready.
-- **Why each feature exists.** Seven steps carry a sourced figure with a link:
-  - FTC, July 2024: dark patterns on subscription sites
-  - FTC, October 2024: subscription complaints a day
-  - Adobe, January 2026: generative-AI traffic to retail sites
-  - FBI IC3 2024: business email compromise losses
-  - C+R Research: what people guess they spend on subscriptions, against what they spend
-  - CSA Research 2020: people who prefer their own language
-  - WHO: people living with a significant disability
-  - Each figure was checked against its source page on 13 Nov 2026. The FTC's click-to-cancel rule was struck down in July 2025, so only the complaint figure is cited from that notice.
-- **Renamed paths on `/judge`:**
-  - "Let your AI handle it (you're the member)", replacing "Be the member's assistant"
-  - "Cancel in one step (you're the member)"
-  - "Run the shop (you're the owner)"
+- **Where the journey's place is kept.** On the server, in the visitor's own demo workspace (`checklist.journey`), through `GET`/`POST /ui/journey`. The browser holds only a readable `kept_journey=1` flag cookie, which tells the script to ask the server. Another browser with the same workspace cookie picks up the same step.
+- **The card.** `public/journey.js` and `public/journey.css`, loaded on every page (React pages and server pages). A fixed card in the corner (at the bottom on a phone), no overlay. The step's part of the page gets an outline. **Fill it in for me** types the example; the visitor presses the page's own button.
+  - **Tags** show what the step really uses, coloured by kind: PayPal (with the PayPal mark), AI, on-device, tools. Only things Kept really calls or runs are tagged (`TAGS` in `src/demo/journey.ts`).
+  - **The criterion strip** at the bottom names one judging criterion the step answers (technological implementation, potential impact or innovation) in one line. The card's size didn't change.
+- **The 15 or 16 steps** (`src/demo/journey.ts`):
+  - **The owner:** the shop's numbers from PayPal; the discount Kept held (Approve or Decline on the highlighted card); Ask; a dark-pattern rule that is refused with the law it breaks; the fake "new PayPal account" message checked by the in-browser scam model; the members (AG Grid, Bryntum).
+  - **The member:** how a customer joins (the shop's Subscribe with PayPal buttons); their subscription page; skip next month (read back from PayPal); Telegram reminders with Skip and Keep buttons (only shown when Kept's bot is on).
+  - **The member's AI assistant:** pause through the assistant, with a 15-minute permission slip and Kept's MCP tools.
+  - **The member again:** cancel in one step.
+  - **The owner again:** the activity log.
+  - **Proof:** `/paypal`, `/accessibility` (Look and Say with on-device face tracking, four languages), `/proof`.
+  - Removed after feedback: the MCP-client step on `/agents`, "who can move money", undo, history and language.
+- **Ticks.** A step is done only from what the server records, and only for something done **after** this journey started (`checklist.last`, the latest time of each tick, against the journey's `startedAt`). Before this, a step could show "done" for something done earlier.
+- **Why each feature exists.** Six steps carry a sourced figure with a link (FTC dark patterns, FTC complaints, Adobe AI traffic, FBI IC3 business email compromise, C+R Research, WHO disability). Each was checked against its source page on 13 Nov 2026.
 
-### Bug found and fixed on the way
+### Telegram (13 Nov 2026)
 
-- The full-screen hand-over card between people compared the new step with itself, so it never showed. The browser test caught it.
+- Kept now has its own bot, `@kept_paypal_demo_bot` (Render env `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME`, `TELEGRAM_WEBHOOK_SECRET`, `KEPT_TELEGRAM=on`). The webhook is `https://pph-kept.onrender.com/webhooks/telegram` with a secret token header.
+- A member presses **Connect Telegram** on their page (`POST /ui/manage/:ref/telegram`): Kept shows a QR code and an **Open Telegram** link with a one-time code (15 minutes, works once). Pressing Start in Telegram links the chat and sends the first reminder straight away, with **Skip next payment** and **Keep it** buttons. Skip changes the subscription in PayPal, the same as the member page.
+- An owner who connects gets up to three waiting approvals with Approve and Decline buttons.
+
+### Other fixes the same day
+
+- `/proof` and `/accessibility` "didn't open" after another public page: the shared page component showed the previous page's data and crashed. Routes are now keyed and the data is kept per page.
+- The approval pool: links PayPal had dropped (`INVALID_RESOURCE_ID`) are retired as spent (c07af82); 10 fresh links were approved by the owner, and the sync found 9 ready.
+- The rules page says "Your rules, in plain words" and "Check these rules" instead of "Draft and backtest".
+- A new landing page (`web/src/pages/Landing.tsx`, `landing.css`): hero with an illustrated member page, why it exists (sourced), how it works for the three people, features, the technical details, the four judging criteria and the prize tracks Kept enters, and planned pricing (labelled: nothing is for sale).
+- The robot judge (`npm run robot:judge`) now follows the guided journey instead of `/judge`.
 
 ### Tests
 
-- `test/guided-journey.test.ts`: 8 server tests:
-  - off until started
-  - forward, back and stop
-  - the three start points
-  - ticks from a real fake-PayPal member's change and the held approval
-  - the card's words in four languages
-  - every why has a source link
-  - server pages load the script and have the step targets
-  - route coverage
-- `e2e/journey.spec.ts`: 4 browser tests, each on phone and desktop:
-  - start from `/demo`, with the page still typeable under the card
-  - fill in Ask
-  - onto the server guard page
-  - the hand-over to the member
-  - shrink and end
-  - the place carried to a second browser
-  - no card when no journey runs
-  - axe and no side scroll
+- `test/guided-journey.test.ts`: off until started; forward, back and stop; start points; ticks from a real fake-PayPal member and the held approval; ticks before the start don't count; tags and criterion; the Telegram step only with the bot on; the card's words in four languages; every why has a source.
+- `test/ui.test.ts`: the Telegram connect route (off without the bot; on, a one-time link, its QR code, and the first reminder with Skip and Keep buttons); `/judge` redirects to `/demo`.
+- `e2e/journey.spec.ts`: start from `/demo` with tags and the criterion strip, the held approval outlined, Fill it in on the rules page, the hand-over to the member on the shop page, shrink and end, the place in a second browser, no card when none runs; axe and no side scroll on phone and desktop.
+- `e2e/personas.spec.ts`: the new landing page (headline, illustration and planned-pricing labels, the four criteria, no "For judges", the guided demo starts from it).
 
 ### Not done, or not verified
 
-- The step text is in English only. The card's buttons and notes are in all four languages, and in Hindi, Indonesian and Portuguese the card says the steps are in English.
-- The approval pool of real sandbox subscriptions is empty at the time of writing (9 wait for the sandbox buyer's approval on PayPal). Until the owner approves them, every judge gets a sample member: the steps that change PayPal show what they do but reach no PayPal subscription, and the card says so.
-- The journey was not tried by a judge who has never seen Kept.
+- The step text is in English only. The card's buttons and the criterion names are in all four languages, and the card says the steps are in English.
+- Kept has no mobile app, Chrome extension or Channel3 integration, and APIMatic is only the OpenAPI spec (no portal), so none of those is claimed on the landing page.
+- The journey was not tried by someone who has never seen Kept.

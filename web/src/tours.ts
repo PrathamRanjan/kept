@@ -2,8 +2,7 @@
  * Guided tours with Driver.js (MIT), one per page: owner, member, shop (spec A3.3).
  *  - A tour starts only from a button ("Take the tour"); nothing starts by itself.
  *  - A running tour ends on any route change (main.tsx calls endTour) and never navigates.
- * The cross-page Judge Mode tour is gone: the judge page (/judge) has paths with buttons that open each screen,
- * and its steps tick themselves from what the server records.
+ * The cross-person guided journey (public/journey.js) starts only from /demo; these tours stay on their own page.
  */
 import type { DriveStep, Driver } from "driver.js";
 
@@ -80,7 +79,7 @@ async function build(steps: DriveStep[], opts: { name: TourName; onClose: () => 
 
 /** Start a page's tour. Only ever called from a button. */
 export function startTour(name: TourName, _o: { force?: boolean } = {}) {
-  // A page's own tour stays on that page. The cross-person guided journey starts only from /demo and /judge, so a
+  // A page's own tour stays on that page. The cross-person guided journey starts only from /demo, so a
   // real member pressing this on their own page is never moved into a demo shop.
   const steps = name === "owner" ? ownerSteps : name === "member" ? memberSteps : shopSteps;
   // Wait a frame so the page's targets exist.

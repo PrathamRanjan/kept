@@ -13,9 +13,9 @@ test.beforeEach(async ({ page }) => noTours(page));
 test("the demo page names the three people and starts the journey as the owner", async ({ page }) => {
   await page.goto("/demo");
   const who = page.getByRole("list", { name: "The three people in this demo" });
-  await expect(who.getByText("The owner", { exact: true })).toBeVisible();
-  await expect(who.getByText("The member", { exact: true })).toBeVisible();
-  await expect(who.getByText("The member's AI assistant", { exact: true })).toBeVisible();
+  await expect(who.getByText(/^1\. The owner$/)).toBeVisible();
+  await expect(who.getByText(/^2\. The member$/)).toBeVisible();
+  await expect(who.getByText(/^3\. The member's AI assistant$/)).toBeVisible();
   await noSideScroll(page);
   await page.getByRole("button", { name: "Start the guided journey" }).click();
   await expect(page).toHaveURL(/\/dashboard$/);
@@ -30,9 +30,13 @@ test("the demo page names the three people and starts the journey as the owner",
   await expect(page.locator("#q")).toHaveValue("still typeable");
 
   // Next, Next: the Ask step, where the guide can fill the question in.
+  // Each step shows what it really uses as small tags, and ends with the judging criterion it answers.
+  await expect(card(page).locator(".kj-tags")).toContainText("PayPal Subscriptions API");
+  await expect(card(page).locator(".kj-crit")).toContainText("Technological implementation");
   await card(page).getByRole("button", { name: "Next" }).click();
   await expect(card(page)).toContainText("Step 2 of");
-  await expect(page.locator("[data-tour='needs'].kj-lit")).toBeVisible();
+  // The held discount: the card outlines the approval itself (or the "needs you" list when none is waiting).
+  await expect(page.locator("[data-tour='approval'].kj-lit, [data-tour='needs'].kj-lit").first()).toBeVisible();
   await card(page).getByRole("button", { name: "Next" }).click();
   await expect(card(page)).toContainText("Step 3 of");
   await card(page).getByRole("button", { name: "Fill it in for me" }).click();
@@ -40,9 +44,11 @@ test("the demo page names the three people and starts the journey as the owner",
 
   // Next goes to a server-rendered page; the card comes along and outlines the rule it is about.
   await card(page).getByRole("button", { name: "Next" }).click();
-  await expect(page).toHaveURL(/\/dashboard\/guard\?text=/);
+  await expect(page).toHaveURL(/\/dashboard\/guard/);
   await expect(card(page)).toContainText("Step 4 of");
   await expect(page.locator("#policy.kj-lit")).toBeVisible();
+  await card(page).getByRole("button", { name: "Fill it in for me" }).click();
+  await expect(page.locator("#policy textarea[name='text']")).toHaveValue(/three retention offers/);
   await expect(card(page).locator(".kj-why a")).toHaveAttribute("href", /^https:\/\//);
   await noSideScroll(page);
   await settled(page);
@@ -62,9 +68,13 @@ test("handing over to the member shows who you are now, in the member's colour",
   const sw = page.locator(".kj-switch[data-role='member']");
   await expect(sw).toBeVisible();
   await expect(sw).toContainText("Switching to");
-  await expect(page).toHaveURL(new RegExp(`/manage/${j.member.ref}`));
+  // The member's first step is how a customer joins: the shop's PayPal buttons.
+  await expect(page).toHaveURL(/\/s\/[^/]+$/);
   await expect(sw).toHaveCount(0);
   await expect(card(page)).toHaveAttribute("data-role", "member");
+  await expect(page.locator("[data-tour='plans'].kj-lit")).toBeVisible();
+  await card(page).getByRole("button", { name: "Next" }).click();
+  await expect(page).toHaveURL(new RegExp(`/manage/${j.member.ref}`));
   await expect(page.locator("[data-tour='card'].kj-lit")).toBeVisible();
   await noSideScroll(page);
   await settled(page);
@@ -84,7 +94,7 @@ test("handing over to the member shows who you are now, in the member's colour",
 
 test("the place lives on the server: a second browser on the same shop picks it up", async ({ page, browser }) => {
   await page.goto("/demo");
-  await page.getByRole("button", { name: "Start as the member" }).click();
+  await page.getByRole("button", { name: "as the member", exact: true }).click();
   await expect(card(page)).toHaveAttribute("data-role", "member");
   const cookies = await page.context().cookies();
   const other = await browser.newContext({ viewport: { width: 1280, height: 800 } });

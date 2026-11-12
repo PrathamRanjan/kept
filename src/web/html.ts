@@ -48,7 +48,7 @@ export const BRAND: Brand = {
   siteLinks: [["/#how", "How it works"], ["/#fair", "Fair by design"], ["/agents", "For AI agents"], ["/#try", "Sign in"]],
   cta: ["/#try", "Sign in"],
   siteFoot: "© 2026 Kept. Test mode: subscriptions run on the PayPal sandbox.",
-  siteFootLinks: [["/judge", "Guided tour"], ["/onboard", "Set up a shop"], ["/login", "Owner sign-in"]],
+  siteFootLinks: [["/demo", "Live demo"], ["/onboard", "Set up a shop"], ["/login", "Owner sign-in"]],
   staticBase: "/static",
   legacyCss: ["legacy.css"],
 };

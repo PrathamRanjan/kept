@@ -134,8 +134,14 @@ export async function recentMessages(limit = 100) {
 export async function telegramUpdate(update: any): Promise<void> {
   if (update.callback_query) {
     const cq = update.callback_query;
-    const [replyTo, buttonId] = String(cq.data ?? "").split(":");
-    await receive("telegram", String(cq.message?.chat?.id ?? cq.from?.id), cq.data ?? "", buttonId ?? null, replyTo ?? null);
+    // callback_data is "<message id>:<button id>", and a button id can itself hold a colon ("skip:<ref>").
+    const [replyTo, ...rest] = String(cq.data ?? "").split(":");
+    const buttonId = rest.join(":") || null;
+    // Stop the button's spinner in Telegram; the reply itself comes as a message.
+    if (telegramReady() && cq.id) {
+      void fetchImpl(`https://api.telegram.org/bot${config.channels.telegramToken}/answerCallbackQuery`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ callback_query_id: cq.id }) }).catch(() => undefined);
+    }
+    await receive("telegram", String(cq.message?.chat?.id ?? cq.from?.id), cq.data ?? "", buttonId, replyTo ?? null);
     return;
   }
   const msg = update.message;

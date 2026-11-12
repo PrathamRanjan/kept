@@ -9,6 +9,13 @@
 (() => {
   "use strict";
   const KEY_MIN = "kj-min";
+  // Small marks for the step's tags. The PayPal one is the two-P monogram in PayPal's blues.
+  const ICONS = {
+    paypal: '<svg viewBox="0 0 24 24" width="14" height="14"><path fill="#003087" d="M8.3 21H4.6c-.3 0-.5-.3-.4-.6L7 3.6c.1-.4.4-.6.8-.6h6.4c3.4 0 5.4 1.8 4.9 4.8-.6 3.6-3 5.3-6.6 5.3H10.4c-.4 0-.7.3-.8.7L8.3 21z"/><path fill="#009cde" d="M19.6 8.2c.6 3.3-1.6 6.1-5.6 6.1h-1.6c-.4 0-.7.3-.8.7l-1 5.4c0 .3-.3.6-.7.6H7.8l.2-1.3 1-6 .1-.5c.1-.4.4-.7.8-.7h2.1c3.6 0 6-1.7 6.6-5.3 0-.2.1-.4.1-.6.5.4.8 1 .9 1.6z"/></svg>',
+    ai: '<svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M12 2l1.9 5.6L19.5 9.5l-5.6 1.9L12 17l-1.9-5.6L4.5 9.5l5.6-1.9zM19 15l.9 2.6 2.6.9-2.6.9L19 22l-.9-2.6-2.6-.9 2.6-.9z"/></svg>',
+    device: '<svg viewBox="0 0 24 24" width="14" height="14"><rect x="6" y="2" width="12" height="20" rx="3" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="18" r="1.3" fill="currentColor"/></svg>',
+    tool: '<svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" opacity=".85"/></svg>',
+  };
   const SPA = /^\/($|demo\/?$|judge\/?$|proof\/?$|ai\/?$|paypal\/?$|who-can-move-money\/?$|accessibility\/?$|s\/[^/]+\/?$|manage\/[^/]+\/?$|dashboard\/?$|dashboard\/(members|approvals)\/?$)/;
   const reduced = () => matchMedia("(prefers-reduced-motion: reduce)").matches || document.documentElement.dataset.a11yMotion === "off";
   const store = (k, v) => {
@@ -171,6 +178,19 @@
     fillBar.style.width = `${Math.round(((data.i + 1) / data.n) * 100)}%`;
     bar.append(fillBar);
     box.append(head, bar);
+    if (!collapsed && s.tags && s.tags.length) {
+      const tags = el("ul", "kj-tags");
+      tags.setAttribute("aria-label", "Used in this step");
+      for (const t of s.tags) {
+        const li = el("li", `kj-tag kj-tag-${t.kind}`);
+        const ic = el("span", "kj-tag-ic");
+        ic.setAttribute("aria-hidden", "true");
+        ic.innerHTML = ICONS[t.kind] || "";
+        li.append(ic, el("span", "", t.label));
+        tags.append(li);
+      }
+      box.append(tags);
+    }
 
     if (collapsed) {
       const t = el("p", "kj-t kj-t-min", s.title);
@@ -179,18 +199,18 @@
       const main = el("div", "kj-main");
       main.setAttribute("aria-live", "polite");
       main.append(el("p", "kj-t", s.title), el("p", "kj-b", s.body));
-      if (s.do) {
+      if (s.do && !s.done) {
         const d = el("p", "kj-do");
         d.append(el("b", "", `${w.doThis} `), document.createTextNode(s.do));
         main.append(d);
       }
-      if (s.done) main.append(el("p", "kj-ok", `✓ ${w.done}`));
+      if (s.done) main.append(el("p", "kj-ok", `✓ ${s.doneText || w.done}`));
       if (s.sample) main.append(el("p", "kj-warn", s.sample));
       if (!here(s)) main.append(el("p", "kj-away", w.away));
       else if ((shownMissing = missing(s))) main.append(el("p", "kj-away", w.missing));
       if (s.why) {
         const y = el("div", "kj-why");
-        y.append(el("b", "", w.why), el("span", "", ` ${s.why.fact} `));
+        y.append(el("b", "", w.why), el("span", "", `${s.why.fact} `));
         const a = el("a", "", `${w.source}: ${s.why.src}`);
         a.href = s.why.url;
         a.target = "_blank";
@@ -219,6 +239,12 @@
       primary.dataset.a = here(s) || !s.href ? (last ? "end" : "next") : "go";
       act.append(primary);
       box.append(act);
+      if (s.crit) {
+        const c = el("p", `kj-crit kj-crit-${s.crit.k}`);
+        c.append(el("b", "", s.crit.label), el("span", "", s.crit.line));
+        c.setAttribute("aria-label", `${w.judged}: ${s.crit.label}. ${s.crit.line}`);
+        box.append(c);
+      }
     }
     if (focused) box.querySelector(`[data-a="${focused}"]`)?.focus();
     lastSig = sig();

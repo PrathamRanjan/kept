@@ -13,8 +13,9 @@
 import type { Queryable } from "../db.js";
 import { getDb } from "../db.js";
 import type { Lang } from "../i18n.js";
+import { telegramReady } from "../channels/index.js";
 import { merchantById } from "../store.js";
-import { ticksOf, type Tick } from "./checklist.js";
+import { lastTicksOf, type Tick } from "./checklist.js";
 import { poolCounts } from "./pool.js";
 import type { Workspace } from "./workspaces.js";
 
@@ -44,6 +45,14 @@ interface StepDef {
   /** "Fill it in for me" types these words into this field. Nothing is sent until the visitor presses the button. */
   fill?: { sel: string; value: string };
   why?: Why;
+  /** What the card says once the step's tick arrives. */
+  doneText?: string;
+  /** What the step uses, shown as tags. */
+  tags?: TagId[];
+  /** The judging criterion this step shows best, in one line. */
+  crit?: { k: Crit; line: string };
+  /** Shown only when this server has it switched on. */
+  needs?: "telegram";
 }
 
 const WHY = {
@@ -59,153 +68,192 @@ const WHY = {
 const MEMBER = "/manage/{member}";
 const MEMBER_RE = "^/manage/{member}/?$";
 
+/** What a step shows it uses, as small tags on the card. Only things Kept really calls or runs. */
+export const TAGS = {
+  subs: { label: "PayPal Subscriptions API", kind: "paypal" },
+  checkout: { label: "PayPal approval page", kind: "paypal" },
+  webhooks: { label: "PayPal webhooks", kind: "paypal" },
+  ppmcp: { label: "PayPal MCP server", kind: "paypal" },
+  openai: { label: "OpenAI agent", kind: "ai" },
+  decisions: { label: "OpenAI Decisions", kind: "ai" },
+  keptmcp: { label: "Kept MCP server", kind: "ai" },
+  onnx: { label: "Scam model in your browser", kind: "device" },
+  mediapipe: { label: "MediaPipe, on device", kind: "device" },
+  code: { label: "Rules enforced by code", kind: "tool" },
+  aggrid: { label: "AG Grid", kind: "tool" },
+  bryntum: { label: "Bryntum Calendar", kind: "tool" },
+  telegram: { label: "Telegram bot", kind: "tool" },
+  langs: { label: "4 languages", kind: "tool" },
+} as const;
+export type TagId = keyof typeof TAGS;
+export type Crit = "tech" | "impact" | "innovation";
+
 export const STEPS: StepDef[] = [
   // ---------------------------------------------------------------- the owner
   {
-    id: "today", role: "owner", path: "/dashboard", match: "^/dashboard/?$", target: "[data-tour='kpis']",
-    title: "You run {shop}",
-    body: "This is the owner's Today page, in your own private copy of the shop. Members pay through PayPal Subscriptions on the PayPal sandbox: PayPal's test system, with real API calls and test money. These numbers are read from those subscriptions. Rows marked \"sample\" are labelled demo members that never touch PayPal.",
-    do: "Look over the four numbers, then press Next.",
+    id: "shop", role: "owner", path: "/dashboard", match: "^/dashboard/?$", target: "[data-tour='kpis']",
+    title: "Your shop, running on PayPal",
+    body: "Ember & Oak sells coffee by subscription. Members pay through PayPal subscriptions (the PayPal sandbox: real calls, test money), and these numbers are read from PayPal itself.",
+    do: "Glance at the four numbers, then press Next.",
+    tags: ["subs", "webhooks"],
+    crit: { k: "tech", line: "Live data from PayPal's Subscriptions API, not numbers typed into a database." },
   },
   {
-    id: "held", role: "owner", path: "/dashboard", match: "^/dashboard/?$", target: "[data-tour='needs']", done: ["approval_decided"],
-    title: "Kept held a move for you",
-    body: "The shop's offer step wanted to give a member 25% off for 3 payments. You let Kept give at most 15% on its own, so code held this one here instead of doing it. Nothing has moved. No AI model makes this call: code compares the offer with your limit.",
-    do: "Press Approve or Decline on the card. Either is fine.",
+    id: "held", role: "owner", path: "/dashboard", match: "^/dashboard/?$", target: "[data-tour='approval'], [data-tour='needs']", done: ["approval_decided"],
+    title: "Kept stopped a discount and asked you",
+    body: "A member was about to get 25% off. Your rule says 15% at most, so code held it for you. The AI can't change that.",
+    do: "Press Approve or Decline on the highlighted card.",
+    doneText: "You decided. Declined means nothing moved in PayPal.",
+    tags: ["code"],
+    crit: { k: "tech", line: "Money decisions run through code the owner controls, never through the AI." },
   },
   {
     id: "ask", role: "owner", path: "/dashboard", match: "^/dashboard/?$", target: "[data-tour='ask']", done: ["owner_asked"], fill: { sel: "#q", value: "Why are people cancelling?" },
     title: "Ask your shop a question",
-    body: "Ask in plain words. A real AI model answers, but it can only read: it calls read-only tools, one of them PayPal's own MCP server, and every sentence has to cite a fact that code checked. The AI work panel beside the answer shows each tool call as it happens.",
-    do: "Press \"Fill it in for me\" (or type your own question), then press Ask.",
+    body: "Plain words in, an answer with sources out. An AI agent reads your shop and your PayPal account (through PayPal's own MCP server). It can read, not act.",
+    do: "Press \"Fill it in for me\", then Ask.",
+    doneText: "Answered. Every number in it links to where it came from.",
+    tags: ["openai", "ppmcp"],
+    crit: { k: "innovation", line: "An AI agent that reads PayPal through PayPal's MCP server, with every figure cited." },
   },
   {
-    id: "rules", role: "owner", path: `/dashboard/guard?text=${encodeURIComponent("Show three retention offers before cancel. One skip per quarter.")}#policy`, match: "^/dashboard/guard/?$", target: "#policy", done: ["rule_refused"],
-    title: "Try to write a dark pattern",
-    body: "Owners write their rules in plain words. This box already says \"Show three retention offers before cancel.\" Kept refuses that line and cites the law it breaks, and cancelling stays one step whatever the owner writes. The other line, one skip per quarter, is accepted.",
-    do: "Read the notes under the box. To try your own words, edit them and press Draft and backtest.",
+    id: "rules", role: "owner", path: "/dashboard/guard#policy", match: "^/dashboard/guard/?$", target: "#policy", done: ["rule_refused"],
+    fill: { sel: "#policy textarea[name='text']", value: "Show three retention offers before letting anyone cancel." },
+    title: "Try to sneak in a dark pattern",
+    body: "Owners write their shop's rules in plain English and Kept turns them into limits. A rule that breaks consumer law is refused, with the law it breaks.",
+    do: "Press \"Fill it in for me\", then Check these rules.",
+    doneText: "Refused, quoting the law it breaks.",
+    tags: ["code", "openai"],
     why: WHY.darkPatterns,
+    crit: { k: "impact", line: "Fair by default: the tricks behind most cancel complaints can't be switched on." },
   },
   {
-    id: "scam", role: "owner", path: `/dashboard/safety?text=${encodeURIComponent(NOV10)}#check`, match: "^/dashboard/safety/?$", target: "#check", done: ["scam_checked"],
-    title: "A scam message arrives",
-    body: "A member forwarded this: \"we've moved banks, send this month's payment to our new PayPal.\" Three separate readers check it: fixed rules, an AI model answering yes-or-no questions, and code that looks at where the money would go. The strictest one wins, and a message that sends money somewhere new is never shown as safe.",
-    do: "Press Check this message and read the three results.",
+    id: "scam", role: "owner", path: "/dashboard/safety#check", match: "^/dashboard/safety/?$", target: "#check", done: ["scam_checked"],
+    fill: { sel: "#scan-text", value: NOV10 },
+    title: "A fake \"new PayPal account\" message",
+    body: "Scammers write to small shops asking for payments to go to a new account. Kept checks the message three ways, starting with a scam model that runs inside this browser.",
+    do: "Press \"Fill it in for me\", then Check.",
+    doneText: "Held: all three checks flagged it.",
+    tags: ["onnx", "decisions"],
     why: WHY.bec,
+    crit: { k: "innovation", line: "A fine-tuned MiniLM model runs on the device: the message never leaves it." },
   },
   {
     id: "members", role: "owner", path: "/dashboard/members", match: "^/dashboard/members/?$", target: "[data-tour='grid'], [data-tour='grid-m']",
-    title: "Every member, stamp by stamp",
-    body: "Each subscription is a row of stamps, one per billing cycle: paid, skipped, paused, discounted or failed. {memberLine}",
-    do: "Press Next to switch to the member's side.",
+    title: "Every member at a glance",
+    body: "Each row is one PayPal subscription: plan, next payment, pauses and offers. {memberLine}",
+    do: "Press Next to become {first}.",
+    tags: ["aggrid", "bryntum"],
   },
   // ---------------------------------------------------------------- the member
   {
+    id: "join", role: "member", path: "/s/{slug}", match: "^/s/{slug}/?$", target: "[data-tour='plans']",
+    title: "How a customer joins",
+    body: "You're {first} now. Customers pick a plan here and approve it on PayPal's own page; Kept never sees a card number.",
+    do: "Look at the Subscribe with PayPal buttons. No need to subscribe: {first} already has. Press Next.",
+    tags: ["checkout", "subs"],
+    crit: { k: "tech", line: "Real PayPal subscription checkout, in sandbox mode." },
+  },
+  {
     id: "card", role: "member", path: MEMBER, match: MEMBER_RE, target: "[data-tour='card']",
-    title: "Now you're {first}, a member",
-    body: "This is the page a member opens from any reminder: no app to install and no password. The stamps are this subscription's history, and the highlighted one is the next payment.",
+    title: "{first}'s subscription",
+    body: "No app and no password: the link in every reminder opens this page. Each circle is one PayPal payment, and the ringed one is the next.",
     do: "Press Next.",
+    tags: ["subs"],
     why: WHY.forget,
   },
   {
     id: "change", role: "member", path: MEMBER, match: MEMBER_RE, target: "[data-tour='change']", real: true, done: ["member_changed"],
-    title: "Change it yourself",
-    body: "Skip, pause or switch, within the owner's rules. Kept makes the change in PayPal, then reads the subscription back from PayPal, and only that read-back updates this page.",
-    do: "Press Skip next payment, or choose 1 and press Pause.",
+    title: "Skip next month in one tap",
+    body: "Kept asks PayPal to change the subscription, then reads it back from PayPal before it says done.",
+    do: "Press Skip next payment (or Pause).",
+    doneText: "PayPal confirmed it. It's in History at the bottom.",
+    tags: ["subs"],
+    crit: { k: "tech", line: "Every change is read back from PayPal before Kept confirms it." },
   },
-  // ---------------------------------------------------------------- the member's assistant
+  {
+    id: "telegram", role: "member", path: `${MEMBER}#telegram`, match: MEMBER_RE, target: "[data-tour='telegram']", real: true, needs: "telegram",
+    title: "Reminders in Telegram",
+    body: "Before each payment Kept sends a Telegram message with Skip and Keep buttons. Tapping Skip there changes PayPal, the same as here.",
+    do: "Press Connect Telegram, then Start in Telegram. A reminder arrives straight away.",
+    tags: ["telegram", "subs"],
+    crit: { k: "impact", line: "Reminders where people already are, so nobody pays for something they forgot." },
+  },
+  // ---------------------------------------------------------------- the member's AI assistant
   {
     id: "assistant", role: "assistant", path: `${MEMBER}#assistant`, match: MEMBER_RE, target: "[data-tour='assistant']", real: true, done: ["assistant_acted"], fill: { sel: "#assistant-msg", value: "Pause my coffee for a month" },
-    title: "Or let your AI handle it",
-    body: "Now watch from the assistant's side. {first} tells their assistant what they want. Before the assistant runs, code writes a signed permission from those words: it covers only what was asked and lasts 15 minutes. The assistant then calls Kept's MCP tools, the same ones Claude or ChatGPT would use, and code reads PayPal back after the change.",
-    do: "Press \"Fill it in for me\", then Send. Each step appears in the panel as it happens.",
+    title: "Or let an AI assistant do it",
+    body: "{first} says what they want. Kept gives the AI a permission slip for exactly that, valid 15 minutes, and the AI makes the change through Kept's MCP tools: the same ones Claude or ChatGPT would use.",
+    do: "Press \"Fill it in for me\", then Send.",
+    doneText: "Done by the AI, inside its permission. PayPal confirmed it.",
+    tags: ["openai", "keptmcp", "subs"],
     why: WHY.aiShoppers,
+    crit: { k: "innovation", line: "Agentic commerce with a narrow, signed permission instead of handing over a login." },
   },
-  {
-    id: "undo", role: "assistant", path: `${MEMBER}#assistant`, match: MEMBER_RE, target: "[data-tour='assistant']", real: true, fill: { sel: "#assistant-msg", value: "Resume it please" },
-    title: "Ask it to undo that",
-    body: "The permission from the last request doesn't cover a new one, so code writes a fresh one from these words. Every line in the panel says who acted: the model, a rule, or PayPal.",
-    do: "Fill it in, press Send, and check that the status at the top goes back to Active.",
-  },
-  {
-    id: "history", role: "member", path: `${MEMBER}#history`, match: MEMBER_RE, target: "[data-tour='history']",
-    title: "Who did what, and the money trail",
-    body: "Every change is listed with who did it: {first}, the assistant, a rule, or PayPal. PayPal's lines carry PayPal's own request ids, so each change can be matched in PayPal's records.",
-    do: "Press Next.",
-  },
-  {
-    id: "language", role: "member", path: MEMBER, match: MEMBER_RE, target: "[data-testid='lang-picker']",
-    title: "In the member's own language",
-    body: "Members can switch the whole flow to Hindi, Indonesian or Portuguese: the pages, the AI's replies, the reminders and the scam check. PayPal's own page then opens in the matching language.",
-    do: "Optional: pick a language, look around, then switch back to English.",
-    why: WHY.language,
-  },
+  // ---------------------------------------------------------------- the member again
   {
     id: "cancel", role: "member", path: `${MEMBER}#cancel`, match: MEMBER_RE, target: "[data-tour='cancel']", real: true, done: ["offer_shown", "cancel_answered"],
     title: "Cancel in one step",
-    body: "No survey and no phone call. Tick \"show me one offer\" only if you want one: code picks it from the owner's rules (a quality complaint never gets a discount), and the AI only words it. Saying no, or ignoring it, cancels on PayPal at once.",
-    do: "Tick the box and press the button, then take the offer or say no. Saying no really cancels this test subscription, which uses up one from the demo pool.",
+    body: "No maze. If {first} asks, the shop may show one offer. Saying no cancels the subscription in PayPal right away.",
+    do: "Press Cancel subscription and go through it. It's a test subscription.",
+    doneText: "Done in one step.",
+    tags: ["subs", "code"],
     why: WHY.complaints,
+    crit: { k: "impact", line: "One-step cancel for every member, the opposite of a cancel maze." },
   },
   // ---------------------------------------------------------------- back to the owner
   {
     id: "back", role: "owner", path: "/dashboard", match: "^/dashboard/?$", target: "[data-tour='activity']",
-    title: "Back to the owner: what changed",
-    body: "Everything {first} and the assistant did is already on the owner's page: in Activity at the bottom, in the counts at the top, and in the member's row. Check against PayPal re-reads every live subscription from PayPal and corrects anything that drifted.",
-    do: "Open Activity, or press Check against PayPal at the top.",
-  },
-  {
-    id: "byo", role: "assistant", path: "/agents", match: "^/agents/?$", target: "#main .card", done: ["agents_opened"],
-    title: "Bring your own assistant",
-    body: "The assistant you watched uses Kept's MCP endpoint, and so can any other: Claude, ChatGPT or your own agent. A member's assistant gets 14 tools. A new subscriber's assistant can find the shop, quote a plan and start a subscription; the person then approves on PayPal's own page.",
-    do: "Copy the address into Claude (Settings, Connectors, Add custom connector) or run the Claude Code line.",
+    title: "Back to the owner: it's all here",
+    body: "What {first} and the AI did is on the owner's page: who did it, what PayPal said, and the money in and out.",
+    do: "Open Activity to see it, then press Next.",
+    tags: ["webhooks", "subs"],
+    crit: { k: "tech", line: "PayPal webhooks and a daily re-read keep Kept and PayPal in step." },
   },
   // ---------------------------------------------------------------- the proof
   {
     id: "paypal", role: "proof", path: "/paypal", match: "^/paypal/?$", target: "main h1", done: ["paypal_opened"],
-    title: "Every PayPal call, with real ids",
-    body: "Every PayPal API Kept uses, when it last used each one, and the latest PayPal sandbox id. Only one part of Kept calls PayPal, the executor, and only after code has checked the rules; it reads PayPal back after every change.",
-    do: "Scroll the list, then press Next.",
-  },
-  {
-    id: "roles", role: "proof", path: "/who-can-move-money", match: "^/who-can-move-money/?$", target: "main h1",
-    title: "No AI can move money",
-    body: "Every actor (the owner, the member, the member's assistant, the shop's agent and the background worker) and exactly what each one may do. Models read, choose between options code gave them, and word things. Code decides. PayPal does it.",
-    do: "Press Next.",
+    title: "Every PayPal call, live",
+    body: "The real PayPal sandbox calls behind this demo, newest first, each with PayPal's own id.",
+    tags: ["subs", "ppmcp", "webhooks"],
+    crit: { k: "tech", line: "Subscriptions, transactions, webhooks and PayPal's MCP server, all in use." },
   },
   {
     id: "a11y", role: "proof", path: "/accessibility", match: "^/accessibility/?$", target: "[data-testid='hf-sim-run'], main h1",
-    title: "Everyone can use it",
-    body: "Every page works by keyboard, at 200% text and by voice. Hands-free mode lets people point with their eyes or head and click by saying \"click\"; anything that moves money needs a spoken yes. The simulation here shows it working without a camera.",
-    do: "Press the simulation's Run button.",
+    title: "Hands-free, and in four languages",
+    body: "Look and Say lets people use Kept by looking and speaking; the face tracking runs on the device. The site reads in English, Hindi, Indonesian and Portuguese.",
+    tags: ["mediapipe", "langs"],
     why: WHY.disability,
+    crit: { k: "impact", line: "Built for people other subscription sites leave out." },
   },
   {
     id: "proof", role: "proof", path: "/proof", match: "^/proof/?$", target: "main h1", done: ["proof_opened"],
-    title: "Every test case, in the open",
-    body: "The evaluation sets behind each claim, case by case: the scam check, unfair offers, hostile agent moves, cancel reasons, and the robot judge that walks this site. That's the journey. Keep exploring; this card stays until you end it.",
+    title: "Checked, not claimed",
+    body: "The test sets behind each claim, and a robot judge that walks this live site. That's the tour: keep exploring, the card stays until you end it.",
+    crit: { k: "tech", line: "Every claim on this site has a test you can open." },
   },
 ];
 
-export const START: Record<StartAs, number> = {
-  owner: 0,
-  member: STEPS.findIndex((s) => s.id === "card"),
-  assistant: STEPS.findIndex((s) => s.id === "assistant"),
+/** The steps this server can show: Telegram's step only when Kept's own bot is switched on. */
+export const activeSteps = (): StepDef[] => STEPS.filter((s) => !s.needs || (s.needs === "telegram" && telegramReady()));
+export const startOf = (as: StartAs): number => {
+  const id = as === "member" ? "join" : as === "assistant" ? "assistant" : "shop";
+  return Math.max(0, activeSteps().findIndex((s) => s.id === id));
 };
 
 export const ROLES: Record<Role, { name: string; who: string }> = {
-  owner: { name: "The owner", who: "You are the owner of {shop}" },
-  member: { name: "The member", who: "You are {first}, a member" },
-  assistant: { name: "The member's AI assistant", who: "Watching {first}'s AI assistant" },
-  proof: { name: "The proof", who: "How you can check all of it" },
+  owner: { name: "the owner", who: "You are the owner of {shop}" },
+  member: { name: "the member", who: "You are {first}, a member" },
+  assistant: { name: "the AI assistant", who: "{first}'s AI assistant at work" },
+  proof: { name: "the proof", who: "How you can check all of it" },
 };
 
 /** The card's own words. Steps are English; these follow the visitor's language. */
 const WORDS: Record<Lang, Record<string, string>> = {
-  en: { region: "Guided journey", step: "Step {i} of {n}", next: "Next", back: "Back", finish: "Finish", end: "End the journey", min: "Shrink the guide", open: "Open the guide", go: "Take me there", fill: "Fill it in for me", doThis: "Do this:", done: "Done. Kept saw you do it.", why: "Why this exists", source: "Source", away: "This step is on another page.", switching: "Switching to", note: "", sample: "{first} is a labelled sample member, so these buttons only show what they do and nothing reaches PayPal. Real members come from a pool of PayPal sandbox subscriptions approved in advance. {pool}", poolEmpty: "The pool is empty right now, so this demo has no real member to change.", poolReady: "The pool has {n} ready: press Start over on the demo page to get one.", missing: "That part isn't on this page right now." },
-  "hi-IN": { region: "गाइडेड यात्रा", step: "चरण {i} / {n}", next: "आगे", back: "पीछे", finish: "समाप्त", end: "यात्रा खत्म करें", min: "गाइड छोटा करें", open: "गाइड खोलें", go: "मुझे वहाँ ले चलें", fill: "मेरे लिए भर दें", doThis: "यह करें:", done: "हो गया। Kept ने इसे देखा।", why: "यह क्यों है", source: "स्रोत", away: "यह चरण दूसरे पेज पर है।", switching: "बदल रहे हैं:", note: "चरणों का पाठ अंग्रेज़ी में है।", sample: "{first} एक चिह्नित नमूना सदस्य है, इसलिए ये बटन सिर्फ़ दिखाते हैं कि वे क्या करते हैं, PayPal तक कुछ नहीं जाता। असली सदस्य पहले से स्वीकृत PayPal सैंडबॉक्स सदस्यताओं के पूल से आते हैं। {pool}", poolEmpty: "पूल अभी खाली है, इसलिए इस डेमो में बदलने के लिए कोई असली सदस्य नहीं है।", poolReady: "पूल में {n} तैयार हैं: एक पाने के लिए डेमो पेज पर फिर से शुरू करें दबाएँ।", missing: "वह हिस्सा अभी इस पेज पर नहीं है।" },
-  "id-ID": { region: "Perjalanan terpandu", step: "Langkah {i} dari {n}", next: "Lanjut", back: "Kembali", finish: "Selesai", end: "Akhiri perjalanan", min: "Kecilkan panduan", open: "Buka panduan", go: "Bawa saya ke sana", fill: "Isikan untuk saya", doThis: "Lakukan ini:", done: "Selesai. Kept melihat Anda melakukannya.", why: "Mengapa ini ada", source: "Sumber", away: "Langkah ini ada di halaman lain.", switching: "Beralih ke", note: "Teks langkah ditulis dalam bahasa Inggris.", sample: "{first} adalah anggota contoh berlabel, jadi tombol ini hanya menunjukkan fungsinya dan tidak ada yang sampai ke PayPal. Anggota asli berasal dari kumpulan langganan sandbox PayPal yang sudah disetujui. {pool}", poolEmpty: "Kumpulan itu sedang kosong, jadi demo ini tidak punya anggota asli untuk diubah.", poolReady: "Kumpulan itu punya {n} yang siap: tekan Mulai lagi di halaman demo untuk mendapatkannya.", missing: "Bagian itu sedang tidak ada di halaman ini." },
-  "pt-BR": { region: "Jornada guiada", step: "Passo {i} de {n}", next: "Próximo", back: "Voltar", finish: "Concluir", end: "Encerrar a jornada", min: "Recolher o guia", open: "Abrir o guia", go: "Leve-me até lá", fill: "Preencher para mim", doThis: "Faça isto:", done: "Feito. O Kept viu você fazer.", why: "Por que isto existe", source: "Fonte", away: "Este passo está em outra página.", switching: "Mudando para", note: "O texto dos passos está em inglês.", sample: "{first} é um membro de exemplo identificado, então estes botões só mostram o que fazem e nada chega ao PayPal. Membros reais vêm de um conjunto de assinaturas sandbox do PayPal aprovadas antes. {pool}", poolEmpty: "O conjunto está vazio agora, então esta demonstração não tem um membro real para alterar.", poolReady: "O conjunto tem {n} prontas: toque em Começar de novo na página da demonstração para receber uma.", missing: "Essa parte não está nesta página agora." },
+  en: { region: "Guided journey", step: "Step {i} of {n}", next: "Next", back: "Back", finish: "Finish", end: "End the journey", min: "Shrink the guide", open: "Open the guide", go: "Take me there", fill: "Fill it in for me", doThis: "Do this:", done: "Done: you did this step.", why: "Why this exists", source: "Source", away: "This step is on another page.", switching: "Switching to", note: "", sample: "{first} is a labelled sample member, so these buttons only show what they do and nothing reaches PayPal. Real members come from a pool of PayPal sandbox subscriptions approved in advance. {pool}", poolEmpty: "The pool is empty right now, so this demo has no real member to change.", poolReady: "The pool has {n} ready: press Start over on the demo page to get one.", missing: "That part isn't on this page right now.", crit_tech: "Technological implementation", crit_impact: "Potential impact", crit_innovation: "Innovation", judged: "Judging criterion" },
+  "hi-IN": { region: "गाइडेड यात्रा", step: "चरण {i} / {n}", next: "आगे", back: "पीछे", finish: "समाप्त", end: "यात्रा खत्म करें", min: "गाइड छोटा करें", open: "गाइड खोलें", go: "मुझे वहाँ ले चलें", fill: "मेरे लिए भर दें", doThis: "यह करें:", done: "हो गया: आपने यह चरण कर लिया।", why: "यह क्यों है", source: "स्रोत", away: "यह चरण दूसरे पेज पर है।", switching: "बदल रहे हैं:", note: "चरणों का पाठ अंग्रेज़ी में है।", sample: "{first} एक चिह्नित नमूना सदस्य है, इसलिए ये बटन सिर्फ़ दिखाते हैं कि वे क्या करते हैं, PayPal तक कुछ नहीं जाता। असली सदस्य पहले से स्वीकृत PayPal सैंडबॉक्स सदस्यताओं के पूल से आते हैं। {pool}", poolEmpty: "पूल अभी खाली है, इसलिए इस डेमो में बदलने के लिए कोई असली सदस्य नहीं है।", poolReady: "पूल में {n} तैयार हैं: एक पाने के लिए डेमो पेज पर फिर से शुरू करें दबाएँ।", missing: "वह हिस्सा अभी इस पेज पर नहीं है।", crit_tech: "तकनीकी क्रियान्वयन", crit_impact: "संभावित प्रभाव", crit_innovation: "नवाचार", judged: "निर्णय का मानदंड" },
+  "id-ID": { region: "Perjalanan terpandu", step: "Langkah {i} dari {n}", next: "Lanjut", back: "Kembali", finish: "Selesai", end: "Akhiri perjalanan", min: "Kecilkan panduan", open: "Buka panduan", go: "Bawa saya ke sana", fill: "Isikan untuk saya", doThis: "Lakukan ini:", done: "Selesai: Anda sudah melakukan langkah ini.", why: "Mengapa ini ada", source: "Sumber", away: "Langkah ini ada di halaman lain.", switching: "Beralih ke", note: "Teks langkah ditulis dalam bahasa Inggris.", sample: "{first} adalah anggota contoh berlabel, jadi tombol ini hanya menunjukkan fungsinya dan tidak ada yang sampai ke PayPal. Anggota asli berasal dari kumpulan langganan sandbox PayPal yang sudah disetujui. {pool}", poolEmpty: "Kumpulan itu sedang kosong, jadi demo ini tidak punya anggota asli untuk diubah.", poolReady: "Kumpulan itu punya {n} yang siap: tekan Mulai lagi di halaman demo untuk mendapatkannya.", missing: "Bagian itu sedang tidak ada di halaman ini.", crit_tech: "Implementasi teknologi", crit_impact: "Potensi dampak", crit_innovation: "Inovasi", judged: "Kriteria penilaian" },
+  "pt-BR": { region: "Jornada guiada", step: "Passo {i} de {n}", next: "Próximo", back: "Voltar", finish: "Concluir", end: "Encerrar a jornada", min: "Recolher o guia", open: "Abrir o guia", go: "Leve-me até lá", fill: "Preencher para mim", doThis: "Faça isto:", done: "Feito: você concluiu esta etapa.", why: "Por que isto existe", source: "Fonte", away: "Este passo está em outra página.", switching: "Mudando para", note: "O texto dos passos está em inglês.", sample: "{first} é um membro de exemplo identificado, então estes botões só mostram o que fazem e nada chega ao PayPal. Membros reais vêm de um conjunto de assinaturas sandbox do PayPal aprovadas antes. {pool}", poolEmpty: "O conjunto está vazio agora, então esta demonstração não tem um membro real para alterar.", poolReady: "O conjunto tem {n} prontas: toque em Começar de novo na página da demonstração para receber uma.", missing: "Essa parte não está nesta página agora.", crit_tech: "Implementação tecnológica", crit_impact: "Impacto potencial", crit_innovation: "Inovação", judged: "Critério de avaliação" },
 };
 export const journeyWords = (lang: Lang) => WORDS[lang] ?? WORDS.en;
 
@@ -255,25 +303,32 @@ export async function journeyView(ws: Workspace, lang: Lang) {
     shop: m?.name ?? "the shop",
     first,
     member: ref ?? "",
-    memberLine: real ? `${first} is a real PayPal sandbox subscription in your shop. Next, you become ${first}.` : `Next, you become ${first}, one of the labelled sample members.`,
+    slug: m?.slug ?? "",
+    memberLine: real ? `${first} is a real PayPal sandbox subscription.` : `${first} is one of the labelled sample members.`,
   };
-  const ticks = ticksOf(ws.checklist);
-  const steps = STEPS.map((s, i) => ({
+  // A step counts as done only for something the visitor did after starting this journey, not earlier.
+  const last = lastTicksOf(ws.checklist);
+  const since = Date.parse(j.startedAt) || 0;
+  const didAfter = (k: Tick) => Boolean(last[k]) && Date.parse(last[k]) >= since - 1000;
+  const steps = activeSteps().map((s, i) => ({
     i,
     id: s.id,
     role: s.role,
     who: fill(ROLES[s.role].who, v),
     roleName: ROLES[s.role].name,
     href: ref || !s.path.includes("{member}") ? fill(s.path, v) : null,
-    match: ref || !s.match.includes("{member}") ? s.match.replace("{member}", reEscape(ref ?? "")) : null,
+    match: ref || !s.match.includes("{member}") ? s.match.replace("{member}", reEscape(ref ?? "")).replace("{slug}", reEscape(v.slug)) : null,
     target: s.target ?? null,
     title: fill(s.title, v),
     body: fill(s.body, v),
     do: s.do ? fill(s.do, v) : null,
     fill: s.fill ?? null,
     why: s.why ?? null,
+    tags: (s.tags ?? []).map((t) => ({ id: t, ...TAGS[t] })),
+    crit: s.crit ? { k: s.crit.k, label: words[`crit_${s.crit.k}`], line: s.crit.line } : null,
+    doneText: s.doneText ?? null,
     watches: s.done ?? [],
-    done: (s.done ?? []).some((k) => Boolean(ticks[k])),
+    done: (s.done ?? []).some(didAfter),
     sample: s.real && !real ? fill(words.sample, { first, pool: pc.ready > 0 ? fill(words.poolReady, { n: String(pc.ready) }) : words.poolEmpty }) : null,
   }));
   const i = Math.max(0, Math.min(j.i, steps.length - 1));

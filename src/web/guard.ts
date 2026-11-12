@@ -85,7 +85,7 @@ export function guardRouter(): Router {
       } catch (e) {
         if (!(e instanceof KeptError)) throw e;
         candidate = null;
-        draftNotes = [`${e.message} Press "Draft and backtest" again to retry.`];
+        draftNotes = [`${e.message} Press "Check these rules" again to retry.`];
       }
     }
     const bt = candidate ? await backtest(m.id, candidate, { auto_discount_max_pct: pct, auto_pause_max_cycles: cycles }, db) : null;
@@ -108,12 +108,13 @@ export function guardRouter(): Router {
           <div class="tile"><div class="label">Offers held or blocked</div><div class="big">${fair.held_offers + fair.compliance_blocked_offers}</div><div class="hint">${fair.held_offers} above autonomy, ${fair.compliance_blocked_offers} by a compliance rule</div></div>
         </div></div>
 
-      <div class="card" id="policy"><h2>Policy in plain words, backtested</h2>
+      <div class="card" id="policy"><h2>Your rules, in plain words</h2>
+        <p class="small muted">Write how your shop treats members. Kept turns it into limits, refuses anything consumer law forbids, and replays it against your past members so you see what would have changed.</p>
         <form method="get" action="/dashboard/guard">
           <textarea name="text" rows="3" style="width:100%" placeholder="One skip per quarter. Pause up to 2 months. At most 15% off for 3 months. Remind people 7 days before a renewal. My customers are in California.">${candidateText}</textarea>
           <div class="slider"><label for="bt-slider">Discount the offer step may give without you</label><input id="bt-slider" type="range" name="pct" min="0" max="50" value="${pct}"><output id="bt-out">${pct}%</output></div>
           <div class="slider"><label for="bt-cycles">Pause length it may give without you</label><input id="bt-cycles" type="range" name="cycles" min="0" max="6" value="${cycles}"><output>${cycles} cycles</output></div>
-          <button class="btn primary" type="submit">Draft and backtest</button>
+          <button class="btn primary" type="submit">Check these rules</button>
         </form>
         ${draftNotes.length ? html`<ul class="small">${draftNotes.map((d) => html`<li>${d}</li>`)}</ul>` : ""}
         ${candidate ? html`<ul>${describeRules(candidate).map((d) => html`<li>${d}</li>`)}</ul>` : html`<p class="muted">No valid policy to test yet.</p>`}

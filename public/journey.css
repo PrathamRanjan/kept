@@ -35,7 +35,7 @@
 .kj[data-role="assistant"] { --kj: var(--kj-assistant); }
 .kj[data-role="proof"] { --kj: var(--kj-proof); }
 .kj p { margin: 0; }
-.kj-head { display: flex; align-items: center; gap: 6px; padding: 8px 8px 6px 14px; }
+.kj-head { display: flex; align-items: center; gap: 6px; padding: 8px 8px 6px 14px; background: color-mix(in srgb, var(--kj) 9%, var(--kj-bg)); border-radius: 10px 10px 0 0; }
 .kj-who { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 0.8125rem; color: var(--kj); }
 .kj-who span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .kj-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--kj); flex: none; }
@@ -56,7 +56,35 @@
 .kj-why b { display: block; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--kj); }
 .kj-why a { color: var(--kj-ink); text-decoration: underline; overflow-wrap: anywhere; }
 .kj-note { font-size: 0.8125rem; color: var(--kj-ink-2); }
-.kj-act { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; padding: 10px 16px 14px; }
+/* What the step uses: small coloured tags under the header. */
+.kj-tags { list-style: none; margin: 0; padding: 8px 14px 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.kj-tag { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px 3px 6px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; line-height: 1.3; border: 1px solid transparent; }
+.kj-tag-ic { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; }
+.kj-tag-paypal { background: #eaf3ff; color: #003087; border-color: #c4dcfb; }
+.kj-tag-paypal .kj-tag-ic { background: #fff; }
+.kj-tag-ai { background: #f1eaff; color: #4b2a9e; border-color: #ddcdfc; }
+.kj-tag-device { background: #e5f6ee; color: #145c39; border-color: #bfe6d1; }
+.kj-tag-tool { background: #fff1de; color: #7a4a00; border-color: #f4d9ab; }
+:root.dark .kj-tag-paypal { background: #11233f; color: #b8d4ff; border-color: #24426d; }
+:root.dark .kj-tag-ai { background: #261a45; color: #d8c8ff; border-color: #3d2b6c; }
+:root.dark .kj-tag-device { background: #12301f; color: #a9e6c5; border-color: #1f4d33; }
+:root.dark .kj-tag-tool { background: #33240d; color: #f6d6a0; border-color: #54401c; }
+/* The judging criterion this step shows, as a strip along the bottom of the card. */
+.kj-crit { margin: 0; display: grid; gap: 1px; padding: 9px 16px 11px; font-size: 0.8125rem; line-height: 1.35; color: var(--kj-ink); border-top: 1px solid var(--kj-rule); border-radius: 0 0 12px 12px; }
+.kj-crit b { font-size: 0.6875rem; letter-spacing: 0.06em; text-transform: uppercase; }
+.kj-crit-tech { background: linear-gradient(90deg, #e8f0ff, #f4f7ff); }
+.kj-crit-tech b { color: #1f3fae; }
+.kj-crit-impact { background: linear-gradient(90deg, #ffeedd, #fff7ef); }
+.kj-crit-impact b { color: #9a3b00; }
+.kj-crit-innovation { background: linear-gradient(90deg, #f3e9ff, #faf5ff); }
+.kj-crit-innovation b { color: #6a2fc9; }
+:root.dark .kj-crit-tech { background: linear-gradient(90deg, #142244, #171d2b); }
+:root.dark .kj-crit-tech b { color: #a9bcff; }
+:root.dark .kj-crit-impact { background: linear-gradient(90deg, #3a2210, #221c18); }
+:root.dark .kj-crit-impact b { color: #ffbf8a; }
+:root.dark .kj-crit-innovation { background: linear-gradient(90deg, #2b1a4a, #1f1a2b); }
+:root.dark .kj-crit-innovation b { color: #d3b8ff; }
+.kj-act { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; padding: 10px 16px 12px; }
 .kj-btn { min-height: 44px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--kj-rule); background: var(--kj-bg); color: var(--kj-ink); font: inherit; font-weight: 600; cursor: pointer; }
 .kj-btn:disabled { opacity: 0.45; cursor: default; }
 .kj-primary { background: var(--kj); border-color: var(--kj); color: #fff; }

@@ -3,19 +3,22 @@ import { axe, freshMember, noSideScroll, noTours } from "./helpers";
 
 test.beforeEach(async ({ page }) => noTours(page));
 
-test("landing: hero, live cycle card, illustrative pricing, FAQ, persona picker", async ({ page }) => {
+test("landing: hero, why it exists, the four criteria, planned pricing, and the guided demo starts from it", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("cancel in one step");
-  await expect(page.locator("[data-tour='hero-card'] li").first()).toBeVisible();
-  await expect(page.getByText(/Illustrative/i).first()).toBeVisible();
-  await page.getByText("Does Kept hold my money?").click();
-  await expect(page.getByText(/PayPal/).first()).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("because leaving takes one tap");
+  // The phone in the hero is an illustration and says so; pricing is planned and says so.
+  await expect(page.getByText(/illustration/i).first()).toBeVisible();
+  await expect(page.getByText(/Planned pricing/).first()).toBeVisible();
+  for (const h of ["Technological implementation", "Design", "Potential impact", "Innovation"]) await expect(page.getByRole("heading", { name: h, exact: true })).toBeVisible();
+  await expect(page.getByText("For judges")).toHaveCount(0);
   await noSideScroll(page);
   await axe(page);
-  await page.getByRole("link", { name: /Try the live demo/ }).first().click();
-  await expect(page).toHaveURL(/\/demo$/);
-  await expect(page.getByRole("heading", { name: "Try the live demo" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Start as the owner" })).toBeVisible();
+  await page.getByRole("button", { name: "Start the guided demo" }).first().click();
+  await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page.locator("#kept-journey")).toContainText("Step 1 of");
+  await page.locator("#kept-journey").getByRole("button", { name: "End the journey" }).click();
+  await page.goto("/demo");
+  await expect(page.getByRole("button", { name: "Start the guided journey" })).toBeVisible();
   await noSideScroll(page);
 });
 
@@ -76,7 +79,7 @@ test("member: asking for an offer shows one offer; declining cancels at once", a
 
 test("owner: today, ask, approvals and members", async ({ page, isMobile }) => {
   await page.goto("/demo");
-  await page.getByRole("button", { name: "Skip the walkthrough" }).click();
+  await page.getByRole("button", { name: "Open the owner's dashboard" }).click();
   await expect(page).toHaveURL(/\/dashboard$/);
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Today at Ember & Oak");
   await expect(page.locator("[data-tour='kpis']")).toContainText("Live members");

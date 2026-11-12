@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { isAdmin } from "./admin.js";
 import { aiUsageSummary, hasOpenAI, providerLabel } from "../ai/provider.js";
+import QRCode from "qrcode";
 import { recentMessages, telegramReady, telegramUpdate, twilioInbound, whatsappReady, whatsappUpdate } from "../channels/index.js";
 import { history } from "../guard/backtest.js";
 import { randomBytes } from "node:crypto";
@@ -257,6 +258,14 @@ export function foundationRouter(): Router {
     if (!telegramReady()) return res.status(404).send("Telegram is off for Kept: it has no bot of its own yet.");
     res.redirect(303, await tgCode("subscriber", s.id));
   }));
+  /** For the member page: the same one-time link, plus a QR code so a desktop visitor can open it on their phone. */
+  r.post("/ui/manage/:ref/telegram", json(async (req, res) => {
+    const s = await subscriberByRef(await getDb(), req.params.ref);
+    if (!s || s.is_sample) return res.status(404).json({ error: "not_found", message: "Subscription not found" });
+    if (!telegramReady()) return res.status(404).json({ error: "off", message: "Telegram is off on this server." });
+    const url = await tgCode("subscriber", s.id);
+    res.set("cache-control", "no-store").json({ url, bot: config.channels.telegramBot, qr: await QRCode.toString(url, { type: "svg", margin: 1, width: 168 }) });
+  }));
   r.post("/webhooks/telegram", json(async (req, res) => {
     if (config.channels.telegramSecret && req.header("x-telegram-bot-api-secret-token") !== config.channels.telegramSecret) {
       res.status(401);
@@ -361,12 +370,13 @@ export function foundationRouter(): Router {
     `));
   }));
 
-  /* The judge page is the React page at /judge (src/web/public.ts serves its data). */
+  /* The old judge page is gone: the live demo at /demo and its guided journey replace it. Old links still land. */
+  r.get("/judge", (_req, res) => res.redirect(301, "/demo"));
   r.get("/judge/reset", page(async (req, res) => {
     const sid = typeof req.cookies?.kept_judge === "string" ? req.cookies.kept_judge : "";
     if (sid) await (await getDb()).query("DELETE FROM judge_sessions WHERE id = $1", [sid]);
     res.clearCookie("kept_judge");
-    res.redirect("/judge");
+    res.redirect("/demo");
   }));
 
   return r;

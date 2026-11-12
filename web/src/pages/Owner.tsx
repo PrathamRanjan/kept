@@ -303,7 +303,11 @@ function TodayPage({ d, reload }: { d: Today; reload: () => void }) {
       <section data-tour="needs" className="mt-10" aria-labelledby="needs">
         <h2 id="needs" className="m-0 text-2xl font-bold">Needs you</h2>
         <div className="mt-4 space-y-3">
-          {d.approvals.slice(0, 3).map((a) => <ApprovalCard key={a.id} a={a} currency={cur} onDone={reload} />)}
+          {d.approvals.slice(0, 3).map((a, i) => (
+            <div key={a.id} data-tour={i === 0 ? "approval" : undefined}>
+              <ApprovalCard a={a} currency={cur} onDone={reload} />
+            </div>
+          ))}
           {d.approvals.length > 3 && (
             <Button variant="outline" asChild>
               <Link to="/dashboard/approvals">See all {d.approvals.length} approvals <ArrowRight aria-hidden="true" /></Link>

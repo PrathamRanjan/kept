@@ -25,7 +25,7 @@ test("keyboard only: a member cancels with Tab and Enter, and hears the result",
 test("200% text: no sideways scroll on the main pages", async ({ page }) => {
   await noTours(page);
   const ref = await freshMember(page);
-  for (const p of ["/", `/manage/${ref}`, "/judge", "/proof"]) {
+  for (const p of ["/", `/manage/${ref}`, "/demo", "/proof"]) {
     await page.goto(p);
     await page.evaluate(() => { document.documentElement.style.fontSize = "200%"; });
     await page.waitForTimeout(150);
@@ -36,7 +36,7 @@ test("200% text: no sideways scroll on the main pages", async ({ page }) => {
 test("reduced motion: the marquee stops and is read once", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
-  const copies = page.locator("[aria-label='Kinds of shops Kept is for'] > div");
+  const copies = page.locator("[aria-label='Built on'] > div");
   const n = await copies.count();
   expect(n).toBeGreaterThan(1);
   for (let i = 1; i < n; i++) await expect(copies.nth(i)).toHaveAttribute("aria-hidden", "true");

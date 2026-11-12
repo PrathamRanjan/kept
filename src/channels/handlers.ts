@@ -9,19 +9,32 @@ import { getDb } from "../db.js";
 import { decideApproval, pendingApprovals } from "../guard/dryrun.js";
 import * as svc from "../service.js";
 import { KeptError, merchantByToken, subscriberByRef, subscriberById } from "../store.js";
-import { link, onInbound } from "./index.js";
+import { link, onInbound, send, type Channel } from "./index.js";
+
+const describeApproval = (a: any) => (a.payload?.offer ? `${a.payload.offer.type} ${a.payload.offer.percent ? `${a.payload.offer.percent}% off` : a.payload.offer.cycles ? `${a.payload.offer.cycles} cycles` : ""}`.trim() : `${a.action} ${((a.payload?.cents ?? 0) / 100).toFixed(2)}`);
+
+/** A renewal reminder with Skip and Keep buttons, sent right after a member connects a chat. */
+async function firstReminder(channel: Channel, address: string, ref: string) {
+  const v = await svc.subscriptionView(ref);
+  const when = v.next_billing_time ? new Date(v.next_billing_time).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
+  const what = v.plan ? `${v.plan.name} (${v.plan.price} ${v.plan.currency})` : "subscription";
+  const body = `${v.shop}: your ${what} ${when ? `renews on ${when}` : "is active"}. Skip the next payment, or keep it? Tapping Skip changes it in PayPal.`;
+  await send({ channel, address, body, buttons: [{ id: `skip:${ref}`, label: "Skip next payment" }, { id: `keep:${ref}`, label: "Keep it" }], entity: "subscriber", entityId: ref });
+}
 
 let installed = false;
 export function installChannelHandlers() {
   if (installed) return;
   installed = true;
   onInbound(async (msg) => {
-    const text = (msg.text ?? "").trim();
+    // Telegram's command menu sends "/pending" or "/help@kept_paypal_demo_bot": read those as the bare word ("/start" stays as is).
+    const text = (msg.text ?? "").trim().replace(/^\/(?!start\b)([a-z]+)(?:@\S+)?/i, "$1");
     const db = await getDb();
     // One tap from the app: "/start <one-time code>" (the shared bot strips its "kept-" prefix). Codes last 15 minutes and work once.
     const st = text.match(/^\/start(?:\s+(\S+))?$/i);
     if (st) {
-      const code = st[1] ?? "";
+      // Kept's own bot gets "kept-<code>" (the prefix the shared bot used to route by); both forms work.
+      const code = (st[1] ?? "").replace(/^kept-/, "");
       const row = code ? (await db.query<{ value: string }>("SELECT value FROM settings WHERE key = $1", [`tglink:${code}`])).rows[0] : undefined;
       if (code) await db.query("DELETE FROM settings WHERE key = $1", [`tglink:${code}`]);
       const v = row ? (JSON.parse(row.value) as { party: "owner" | "subscriber"; party_id: string; exp: number }) : null;
@@ -29,9 +42,15 @@ export function installChannelHandlers() {
       await link(msg.channel, msg.address, v.party, v.party_id);
       if (v.party === "subscriber") {
         const s = await subscriberById(db, v.party_id);
+        // The first reminder comes straight away, so the buttons can be tried now rather than days before a renewal.
+        if (s) await firstReminder(msg.channel, msg.address, s.ref).catch(() => undefined);
         return `Connected. You'll get renewal reminders, with Skip and Keep buttons, for ${s?.subscriber_name ? `${s.subscriber_name}'s subscription` : "your subscription"} here. A payment problem is only ever shown on your member page, never as a link in this chat.`;
       }
-      return "Connected as the shop owner. Held offers and large collections will ask you here with Approve and Decline buttons. Send “pending” any time.";
+      const waiting = (await pendingApprovals(v.party_id)).filter((a) => a.status === "pending").slice(0, 3);
+      for (const a of waiting) {
+        await send({ channel: msg.channel, address: msg.address, body: `Waiting for you: ${describeApproval(a)}`, buttons: [{ id: `approve:${a.id}`, label: "Approve" }, { id: `decline:${a.id}`, label: "Decline" }] });
+      }
+      return `Connected as the shop owner. Held offers and large collections will ask you here with Approve and Decline buttons.${waiting.length ? ` ${waiting.length} ${waiting.length === 1 ? "is" : "are"} waiting now.` : ""} Send “pending” any time.`;
     }
     const m = text.match(/^link\s+(subscriber|owner):(\S+)$/i);
     // A phone number is linked only through the code Kept texts it, never by a typed reference.
