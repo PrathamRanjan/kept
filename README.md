@@ -320,12 +320,6 @@ npm run robot:judge     # follows the guided tour on the live site (ROBOT_BASE t
 3. Run `npm run webhook:register` and set `PAYPAL_WEBHOOK_ID`.
 4. In a Render shell, run `npm run seed`.
 
-## What's real and what isn't
-
-- **Real:** every PayPal call, on the sandbox, with test money. The demo pool holds real sandbox subscriptions approved in advance by a sandbox buyer.
-- **Labelled samples:** each demo shop has about 40 **labelled sample members**, so there's something to look at. Steps that would change PayPal on a sample member say plainly that nothing reaches PayPal.
-- **Illustrations:** the landing page's phone is labelled as an illustration, and the pricing is labelled as planned. Nothing is for sale.
-- **Not built:** no mobile app, no Chrome extension, no APIMatic portal.
 
 ## More
 
