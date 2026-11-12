@@ -1,0 +1,88 @@
+/* The guided journey's corner card (journey.js). One colour per person; nothing covers the page. */
+:root {
+  --kj-owner: #2443c4;
+  --kj-member: #1d7348;
+  --kj-assistant: #6b3fd4;
+  --kj-proof: #5b4a26;
+  --kj-bg: #fffdf8;
+  --kj-ink: #16181b;
+  --kj-ink-2: #4a4f57;
+  --kj-rule: #dcd4c4;
+  --kj-warn: #fff4d6;
+}
+:root.dark {
+  --kj-owner: #93a6ff;
+  --kj-member: #63c795;
+  --kj-assistant: #c2a8ff;
+  --kj-proof: #e1c98f;
+  --kj-bg: #1b1e22;
+  --kj-ink: #ede8de;
+  --kj-ink-2: #b9b3a8;
+  --kj-rule: #2d3137;
+  --kj-warn: #3a3018;
+}
+.kj {
+  --kj: var(--kj-owner);
+  position: fixed; right: 16px; bottom: 16px; z-index: 45;
+  width: min(392px, calc(100vw - 32px)); max-height: min(70vh, 620px); overflow: auto;
+  background: var(--kj-bg); color: var(--kj-ink);
+  border: 1px solid var(--kj-rule); border-top: 4px solid var(--kj); border-radius: 14px;
+  box-shadow: 0 18px 40px -18px rgb(0 0 0 / 0.45);
+  font: 400 0.9375rem/1.5 "Inter", "Atkinson Hyperlegible", system-ui, sans-serif;
+  animation: kj-in 0.25s ease-out;
+}
+.kj[data-role="member"] { --kj: var(--kj-member); }
+.kj[data-role="assistant"] { --kj: var(--kj-assistant); }
+.kj[data-role="proof"] { --kj: var(--kj-proof); }
+.kj p { margin: 0; }
+.kj-head { display: flex; align-items: center; gap: 6px; padding: 8px 8px 6px 14px; }
+.kj-who { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 0.8125rem; color: var(--kj); }
+.kj-who span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kj-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--kj); flex: none; }
+.kj-n { font-size: 0.75rem; color: var(--kj-ink-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.kj-icon { width: 36px; height: 36px; border: 0; border-radius: 8px; background: transparent; color: var(--kj-ink-2); font-size: 1.25rem; line-height: 1; cursor: pointer; }
+.kj-icon:hover { background: color-mix(in srgb, var(--kj) 12%, transparent); color: var(--kj-ink); }
+.kj-bar { height: 3px; margin: 0 14px; background: var(--kj-rule); border-radius: 2px; overflow: hidden; }
+.kj-bar span { display: block; height: 100%; background: var(--kj); transition: width 0.3s; }
+.kj-main { padding: 10px 16px 4px; display: grid; gap: 8px; }
+.kj-t { font-weight: 700; font-size: 1.0625rem; line-height: 1.3; }
+.kj-t-min { padding: 6px 16px 12px; font-size: 0.9375rem; }
+.kj-b { color: var(--kj-ink); }
+.kj-do { padding: 8px 10px; border-radius: 8px; background: color-mix(in srgb, var(--kj) 10%, var(--kj-bg)); }
+.kj-ok { color: var(--kj-member); font-weight: 600; }
+.kj-warn { padding: 8px 10px; border-radius: 8px; background: var(--kj-warn); font-size: 0.875rem; }
+.kj-away { font-size: 0.875rem; color: var(--kj-ink-2); }
+.kj-why { padding: 8px 10px; border-left: 3px solid var(--kj); background: color-mix(in srgb, var(--kj) 6%, var(--kj-bg)); font-size: 0.875rem; border-radius: 0 8px 8px 0; }
+.kj-why b { display: block; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--kj); }
+.kj-why a { color: var(--kj-ink); text-decoration: underline; overflow-wrap: anywhere; }
+.kj-note { font-size: 0.8125rem; color: var(--kj-ink-2); }
+.kj-act { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; padding: 10px 16px 14px; }
+.kj-btn { min-height: 44px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--kj-rule); background: var(--kj-bg); color: var(--kj-ink); font: inherit; font-weight: 600; cursor: pointer; }
+.kj-btn:disabled { opacity: 0.45; cursor: default; }
+.kj-primary { background: var(--kj); border-color: var(--kj); color: #fff; }
+:root.dark .kj-primary { color: #111; }
+.kj button:focus-visible, .kj a:focus-visible { outline: 2px solid var(--kj); outline-offset: 2px; }
+
+/* The part of the page the step is about: an outline, never a cover. */
+.kj-lit { outline: 3px solid var(--kj-c, var(--kj-owner)) !important; outline-offset: 4px; border-radius: 10px; animation: kj-pulse 1.6s ease-out 2; }
+
+/* The hand-over card between people. */
+.kj-switch { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 24px; background: var(--kj-owner); color: #fff; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+.kj-switch[data-role="member"] { background: var(--kj-member); }
+.kj-switch[data-role="assistant"] { background: var(--kj-assistant); }
+.kj-switch[data-role="proof"] { background: var(--kj-proof); }
+:root.dark .kj-switch { color: #111; }
+.kj-switch.on { opacity: 1; }
+.kj-switch-in { max-width: 34ch; text-align: center; transform: translateY(12px); transition: transform 0.45s ease-out; }
+.kj-switch.on .kj-switch-in { transform: none; }
+.kj-switch-k { margin: 0 0 8px; font: 600 0.875rem/1.4 system-ui, sans-serif; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.85; }
+.kj-switch-t { margin: 0; font: 700 clamp(1.75rem, 5vw, 2.75rem)/1.15 "Bricolage Grotesque", system-ui, sans-serif; }
+
+@keyframes kj-in { from { transform: translateY(12px); opacity: 0; } }
+@keyframes kj-pulse { 0% { outline-offset: 12px; } 100% { outline-offset: 4px; } }
+@media (prefers-reduced-motion: reduce) { .kj, .kj-lit { animation: none; } .kj-switch, .kj-switch-in, .kj-bar span { transition: none; } }
+:root[data-a11y-motion="off"] .kj, :root[data-a11y-motion="off"] .kj-lit { animation: none; }
+@media (max-width: 639px) {
+  .kj { left: 8px; right: 8px; bottom: 8px; width: auto; max-height: 46vh; }
+}
+@media print { .kj, .kj-switch { display: none; } }

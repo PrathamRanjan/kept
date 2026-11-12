@@ -284,7 +284,10 @@ export function uiApi(): Router {
   const act = (path: string, fn: (ref: string, b: any, lang: Lang) => Promise<Record<string, unknown>>) =>
     r.post(`/ui/manage/:ref/${path}`, j(async (req) => {
       await rememberLang(req);
-      return { ok: true, ...(await fn(req.params.ref, req.body ?? {}, langOf(req))) };
+      const out = await fn(req.params.ref, req.body ?? {}, langOf(req));
+      // The guided journey notices a member's own change (a convenience; never blocks the change).
+      if (["skip", "pause", "resume", "switch"].includes(path)) await tick((await subscriberByRef(await getDb(), req.params.ref))?.merchant_id, "member_changed");
+      return { ok: true, ...out };
     }));
   r.post("/ui/manage/:ref/lang", j(async (req) => {
     const s = await subscriberByRef(await getDb(), req.params.ref);
@@ -430,6 +433,7 @@ export function uiApi(): Router {
   r.post("/ui/owner/approvals/:id/:choice(approve|decline)", j(async (req) => {
     const m = await needOwner(req);
     const out = await decideApproval(req.params.id, m.id, req.params.choice === "approve", "click", "owner");
+    await tick(m.id, "approval_decided");
     return { ok: true, status: out.status, message: out.replayed ? `Already ${out.status}.` : out.status === "approved" ? "Approved. Kept will go ahead the next time this move comes up." : "Declined. Nothing moves." };
   }));
 

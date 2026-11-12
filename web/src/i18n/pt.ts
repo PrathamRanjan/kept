@@ -165,7 +165,7 @@ export const pt: Dict = {
   "c.lFailed": "Falhou",
   "c.lNext": "Próximo",
   "c.lEnded": "Encerrada",
-  "a.title": "Seja o assistente do assinante",
+  "a.title": "Deixe seu assistente de IA cuidar disso",
   "a.intro": "Digite o que você diria ao seu próprio assistente de IA. Um modelo agindo por você chama as ferramentas MCP públicas desta loja, as mesmas que o Claude ou o ChatGPT usariam. Cada chamada aparece, com a regra que a permitiu e o que o PayPal diz depois.",
   "a.sample": " Este assinante é um exemplo sem assinatura no PayPal, então o assistente pode ler, mas qualquer mudança é recusada.",
   "a.label": "O que o assistente deve fazer?",

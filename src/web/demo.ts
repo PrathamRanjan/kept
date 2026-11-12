@@ -14,6 +14,8 @@ import { KeptError, merchantById, type Merchant } from "../store.js";
 import { addAdminSection, adminBack, isAdmin } from "./admin.js";
 import { runNightly } from "../eval/nightly.js";
 import { html, layout } from "./html.js";
+import { journeyOf, journeyView, pickMember, saveJourney, START, STEPS, type StartAs } from "../demo/journey.js";
+import { normLang } from "../i18n.js";
 
 type H = (req: Request, res: Response) => Promise<unknown>;
 const page = (fn: H) => (req: Request, res: Response, next: NextFunction) => fn(req, res).catch(next);
@@ -124,6 +126,53 @@ export function demoRouter(): Router {
     const status = await workspaceStatus(out.ws, req);
     if (!req.accepts("json") || req.is("application/x-www-form-urlencoded")) return res.redirect("/demo");
     return { ok: true, created: out.created, ...status };
+  }));
+
+  /* ---------------- the guided journey (src/demo/journey.ts, public/journey.js) ---------------- */
+  // A readable flag cookie so the corner card's script only asks the server when a journey is running. The
+  // journey itself, and where it is, live in the workspace on the server.
+  const flag = (res: Response, on: boolean) =>
+    on ? res.cookie("kept_journey", "1", { sameSite: "lax", secure: config.appUrl.startsWith("https"), maxAge: IDLE_HOURS * 3600_000 }) : res.clearCookie("kept_journey");
+  const jlang = (req: Request) => normLang(req.query.lang ?? req.get("x-kept-lang"));
+  r.get("/ui/journey", j(async (req, res) => {
+    res.set("cache-control", "no-store");
+    const ws = await workspaceOf(req);
+    if (!ws) {
+      flag(res, false);
+      return { on: false };
+    }
+    const out = await journeyView(ws, jlang(req));
+    if (!out.on) flag(res, false);
+    return out;
+  }));
+  r.post("/ui/journey", j(async (req, res) => {
+    res.set("cache-control", "no-store");
+    const action = String(req.body?.action ?? "");
+    if (action === "start") {
+      if (!config.demoMode) throw new KeptError("Demo mode is off.", "not_allowed", 403);
+      // Starting the journey makes the visitor's demo shop if they have none, exactly as "Start my demo shop" does.
+      const { ws } = await ensureWorkspace(req, res);
+      const as = (["owner", "member", "assistant"].includes(req.body?.as) ? req.body.as : "owner") as StartAs;
+      await saveJourney(ws, { on: true, i: START[as], member: await pickMember(ws.tenant_id), startedAt: new Date().toISOString() });
+      flag(res, true);
+      return journeyView(ws, jlang(req));
+    }
+    const ws = await workspaceOf(req);
+    if (!ws) {
+      flag(res, false);
+      throw new KeptError("Start a demo shop first.", "not_found", 404);
+    }
+    const cur = journeyOf(ws);
+    if (action === "stop" || !cur?.on) {
+      await saveJourney(ws, cur ? { ...cur, on: false } : null);
+      flag(res, false);
+      return { on: false };
+    }
+    if (action !== "go") throw new KeptError("Unknown journey action.", "bad_request", 400);
+    const i = Math.max(0, Math.min(STEPS.length - 1, Math.floor(Number(req.body?.i))));
+    if (!Number.isFinite(i)) throw new KeptError("Which step?", "bad_request", 400);
+    await saveJourney(ws, { ...cur, i });
+    return journeyView(ws, jlang(req));
   }));
 
   r.get("/demo/status", j(async (req) => {

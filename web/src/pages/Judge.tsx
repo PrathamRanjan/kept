@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Check, Circle, Copy, ExternalLink, RotateCcw } from "lucide-react";
+import { ArrowRight, Check, Circle, Copy, ExternalLink, RotateCcw } from "lucide-react";
+import { startJourney } from "@/tours";
 import { toast } from "sonner";
 import { PublicFooter, PublicHeader } from "@/components/Shell";
 import { Button } from "@/components/ui/button";
@@ -71,6 +72,14 @@ export default function Judge() {
         <h1 className="text-4xl font-bold">{t("jd.h")}</h1>
         <p className="mt-3 max-w-[62ch] text-lg text-ink-2">{t("jd.b")}</p>
         {lang !== "en" && <p className="mt-2 text-sm text-ink-2">{t("jd.recorded")}</p>}
+        <section aria-labelledby="jr-j" className="mt-6 rounded-2xl border-2 border-stamp/40 bg-card p-5">
+          <h2 id="jr-j" className="m-0 text-xl font-semibold">{t("jd.journeyH")}</h2>
+          <p className="mt-1 mb-0 max-w-[64ch] text-ink-2">{t("jd.journeyB")}</p>
+          <Button className="mt-3" onClick={() => startJourney("owner") || toast.error(t("jr.fail"))}>
+            {t("jr.start")}
+            <ArrowRight aria-hidden="true" />
+          </Button>
+        </section>
         {err && <p role="alert" className="mt-4 text-fail">{err}</p>}
         {!d ? (
           <Skeleton className="mt-8 h-64" />

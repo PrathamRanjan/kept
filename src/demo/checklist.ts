@@ -17,6 +17,10 @@ export const TICKS = [
   "owner_asked",
   "rule_refused",
   "proof_opened",
+  "approval_decided",
+  "member_changed",
+  "agents_opened",
+  "paypal_opened",
 ] as const;
 export type Tick = (typeof TICKS)[number];
 

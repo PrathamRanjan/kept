@@ -39,7 +39,7 @@ const readJson = (rel: string): any => {
 };
 
 type Step = { text: string; button: { label: string; href: string } | null; tick: Tick | Tick[]; done: boolean; at: string | null };
-const NOV10 = "Hi, we've moved banks. Please send this month's payment to our new PayPal, accounts.emberoak@outlook.com. Thanks so much!";
+import { NOV10 } from "../demo/journey.js";
 
 async function lastUse(sql: string, args: unknown[] = []): Promise<{ at: string | null; id: string | null }> {
   const r = (await (await getDb()).query<{ at: Date | null; id: string | null }>(sql, args)).rows[0];
@@ -91,7 +91,7 @@ function paths(ref: string | null, real: boolean, ticks: Record<string, string>)
   return [
     {
       id: "assistant",
-      title: "Be the member's assistant",
+      title: "Let your AI handle it (you're the member)",
       minutes: 2,
       paypalLogin: false,
       needs: real ? null : "a real member in your shop (the pool is empty, so this path can only read)",
@@ -104,7 +104,7 @@ function paths(ref: string | null, real: boolean, ticks: Record<string, string>)
     },
     {
       id: "cancel",
-      title: "Cancel in one step yourself",
+      title: "Cancel in one step (you're the member)",
       minutes: 1,
       paypalLogin: false,
       needs: real ? null : "a real member in your shop",
@@ -116,7 +116,7 @@ function paths(ref: string | null, real: boolean, ticks: Record<string, string>)
     },
     {
       id: "owner",
-      title: "Run the shop",
+      title: "Run the shop (you're the owner)",
       minutes: 2,
       paypalLogin: false,
       needs: null,
@@ -231,7 +231,9 @@ export function publicRouter(): Router {
     return { shop: sc.name, calls, last7days: tot, note: calls.length ? null : "No model calls in the showcase shop yet; the daily showcase run (04:30 UTC) adds some each day." };
   }));
 
-  r.get("/api/public/paypal", j(async () => {
+  r.get("/api/public/paypal", j(async (req) => {
+    const ws = await workspaceOf(req);
+    if (ws) await tick(ws.tenant_id, "paypal_opened");
     const db = await getDb();
     const sc = await showcase(db);
     const latest = async (tool: string) =>

@@ -120,7 +120,7 @@ test("robot judge follows the /judge paths on the live site", async ({ page }) =
 
   await run("assistant", "open the member page and ask the assistant what's next (sample member: read only)", async () => {
     await page.goto("/judge");
-    await expect(page.getByRole("heading", { name: "Be the member's assistant" })).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByRole("heading", { name: "Let your AI handle it" })).toBeVisible({ timeout: 20_000 });
     const link = page.getByRole("link", { name: "Ask: What's my next payment?" }).first();
     await expect(link).toBeVisible({ timeout: 20_000 });
     await link.click();

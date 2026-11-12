@@ -1,6 +1,6 @@
 import { StrictMode, Suspense, lazy, useEffect } from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { PageSkeleton } from "@/components/States";
@@ -35,24 +35,10 @@ function FocusOnNavigate() {
   return null;
 }
 
-/** The guided walkthrough the persona buttons on /demo start: shows the step whose page is open (story.ts). */
-function StoryRunner() {
-  const loc = useLocation();
-  const nav = useNavigate();
-  useEffect(() => {
-    void import("./story").then((s) => s.setStoryNavigate((p) => nav(p)));
-  }, [nav]);
-  useEffect(() => {
-    void import("./story").then((s) => (s.storyActive() ? s.show() : undefined));
-  }, [loc.pathname]);
-  return null;
-}
-
 function App() {
   return (
     <BrowserRouter>
       <FocusOnNavigate />
-      <StoryRunner />
       <Suspense fallback={<div className="mx-auto max-w-5xl p-6"><PageSkeleton /></div>}>
         <Routes>
           <Route path="/" element={<Landing />} />

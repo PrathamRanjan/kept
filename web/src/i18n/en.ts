@@ -175,7 +175,7 @@ export const en = {
   "c.lNext": "Next",
   "c.lEnded": "Ended",
   // Assistant
-  "a.title": "Be the member's assistant",
+  "a.title": "Let your AI assistant handle it",
   "a.intro": "Type what you would say to your own AI assistant. A model acting for you calls this shop's public MCP tools, the same ones Claude or ChatGPT would use. Every call is listed, with the rule that allowed it and what PayPal says afterwards.",
   "a.sample": " This member is a labelled sample with no PayPal subscription, so the assistant can read but any change is refused.",
   "a.label": "What should the assistant do?",

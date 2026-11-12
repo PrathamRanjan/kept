@@ -10,6 +10,9 @@
 @custom-variant dark (&:is(.dark *));
 
 /* Kept tokens: paper, ink and a cobalt stamp pad. See docs/DESIGN_BRIEF.md. */
+/* The guided journey's people colours (public/journey.css has the card's own copy). */
+:root { --kj-owner: #2443c4; --kj-member: #1d7348; --kj-assistant: #6b3fd4; }
+.dark { --kj-owner: #93a6ff; --kj-member: #63c795; --kj-assistant: #c2a8ff; }
 :root {
   --paper: #f6f3ec;
   --card-stock: #fffdf9;

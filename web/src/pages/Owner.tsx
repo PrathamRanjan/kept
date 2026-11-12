@@ -472,7 +472,7 @@ function TodayPage({ d, reload }: { d: Today; reload: () => void }) {
         </section>
       </div>
 
-      <details className="mt-5 rounded-xl border border-rule bg-card p-5">
+      <details data-tour="activity" className="mt-5 rounded-xl border border-rule bg-card p-5">
         <summary className="flex min-h-11 cursor-pointer items-center font-semibold">Activity: every request, offer, PayPal call and webhook</summary>
         <ol className="mt-3 list-none divide-y divide-rule p-0 text-sm">
           {d.events.map((e) => (

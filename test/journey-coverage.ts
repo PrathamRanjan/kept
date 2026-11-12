@@ -93,3 +93,7 @@ export const isWave3Route = (r: string) => WAVE3_ROUTE.test(r);
 /** Look and Say and the language switch: the member's language and the talk before cancelling; walked in looksay.test.ts. */
 export const LOOKSAY_ROUTE = /^POST \/ui\/manage\/:ref\/(lang|negotiate)$/;
 export const isLookSayRoute = (r: string) => LOOKSAY_ROUTE.test(r);
+
+/** The guided journey's routes, walked in guided-journey.test.ts. */
+export const GUIDED_ROUTE = /^(GET|POST) \/ui\/journey$/;
+export const isGuidedRoute = (r: string) => GUIDED_ROUTE.test(r);

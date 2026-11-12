@@ -153,7 +153,7 @@ function dock(p: ShellPage): string {
 export function renderShell(b: Brand, p: ShellPage): string {
   const flash = flashOf(p.flash);
   const L = p.layout ?? b.layout ?? "sidebar";
-  const tail = `${p.scripts ?? ""}<script src="${b.staticBase}/a11y.js?v=${ASSET_V}" defer></script></body></html>`;
+  const tail = `${p.scripts ?? ""}<script src="${b.staticBase}/a11y.js?v=${ASSET_V}" defer></script><script src="${b.staticBase}/journey.js?v=${ASSET_V}" defer></script></body></html>`;
   if (p.mode === "app") {
     return `${head(b, `${p.title} · ${b.name}`, p.head)}
 <body class="L-${L}">

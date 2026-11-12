@@ -108,7 +108,7 @@ export function guardRouter(): Router {
           <div class="tile"><div class="label">Offers held or blocked</div><div class="big">${fair.held_offers + fair.compliance_blocked_offers}</div><div class="hint">${fair.held_offers} above autonomy, ${fair.compliance_blocked_offers} by a compliance rule</div></div>
         </div></div>
 
-      <div class="card"><h2>Policy in plain words, backtested</h2>
+      <div class="card" id="policy"><h2>Policy in plain words, backtested</h2>
         <form method="get" action="/dashboard/guard">
           <textarea name="text" rows="3" style="width:100%" placeholder="One skip per quarter. Pause up to 2 months. At most 15% off for 3 months. Remind people 7 days before a renewal. My customers are in California.">${candidateText}</textarea>
           <div class="slider"><label for="bt-slider">Discount the offer step may give without you</label><input id="bt-slider" type="range" name="pct" min="0" max="50" value="${pct}"><output id="bt-out">${pct}%</output></div>

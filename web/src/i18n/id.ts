@@ -165,7 +165,7 @@ export const id: Dict = {
   "c.lFailed": "Gagal",
   "c.lNext": "Berikutnya",
   "c.lEnded": "Berakhir",
-  "a.title": "Jadilah asisten anggota",
+  "a.title": "Biarkan asisten AI Anda yang mengurus",
   "a.intro": "Ketik apa yang akan Anda katakan ke asisten AI Anda sendiri. Model yang bertindak untuk Anda memanggil alat MCP publik toko ini, alat yang sama yang dipakai Claude atau ChatGPT. Setiap panggilan dicantumkan, dengan aturan yang mengizinkannya dan apa kata PayPal sesudahnya.",
   "a.sample": " Anggota ini contoh berlabel tanpa langganan PayPal, jadi asisten bisa membaca tetapi setiap perubahan ditolak.",
   "a.label": "Apa yang harus dilakukan asisten?",

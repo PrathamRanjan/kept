@@ -21,6 +21,8 @@ import { pendingApprovals } from "../guard/dryrun.js";
 import type { DraftPlan } from "../brain/types.js";
 
 import { ensureWorkspace } from "./demo.js";
+import { workspaceOf } from "../demo/workspaces.js";
+import { tick } from "../demo/checklist.js";
 import { telegramReady } from "../channels/index.js";
 const COOKIE = "kept_owner";
 
@@ -617,7 +619,11 @@ export function webRouter(): Router {
   /* ------------------------------------------------------------------ agents guide */
   r.get("/agents", page(async (req, res) => {
     const shops = await listPublicMerchants(await getDb());
-    const ex = shops[0]?.slug ?? "your-shop";
+    // A visitor with a demo shop sees their own shop's address, and the guided journey notices the visit.
+    const ws = await workspaceOf(req);
+    const own = ws ? await merchantById(await getDb(), ws.tenant_id) : null;
+    if (ws) await tick(ws.tenant_id, "agents_opened");
+    const ex = own?.slug ?? shops[0]?.slug ?? "your-shop";
     res.send(layout({ title: "Connect an AI agent · Kept", nav: "agents", owner: ownerNav(await ownerOf(req)) }, html`
       <h1>Connect an AI agent</h1><p class="lead muted">Kept speaks the Model Context Protocol (Streamable HTTP, stateless). Any MCP client can subscribe and manage subscriptions for its user.</p>
       <div class="grid g2">

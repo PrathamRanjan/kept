@@ -38,6 +38,15 @@ const shopSteps: DriveStep[] = [
 
 let active: Driver | null = null;
 
+type JourneyApi = { start: (as: "owner" | "member" | "assistant") => Promise<unknown>; active: () => boolean };
+/** The guided journey's script, loaded on every page from /static/journey.js; false if it isn't there. */
+export function startJourney(as: "owner" | "member" | "assistant"): boolean {
+  const j = (window as unknown as { keptJourney?: JourneyApi }).keptJourney;
+  if (!j) return false;
+  void j.start(as);
+  return true;
+}
+
 async function build(steps: DriveStep[], opts: { name: TourName; onClose: () => void }) {
   const { driver } = await loadDriver();
   active?.destroy();
@@ -71,7 +80,8 @@ async function build(steps: DriveStep[], opts: { name: TourName; onClose: () => 
 
 /** Start a page's tour. Only ever called from a button. */
 export function startTour(name: TourName, _o: { force?: boolean } = {}) {
-  void import("./story").then((s) => s.endStory());
+  // A page's own tour stays on that page. The cross-person guided journey starts only from /demo and /judge, so a
+  // real member pressing this on their own page is never moved into a demo shop.
   const steps = name === "owner" ? ownerSteps : name === "member" ? memberSteps : shopSteps;
   // Wait a frame so the page's targets exist.
   requestAnimationFrame(() => void build(steps.filter((s) => !s.element || document.querySelector(String(s.element))), { name, onClose: () => undefined }).then((d) => d.drive()));

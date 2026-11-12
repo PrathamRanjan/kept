@@ -6,7 +6,7 @@ import { PublicFooter, PublicHeader } from "@/components/Shell";
 import { Button } from "@/components/ui/button";
 import { api, ApiError } from "@/lib/api";
 import { getSession } from "@/lib/session";
-import { startStory, storyContext } from "@/story";
+import { startJourney } from "@/tours";
 import type { Session } from "@/lib/types";
 import { resetDemo, useDemoStatus } from "@/components/WorkspaceBar";
 import { useT } from "@/i18n";
@@ -39,14 +39,17 @@ export default function Demo({ judge = false }: { judge?: boolean }) {
     }
   }
 
-  /** guided: the walkthrough opens with "You are the owner of …" and walks every use case (story.ts). */
+  /** The guided journey (public/journey.js): one story across the owner, a member and the member's AI assistant. */
+  function journey(as: "owner" | "member" | "assistant") {
+    if (!startJourney(as)) toast.error(t("jr.fail"));
+  }
   async function owner(guided = true) {
+    if (guided) return journey("owner");
     setBusy(true);
     try {
       await api.post("/ui/demo/owner");
       await getSession(true);
-      if (guided) startStory("owner", await storyContext());
-      else nav("/dashboard");
+      nav("/dashboard");
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : t("demo.openFail"));
     } finally {
@@ -56,18 +59,23 @@ export default function Demo({ judge = false }: { judge?: boolean }) {
   async function go(kind: "member" | "shop", guided = false) {
     const fresh = await ensure();
     if (!fresh) return;
-    if (kind === "member" && guided && fresh.demoMemberRef) startStory("member", await storyContext());
+    if (kind === "member" && guided) journey("member");
     else if (kind === "shop") nav(`/s/${fresh.demoShop}`);
     else if (fresh.demoMemberRef) nav(`/manage/${fresh.demoMemberRef}`);
     else toast.error(t("demo.noMember"));
   }
+
+  const people = [
+    { as: "owner", icon: Store, color: "var(--kj-owner, #2443c4)", name: t("jr.owner"), what: t("jr.ownerB") },
+    { as: "member", icon: User, color: "var(--kj-member, #1d7348)", name: t("jr.member"), what: t("jr.memberB") },
+    { as: "assistant", icon: Bot, color: "var(--kj-assistant, #6b3fd4)", name: t("jr.ai"), what: t("jr.aiB") },
+  ];
 
   const personas = [
     {
       icon: Store,
       who: t("demo.ownerWho"),
       what: t("demo.ownerWhat"),
-      badge: t("demo.guided3"),
       action: (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
           <Button onClick={() => owner()} disabled={busy || s?.demoMode === false}>
@@ -84,7 +92,6 @@ export default function Demo({ judge = false }: { judge?: boolean }) {
       icon: User,
       who: t("demo.memberWho"),
       what: t("demo.memberWhat"),
-      badge: t("demo.guided1"),
       action: (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
           <Button variant="outline" onClick={() => go("member", true)} disabled={busy}>
@@ -128,8 +135,29 @@ export default function Demo({ judge = false }: { judge?: boolean }) {
             ? t("demo.judgeB")
             : t("demo.b")}
         </p>
+        <section aria-labelledby="jr-h" className="mt-8 rounded-2xl border-2 border-stamp/40 bg-card p-5 sm:p-7">
+          <h2 id="jr-h" className="m-0 text-2xl font-bold">{t("jr.h")}</h2>
+          <p className="mt-2 mb-0 max-w-[64ch] text-ink-2">{t("jr.b")}</p>
+          <ul className="mt-5 grid list-none gap-3 p-0 md:grid-cols-3" aria-label={t("jr.who")}>
+            {people.map((p) => (
+              <li key={p.as} className="rounded-xl border border-rule p-4" style={{ borderTop: `4px solid ${p.color}` }}>
+                <p className="m-0 flex items-center gap-2 font-semibold"><p.icon className="size-4 shrink-0" style={{ color: p.color }} aria-hidden="true" />{p.name}</p>
+                <p className="mt-1 mb-0 text-sm text-ink-2">{p.what}</p>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-5 flex flex-wrap items-center gap-3">
+            <Button size="lg" onClick={() => journey("owner")} disabled={s?.demoMode === false}>
+              {t("jr.start")}
+              <ArrowRight aria-hidden="true" />
+            </Button>
+            <Button variant="outline" onClick={() => journey("member")} disabled={s?.demoMode === false}>{t("jr.asMember")}</Button>
+            <Button variant="outline" onClick={() => journey("assistant")} disabled={s?.demoMode === false}>{t("jr.asAi")}</Button>
+          </div>
+          <p className="mt-3 mb-0 text-sm text-ink-2">{t("jr.note")}</p>
+        </section>
         <div className="mt-6 flex flex-wrap gap-3">
-          <Button size="lg" variant="outline" asChild>
+          <Button variant="outline" asChild>
             <a href="/judge">
               <Compass aria-hidden="true" />
               {t("demo.paths")}
@@ -166,14 +194,14 @@ export default function Demo({ judge = false }: { judge?: boolean }) {
             </>
           )}
         </section>
-        <ul className="mt-10 grid list-none gap-4 p-0 sm:grid-cols-2">
+        <h2 className="mt-12 text-2xl font-bold">{t("jr.own")}</h2>
+        <ul className="mt-4 grid list-none gap-4 p-0 sm:grid-cols-2">
           {personas.map((p) => (
             <li key={p.who} className="flex flex-col rounded-xl border border-rule bg-card p-6">
               <span className="grid size-11 place-items-center rounded-full bg-stamp-wash text-stamp">
                 <p.icon className="size-5" aria-hidden="true" />
               </span>
-              <h2 className="mt-4 text-xl font-semibold">{p.who}</h2>
-              {"badge" in p && p.badge ? <p className="m-0 mt-1 text-sm font-medium text-stamp">{p.badge}</p> : null}
+              <h3 className="mt-4 text-xl font-semibold">{p.who}</h3>
               <p className="mt-1 flex-1 text-ink-2">{p.what}</p>
               <div className="mt-5">{p.action}</div>
             </li>
