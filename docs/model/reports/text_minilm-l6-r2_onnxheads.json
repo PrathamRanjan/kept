@@ -1,0 +1,46 @@
+{
+ "quant_dir": "onnx-int8-pc",
+ "threshold_1pct_genuine_held": 0.8909257650375366,
+ "sets": {
+  "val": {
+   "n": 4205,
+   "auc": 0.9863866751101067,
+   "catch_rate_at_thr": 0.7211155378486056,
+   "genuine_held_at_thr": 0.010003705075954057
+  },
+  "test_scamshield86": {
+   "n": 8188,
+   "auc": 0.9876981993160155,
+   "catch_rate_at_thr": 0.7500831946755407,
+   "genuine_held_at_thr": 0.010997491800115763
+  },
+  "test_scamshield_evals": {
+   "n": 1574,
+   "auc": 0.9787343008402659,
+   "catch_rate_at_thr": 0.6666666666666666,
+   "genuine_held_at_thr": 0.008873114463176575
+  },
+  "test_bec_seed": {
+   "n": 200,
+   "auc": 0.5804,
+   "catch_rate_at_thr": 0.25,
+   "genuine_held_at_thr": 0.15
+  },
+  "test_dialogue": {
+   "n": 640,
+   "auc": 0.7193554687500001,
+   "catch_rate_at_thr": 0.071875,
+   "genuine_held_at_thr": 0.028125
+  },
+  "test_singlish_genuine": {
+   "n": 600,
+   "genuine_held_at_thr": 0.01
+  },
+  "test_business": {
+   "n": 200,
+   "auc": 0.8503999999999999,
+   "catch_rate_at_thr": 0.11,
+   "genuine_held_at_thr": 0.0
+  }
+ }
+}

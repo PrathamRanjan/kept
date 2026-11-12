@@ -1,0 +1,110 @@
+{
+ "base": "sentence-transformers/all-MiniLM-L6-v2",
+ "n_finetune": 10000,
+ "threshold_1pct_genuine_held": 0.8982545733451843,
+ "sets": {
+  "val": {
+   "n": 4205,
+   "auc": 0.9864959084250867,
+   "catch_rate_at_thr": 0.7051792828685259,
+   "genuine_held_at_thr": 0.010003705075954057
+  },
+  "test_scamshield86": {
+   "n": 8188,
+   "auc": 0.9871957567665699,
+   "catch_rate_at_thr": 0.7294509151414309,
+   "genuine_held_at_thr": 0.010997491800115763
+  },
+  "test_scamshield_evals": {
+   "n": 1574,
+   "auc": 0.9782162062373827,
+   "catch_rate_at_thr": 0.6621923937360179,
+   "genuine_held_at_thr": 0.00709849157054126,
+   "baseline_tfidf_auc": 0.9837623990360662
+  },
+  "test_bec_seed": {
+   "n": 200,
+   "auc": 0.5921000000000001,
+   "catch_rate_at_thr": 0.25,
+   "genuine_held_at_thr": 0.16,
+   "baseline_tfidf_auc": 0.5078
+  },
+  "test_dialogue": {
+   "n": 640,
+   "auc": 0.721953125,
+   "catch_rate_at_thr": 0.059375,
+   "genuine_held_at_thr": 0.025,
+   "baseline_tfidf_auc": 0.709677734375
+  },
+  "test_singlish_genuine": {
+   "n": 600,
+   "genuine_held_at_thr": 0.011666666666666667
+  },
+  "test_business": {
+   "n": 200,
+   "auc": 0.8481,
+   "catch_rate_at_thr": 0.06,
+   "genuine_held_at_thr": 0.0
+  }
+ },
+ "tactics_on_test_scamshield86_scam": {
+  "impersonation": {
+   "precision": 0.6470588235294118,
+   "recall": 0.042801556420233464,
+   "f1": 0.08029197080291971,
+   "positives": 257,
+   "label_source": "labelled"
+  },
+  "urgency_secrecy": {
+   "precision": 0.3503289473684211,
+   "recall": 0.6273932253313697,
+   "f1": 0.4496042216358839,
+   "positives": 679,
+   "label_source": "labelled"
+  },
+  "changed_details": {
+   "precision": 0.0,
+   "recall": 0.0,
+   "f1": 0.0,
+   "positives": 22,
+   "label_source": "weak"
+  },
+  "off_platform": {
+   "precision": 0.0,
+   "recall": 0.0,
+   "f1": 0.0,
+   "positives": 32,
+   "label_source": "weak"
+  },
+  "gift_cards_crypto": {
+   "precision": 0.0,
+   "recall": 0.0,
+   "f1": 0.0,
+   "positives": 11,
+   "label_source": "weak"
+  },
+  "fee_to_release": {
+   "precision": 0.4444444444444444,
+   "recall": 0.008492569002123142,
+   "f1": 0.016666666666666666,
+   "positives": 471,
+   "label_source": "labelled"
+  },
+  "otp_or_link": {
+   "precision": 0.7737430167597765,
+   "recall": 0.8195266272189349,
+   "f1": 0.7959770114942529,
+   "positives": 676,
+   "label_source": "weak"
+  },
+  "too_good": {
+   "precision": 0.46225382932166303,
+   "recall": 0.8596134282807731,
+   "f1": 0.6012095339736748,
+   "positives": 983,
+   "label_source": "labelled"
+  }
+ },
+ "onnx_int8_mb": 22.9,
+ "train_seconds": 1165
+}

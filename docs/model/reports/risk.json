@@ -1,0 +1,7 @@
+{
+ "synthetic": true,
+ "auc_synthetic_holdout": 0.8850343517447792,
+ "monotone_violations": 0,
+ "n_train": 80000,
+ "size_kb": 1692
+}
