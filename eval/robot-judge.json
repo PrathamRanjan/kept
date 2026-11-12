@@ -1,65 +1,66 @@
 {
  "suite": "robot-judge",
- "title": "Robot judge: the /judge paths, followed by a browser on the live site",
- "about": "A Playwright browser opened https://pph-kept.onrender.com, started a demo shop with no real PayPal subscriptions, and did what each /judge step says. Seconds per path: public 5.8 s, start 11.6 s, owner 27.4 s, assistant 7.7 s. Total 53 s.",
+ "title": "Robot judge: the guided journey, followed by a browser on the live site",
+ "about": "A Playwright browser opened https://pph-kept.onrender.com, started a demo shop with no real PayPal subscriptions, started the guided journey and did what each step's card asks. Seconds per path: public 7.4 s, start 2.2 s, owner 19.3 s, assistant 12.5 s, proof 1.1 s. Total 43 s.",
  "model": null,
  "runner": "Playwright, run by hand",
- "run_at": "2026-11-12T17:45:59.471Z",
+ "run_at": "2026-11-12T18:52:25.158Z",
  "base": "https://pph-kept.onrender.com",
  "seconds_per_path": {
-  "public": 5.8,
-  "start": 11.6,
-  "owner": 27.4,
-  "assistant": 7.7
+  "public": 7.4,
+  "start": 2.2,
+  "owner": 19.3,
+  "assistant": 12.5,
+  "proof": 1.1
  },
  "cases": [
   {
    "id": "r01",
    "input": "public: open /, axe, no sideways scroll at 1440px and at 200% text",
    "expected": "works",
-   "actual": "HTTP 200, axe clean (29 rules passed) (1.2 s)",
+   "actual": "HTTP 200, axe clean (27 rules passed) (1.4 s)",
    "pass": true
   },
   {
    "id": "r02",
-   "input": "public: open /judge, axe, no sideways scroll at 1440px and at 200% text",
+   "input": "public: open /demo, axe, no sideways scroll at 1440px and at 200% text",
    "expected": "works",
-   "actual": "HTTP 200, axe clean (24 rules passed) (0.7 s)",
+   "actual": "HTTP 200, axe clean (28 rules passed) (0.8 s)",
    "pass": true
   },
   {
    "id": "r03",
    "input": "public: open /proof, axe, no sideways scroll at 1440px and at 200% text",
    "expected": "works",
-   "actual": "HTTP 200, axe clean (23 rules passed) (0.7 s)",
+   "actual": "HTTP 200, axe clean (29 rules passed) (1.8 s)",
    "pass": true
   },
   {
    "id": "r04",
    "input": "public: open /ai, axe, no sideways scroll at 1440px and at 200% text",
    "expected": "works",
-   "actual": "HTTP 200, axe clean (28 rules passed) (0.8 s)",
+   "actual": "HTTP 200, axe clean (28 rules passed) (0.7 s)",
    "pass": true
   },
   {
    "id": "r05",
    "input": "public: open /paypal, axe, no sideways scroll at 1440px and at 200% text",
    "expected": "works",
-   "actual": "HTTP 200, axe clean (23 rules passed) (0.6 s)",
+   "actual": "HTTP 200, axe clean (23 rules passed) (0.7 s)",
    "pass": true
   },
   {
    "id": "r06",
    "input": "public: open /who-can-move-money, axe, no sideways scroll at 1440px and at 200% text",
    "expected": "works",
-   "actual": "HTTP 200, axe clean (28 rules passed) (0.6 s)",
+   "actual": "HTTP 200, axe clean (28 rules passed) (0.7 s)",
    "pass": true
   },
   {
    "id": "r07",
    "input": "public: open /accessibility, axe, no sideways scroll at 1440px and at 200% text",
    "expected": "works",
-   "actual": "HTTP 200, axe clean (29 rules passed) (0.7 s)",
+   "actual": "HTTP 200, axe clean (29 rules passed) (0.8 s)",
    "pass": true
   },
   {
@@ -71,51 +72,51 @@
   },
   {
    "id": "r09",
-   "input": "start: start a demo shop (no pool subscriptions)",
+   "input": "start: start a demo shop (no pool subscriptions) and the guided journey as the owner",
    "expected": "works",
-   "actual": "workspace ws_mg5ocqjg8tj5r2ye, 40 sample members, pool skipped (11.6 s)",
+   "actual": "workspace ws_ofqbwhy6eemzbur8, 40 sample members, pool skipped, 16 steps (2.2 s)",
    "pass": true
   },
   {
    "id": "r10",
    "input": "owner: Ask the AI why people are cancelling",
    "expected": "works",
-   "actual": "Answered by gpt-6.1-sol in 12.0 s, using the tools listed alongside. Every number comes from a tool; code checked each c (19.6 s)",
+   "actual": "Answered by gpt-6.1-sol in 6.3 s, using the tools listed alongside. Every number comes from a tool; code checked each ci (10.5 s)",
    "pass": true
   },
   {
    "id": "r11",
    "input": "owner: Write a rule the law forbids; it is refused with the citation",
    "expected": "works",
-   "actual": "Not used: [KEPT-OFFER] More than one offer before a cancel is refused: ROSCA §8403(3) and Cal. Bus. & Prof. Code §17602(d) require cancellat (4.4 s)",
+   "actual": "Not used: [KEPT-OFFER] More than one offer before a cancel is refused: ROSCA §8403(3) and Cal. Bus. & Prof. Code §17602(d) require cancellat (6.6 s)",
    "pass": true
   },
   {
    "id": "r12",
-   "input": "owner: Check the 10 Nov scam message; it is held",
+   "input": "owner: Check the fake new-account message; it is held",
    "expected": "works",
-   "actual": "hold; rules hold, code hold, Decisions hold (1.3 s)",
+   "actual": "hold; rules hold, code hold, Decisions hold (1.7 s)",
    "pass": true
   },
   {
    "id": "r13",
-   "input": "owner: Open /proof",
+   "input": "owner: the journey ticked the Ask, rule and scam steps by itself",
    "expected": "works",
-   "actual": "8 suites listed (1.7 s)",
+   "actual": "3 of 3 ticked (0.5 s)",
    "pass": true
   },
   {
    "id": "r14",
-   "input": "owner: the judge page ticked all four owner steps by itself",
+   "input": "assistant: open the member page and ask the assistant what's next (sample member: read only)",
    "expected": "works",
-   "actual": "4 of 4 done (0.4 s)",
+   "actual": "answered; By gpt-6.1-sol in 6.4 s. A sample member: nothing was sent to PayPal. (12.5 s)",
    "pass": true
   },
   {
    "id": "r15",
-   "input": "assistant: open the member page and ask the assistant what's next (sample member: read only)",
+   "input": "proof: Open /proof",
    "expected": "works",
-   "actual": "answered; By gpt-6.1-sol in 5.6 s. A sample member: nothing was sent to PayPal. (7.7 s)",
+   "actual": "8 suites listed (1.1 s)",
    "pass": true
   }
  ],
