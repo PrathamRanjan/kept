@@ -1,65 +1,65 @@
 {
  "suite": "robot-judge",
  "title": "Robot judge: the /judge paths, followed by a browser on the live site",
- "about": "A Playwright browser opened https://pph-kept.onrender.com, started a demo shop with no real PayPal subscriptions, and did what each /judge step says. Seconds per path: public 6.3 s, start 3.4 s, owner 22.6 s, assistant 7.4 s. Total 40 s.",
+ "about": "A Playwright browser opened https://pph-kept.onrender.com, started a demo shop with no real PayPal subscriptions, and did what each /judge step says. Seconds per path: public 6.4 s, start 2.5 s, owner 23 s, assistant 8.4 s. Total 40 s.",
  "model": null,
  "runner": "Playwright, run by hand",
- "run_at": "2026-11-11T15:59:11.493Z",
+ "run_at": "2026-11-12T06:30:10.722Z",
  "base": "https://pph-kept.onrender.com",
  "seconds_per_path": {
-  "public": 6.3,
-  "start": 3.4,
-  "owner": 22.6,
-  "assistant": 7.4
+  "public": 6.4,
+  "start": 2.5,
+  "owner": 23,
+  "assistant": 8.4
  },
  "cases": [
   {
    "id": "r01",
    "input": "public: open /, axe, no sideways scroll at 1440px and at 200% text",
    "expected": "works",
-   "actual": "HTTP 200, axe clean (27 rules passed) (0.8 s)",
+   "actual": "HTTP 200, axe clean (29 rules passed) (0.8 s)",
    "pass": true
   },
   {
    "id": "r02",
    "input": "public: open /judge, axe, no sideways scroll at 1440px and at 200% text",
    "expected": "works",
-   "actual": "HTTP 200, axe clean (20 rules passed) (0.7 s)",
+   "actual": "HTTP 200, axe clean (23 rules passed) (0.7 s)",
    "pass": true
   },
   {
    "id": "r03",
    "input": "public: open /proof, axe, no sideways scroll at 1440px and at 200% text",
    "expected": "works",
-   "actual": "HTTP 200, axe clean (26 rules passed) (1.6 s)",
+   "actual": "HTTP 200, axe clean (29 rules passed) (1.6 s)",
    "pass": true
   },
   {
    "id": "r04",
    "input": "public: open /ai, axe, no sideways scroll at 1440px and at 200% text",
    "expected": "works",
-   "actual": "HTTP 200, axe clean (25 rules passed) (0.7 s)",
+   "actual": "HTTP 200, axe clean (28 rules passed) (0.8 s)",
    "pass": true
   },
   {
    "id": "r05",
    "input": "public: open /paypal, axe, no sideways scroll at 1440px and at 200% text",
    "expected": "works",
-   "actual": "HTTP 200, axe clean (23 rules passed) (0.7 s)",
+   "actual": "HTTP 200, axe clean (26 rules passed) (0.6 s)",
    "pass": true
   },
   {
    "id": "r06",
    "input": "public: open /who-can-move-money, axe, no sideways scroll at 1440px and at 200% text",
    "expected": "works",
-   "actual": "HTTP 200, axe clean (25 rules passed) (0.7 s)",
+   "actual": "HTTP 200, axe clean (28 rules passed) (0.7 s)",
    "pass": true
   },
   {
    "id": "r07",
    "input": "public: open /accessibility, axe, no sideways scroll at 1440px and at 200% text",
    "expected": "works",
-   "actual": "HTTP 200, axe clean (25 rules passed) (0.7 s)",
+   "actual": "HTTP 200, axe clean (29 rules passed) (0.8 s)",
    "pass": true
   },
   {
@@ -73,14 +73,14 @@
    "id": "r09",
    "input": "start: start a demo shop (no pool subscriptions)",
    "expected": "works",
-   "actual": "workspace ws_4dg85onhy6rh3t2i, 40 sample members, pool skipped (3.4 s)",
+   "actual": "workspace ws_siyixbtoxxpq7a3y, 40 sample members, pool skipped (2.5 s)",
    "pass": true
   },
   {
    "id": "r10",
    "input": "owner: Ask the AI why people are cancelling",
    "expected": "works",
-   "actual": "Answered by gpt-6.1-sol in 10.3 s, using the tools listed alongside. Every number comes from a tool; code checked each c (14.9 s)",
+   "actual": "Answered by gpt-6.1-sol in 11.6 s, using the tools listed alongside. Every number comes from a tool; code checked each c (14.8 s)",
    "pass": true
   },
   {
@@ -94,28 +94,28 @@
    "id": "r12",
    "input": "owner: Check the 10 Nov scam message; it is held",
    "expected": "works",
-   "actual": "hold; rules hold, code hold, Decisions hold (1.4 s)",
+   "actual": "hold; rules hold, code hold, Decisions hold (1.6 s)",
    "pass": true
   },
   {
    "id": "r13",
    "input": "owner: Open /proof",
    "expected": "works",
-   "actual": "7 suites listed (1.6 s)",
+   "actual": "8 suites listed (1.4 s)",
    "pass": true
   },
   {
    "id": "r14",
    "input": "owner: the judge page ticked all four owner steps by itself",
    "expected": "works",
-   "actual": "4 of 4 done (0.5 s)",
+   "actual": "4 of 4 done (1 s)",
    "pass": true
   },
   {
    "id": "r15",
    "input": "assistant: open the member page and ask the assistant what's next (sample member: read only)",
    "expected": "works",
-   "actual": "answered; By gpt-6.1-sol in 4.8 s. The model chose the tools; Kept's rules and gate decided; PayPal made the c (7.4 s)",
+   "actual": "answered; By gpt-6.1-sol in 5.3 s. A sample member: nothing was sent to PayPal. (8.4 s)",
    "pass": true
   }
  ],
