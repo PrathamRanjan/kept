@@ -360,7 +360,7 @@ Each item was built, tested (`npm test`: 167 of 167; `npm run e2e`: 28 of 28), p
 
 A change goes to `main` only when all of these pass. This is a checklist run by hand: there is no CI workflow that blocks a push.
 
-1. `npm test`: all suites (210 tests today), including route coverage.
+1. `npm test`: all suites (211 tests today), including route coverage.
 2. `cd web && npx tsc -b && npx vite build`.
 3. `npm run e2e`: all browser tests on phone and desktop, axe with no serious or critical issues (45 today, 3 skipped by design on the phone).
 4. When AI behaviour changes, the eval sets on real models:
@@ -425,10 +425,11 @@ Extra features on top of the core flow. The core flow (subscribe, skip, pause, r
 - The member's language from sign-up was never saved. A test caught it.
 - A slow first frame from the tracker counted as "looked away" and stopped hands-free at once. The look-away stop now counts only after a face has been seen.
 - The simulation's glance at the first button lasted long enough to click it.
+- On the live site the talk returned 500: the Decisions API needs an "other" choice on every choice question, and only the real-model path builds that question. Fixed, with a test that runs the model path against a stubbed Decisions endpoint.
 
 ### Tests
 
-- `npm test`: **210 tests, 21 files**, including `test/looksay.test.ts` (30) and `test/i18n.test.ts` (13):
+- `npm test`: **211 tests, 21 files**, including `test/looksay.test.ts` (31, one with a stubbed Decisions model) and `test/i18n.test.ts` (13):
   - limit and stance reading
   - the referee
   - agreed, no-deal, injection, Hindi, sample and lapse cases

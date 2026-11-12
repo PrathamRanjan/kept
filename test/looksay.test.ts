@@ -1,6 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
 import { openDb, setDb, type Db } from "../src/db.js";
+import { config } from "../src/config.js";
+import { setProviderFetch } from "../src/ai/provider.js";
 import { setBrain } from "../src/brain/index.js";
 import { LocalBrain } from "../src/brain/local.js";
 import { setPayPalFactory } from "../src/paypal/index.js";
@@ -140,6 +142,39 @@ describe("the talk before cancelling (two moves each, code referee)", () => {
     expect(r.status).toBe("agreed");
     expect(r.transcript[0].text).toMatch(/[ऀ-ॿ]/);
     expect((await subscriberByRef(db, x.ref))!.lang).toBe("hi-IN");
+  });
+  it("with a model configured: the Decisions question is valid and the model only reads the stance", async () => {
+    const saved = { brain: config.brain, provider: config.ai.provider, key: config.ai.openaiKey };
+    const sent: any[] = [];
+    (config as any).brain = "openai";
+    (config.ai as any).provider = "openai";
+    (config.ai as any).openaiKey = "sk-test";
+    setProviderFetch((async (url: string, init: RequestInit) => {
+      const body = JSON.parse(String(init.body));
+      sent.push({ url, body });
+      const answers = body.questions.map((q: any) =>
+        q.type === "choice" ? { type: "choice", name: q.name, choice: q.name === "would_stay_for" ? "cheaper" : "too_expensive" } : { type: "predicate", name: q.name, probability: 0.02 },
+      );
+      return new Response(JSON.stringify({ model: "gpt-6-luna", answers, usage: { input_tokens: 100, output_tokens: 0 } }), { status: 200 });
+    }) as unknown as typeof fetch);
+    try {
+      const x = await member("Model Reader");
+      // The member names no limit and no kind: code reads "any", the model reads "cheaper".
+      const r = (await c.postJson(`/ui/manage/${x.ref}/negotiate`, { words: "honestly I'm not sure it's worth it" })).json;
+      expect(r.ok).toBe(true);
+      expect(r.model).toBe("gpt-6-luna");
+      expect(r.ask.stance).toBe("cheaper");
+      expect(r.ask.maxPrice).toBeNull();
+      const q = sent.find((k) => k.body.questions.some((y: any) => y.name === "would_stay_for"))!;
+      expect(q.url).toMatch(/\/v1\/decisions$/);
+      expect(q.body.questions[0].choices.map((ch: any) => ch.value)).toContain("other");
+      expect(await status(x.ref)).toBe("ACTIVE");
+    } finally {
+      setProviderFetch(null);
+      (config as any).brain = saved.brain;
+      (config.ai as any).provider = saved.provider;
+      (config.ai as any).openaiKey = saved.key;
+    }
   });
   it("a sample member never gets a real offer", async () => {
     const x = await member("Gil Sample");

@@ -746,6 +746,7 @@ export async function negotiateCancel(ref: string, words: string, lang: Lang, ac
             { value: "fewer", description: "Getting less, or less often" },
             { value: "any", description: "They did not say, or anything reasonable" },
             { value: "nothing", description: "Nothing: they want no offers and just want to cancel" },
+            { value: "other", description: "Something else, or it is unclear" },
           ] }],
           { purpose: "negotiate_member", ws: m.id, runId: run.id, summary: clean.slice(0, 160) },
         );
